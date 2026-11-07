@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { applyMessage, historyToItems, streamDelta, type ChatItem } from "./lib/claudeItems";
 import { socket, type ConnectionStatus } from "./lib/socket";
 import { load, save } from "./lib/storage";
+import { assignCopies, LEAVE_MS, type CopyState } from "./lib/workerCopies";
 import type {
   AgentActivity,
   Attachment,
@@ -19,6 +20,7 @@ import type {
   WorkerChat,
   WorkerChatSummary,
   WorkerInfo,
+  WorkerRequest,
   WorkerSettings,
 } from "./protocol";
 
@@ -78,6 +80,10 @@ type State = {
   cwd: string;
   workers: WorkerInfo[];
   activity: Record<string, AgentActivity>;
+  /** İşçilere giden istekler (bütün Claude oturumlarından ve doğrudan sohbetlerden) */
+  workerRequests: WorkerRequest[];
+  /** 3D ofiste hangi işi hangi işçi kopyası yapıyor */
+  workerCopies: CopyState;
   jobs: JobInfo[];
   selected: string;
 
@@ -123,6 +129,8 @@ export const useApp = create<State>(() => ({
   cwd: load("cwd", ""),
   workers: [],
   activity: {},
+  workerRequests: [],
+  workerCopies: { base: {}, copies: {} },
   jobs: [],
   selected: load("selected", CLAUDE_ID),
   sessions: [],
@@ -407,6 +415,15 @@ function onServer(msg: ServerMsg) {
     case "workers": {
       const selectedGone = s.selected !== CLAUDE_ID && !msg.workers.some((w) => w.id === s.selected);
       set({ workers: msg.workers, ...(selectedGone ? { selected: CLAUDE_ID } : {}) });
+      return;
+    }
+
+    case "worker.requests": {
+      set({ workerRequests: msg.requests, workerCopies: assignCopies(s.workerCopies, msg.requests, Date.now()) });
+      // Odadan çıkan kopyalar yürüyüp gittikten sonra silinsin
+      if (Object.values(get().workerCopies.copies).some((c) => c.leavingAt)) {
+        setTimeout(() => set({ workerCopies: assignCopies(get().workerCopies, get().workerRequests, Date.now()) }), LEAVE_MS + 50);
+      }
       return;
     }
 

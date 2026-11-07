@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Worker } from "./agents.js";
 import { bus } from "./events.js";
-import type { JobInfo } from "./protocol.js";
+import type { JobInfo, WorkerCaller } from "./protocol.js";
 import { runWorkerTask } from "./workerTasks.js";
 
 /**
@@ -21,7 +21,7 @@ function changed() {
   bus.emit("jobs");
 }
 
-export function startJob(args: { worker: Worker; task: string; files?: string[]; cwd: string }): JobInfo {
+export function startJob(args: { worker: Worker; task: string; files?: string[]; cwd?: string; caller: WorkerCaller }): JobInfo {
   const job: JobInfo = {
     id: randomUUID().slice(0, 8),
     workerId: args.worker.id,

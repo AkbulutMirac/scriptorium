@@ -21,6 +21,8 @@ import { loadWorkers, saveWorkers } from "./agents.js";
 import { ClaudeSession } from "./claude.js";
 import { config, SERVER_ROOT } from "./config.js";
 import { bus, reportActivity } from "./events.js";
+import { createMcpHandler } from "./mcpHttp.js";
+import { listRequests } from "./requests.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { isIgnoredPath, listDir, listProjects } from "./projects.js";
@@ -58,6 +60,7 @@ bus.on("activity", (a) => {
   broadcast({ type: "activity", activity: a });
 });
 bus.on("jobs", () => broadcast({ type: "jobs", jobs: listJobs() }));
+bus.on("requests", () => broadcast({ type: "worker.requests", requests: listRequests() }));
 
 // ─── DeepSeek bakiyesi: açılışta, 5 dakikada bir ve her DeepSeek işinden sonra ─────
 let lastBalance: Awaited<ReturnType<typeof deepseekBalance>> | null = null;
@@ -67,10 +70,15 @@ async function refreshBalance() {
   broadcast({ type: "deepseek.balance", balance: lastBalance });
 }
 setInterval(refreshBalance, 5 * 60_000);
-bus.on("activity", async (a) => {
-  if (a.status === "working") return;
-  const w = (await loadWorkers()).find((x) => x.id === a.agentId);
-  if (w?.provider !== "deepseek") return;
+// Bir DeepSeek isteği bitince (ya da hata verince) bakiyeyi yenile
+let runningIds = new Map<string, string>();
+bus.on("requests", async () => {
+  const now = new Map(listRequests().filter((r) => r.status === "running").map((r) => [r.id, r.workerId]));
+  const finished = [...runningIds].filter(([id]) => !now.has(id)).map(([, workerId]) => workerId);
+  runningIds = now;
+  if (!finished.length) return;
+  const workers = await loadWorkers();
+  if (!finished.some((id) => workers.find((w) => w.id === id)?.provider === "deepseek")) return;
   if (balanceTimer) clearTimeout(balanceTimer);
   balanceTimer = setTimeout(refreshBalance, 2000); // harcama bakiyeye birkaç saniyede yansır
 });
@@ -145,6 +153,7 @@ function openChat(
     additionalDirectories: state.dirs,
     model: opts.model,
     effort: opts.effort,
+    workerTools: "http",
     onMessage: (message) => {
       broadcast({ type: "claude.message", chatId, message });
       const sid = state.session.sessionId;
@@ -201,6 +210,7 @@ function getInfoSession(): ClaudeSession {
   if (!infoSession) {
     const s = new ClaudeSession({
       cwd: config.claudeCwd,
+      workerTools: "http",
       onMessage: () => {},
       canUseTool: async () => ({ behavior: "deny", message: "Bilgi oturumu araç kullanmaz." }),
     });
@@ -475,7 +485,13 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse) {
   res.end(await readFile(file));
 }
 
+const handleMcp = createMcpHandler(ALLOWED_ORIGINS);
+
 const server = createServer((req, res) => {
+  if (req.url === "/mcp" || req.url?.startsWith("/mcp?")) {
+    handleMcp(req, res);
+    return;
+  }
   if (req.url === "/api/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
@@ -511,6 +527,7 @@ wss.on("connection", async (ws) => {
   reply(ws, { type: "welcome", cwd: config.claudeCwd });
   reply(ws, { type: "workers", workers: await workersWithAvailability() });
   reply(ws, { type: "jobs", jobs: listJobs() });
+  reply(ws, { type: "worker.requests", requests: listRequests() });
   for (const a of lastActivity.values()) reply(ws, { type: "activity", activity: a });
   if (lastBalance) reply(ws, { type: "deepseek.balance", balance: lastBalance });
   else refreshBalance();

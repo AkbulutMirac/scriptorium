@@ -22,7 +22,26 @@ export type WorkerInfo = {
 
 export type AgentStatus = "idle" | "working" | "error";
 
-/** 3D kütüphanedeki karakterleri hareket ettiren olay. agentId "claude" ya da bir işçi id'si. */
+/** İşi kim verdi: bir Claude oturumu (label: proje klasörü) ya da kullanıcı (doğrudan sohbet) */
+export type WorkerCaller = { kind: "claude" | "user"; label?: string };
+
+/**
+ * İşçiye giden tek bir istek. Aynı işçiye aynı anda birden fazla oturumdan iş gelebilir:
+ * 3D ofiste her çalışan istek ayrı bir işçi kopyası olarak görünür.
+ */
+export type WorkerRequest = {
+  id: string;
+  workerId: string;
+  /** queued: işçinin aynı anda kaldırabileceği iş sınırı dolu, sırada bekliyor */
+  status: "queued" | "running" | "error";
+  task: string;
+  error?: string;
+  caller: WorkerCaller;
+  createdAt: number;
+  startedAt?: number;
+};
+
+/** 3D kütüphanedeki Claude karakterini hareket ettiren olay (işçiler WorkerRequest kullanır). */
 export type AgentActivity = {
   agentId: string;
   status: AgentStatus;
@@ -251,6 +270,7 @@ export type ServerMsg =
   | { type: "workers"; workers: WorkerInfo[] }
   | { type: "activity"; activity: AgentActivity }
   | { type: "jobs"; jobs: JobInfo[] }
+  | { type: "worker.requests"; requests: WorkerRequest[] }
   | { type: "error"; message: string };
 
 /** Sunucu tarafında saklanan izin önerileri (arayüze gönderilmez). */

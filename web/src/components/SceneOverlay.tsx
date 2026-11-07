@@ -3,12 +3,11 @@ import { Plus } from "lucide-react";
 import { truncate } from "../lib/format";
 import { actions, agentMeta, CLAUDE_ID, useApp } from "../store";
 
-const STATUS_TEXT = { idle: "boşta", working: "çalışıyor", error: "hata" } as const;
-
 /** 3D sahnenin üstündeki düğmeler ve ajan durum listesi */
 export function SceneOverlay() {
   const workers = useApp((s) => s.workers);
   const activity = useApp((s) => s.activity);
+  const requests = useApp((s) => s.workerRequests);
   const selected = useApp((s) => s.selected);
   const ids = [CLAUDE_ID, ...workers.map((w) => w.id)];
 
@@ -23,26 +22,41 @@ export function SceneOverlay() {
       <ul className="absolute bottom-3 left-3 z-30 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5" aria-label="Ajanların durumu">
         {ids.map((id) => {
           const meta = agentMeta(id, workers);
-          const a = activity[id];
-          const status = a?.status ?? "idle";
           const worker = workers.find((w) => w.id === id);
-          const offline = worker && worker.available && !worker.available.ok;
+          const mine = requests.filter((r) => r.workerId === id);
+          const running = worker ? mine.filter((r) => r.status === "running") : [];
+          const queued = mine.filter((r) => r.status === "queued").length;
+          const failed = mine.find((r) => r.status === "error");
+          const a = worker ? undefined : activity[id];
+          const working = worker ? running.length > 0 : a?.status === "working";
+          const error = worker ? !!failed : a?.status === "error";
+          const offline = worker?.available && !worker.available.ok;
+          const status = working
+            ? `çalışıyor${running.length > 1 ? ` ×${running.length}` : ""}`
+            : error
+              ? "hata"
+              : offline
+                ? "ulaşılamıyor"
+                : "boşta";
+          const task = worker ? running[0]?.task : a?.task;
+          const title = worker
+            ? [...running.map((r) => `• ${truncate(r.task, 80)}`), failed?.error, worker.available?.reason].filter(Boolean).join("\n")
+            : (a?.task ?? a?.error ?? "");
           return (
             <li key={id}>
               <button
                 type="button"
                 onClick={() => actions.selectAgent(id)}
-                title={a?.task ?? a?.error ?? worker?.available?.reason ?? ""}
+                title={title}
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs backdrop-blur transition ${
                   selected === id ? "border-accent bg-surface" : "border-separator bg-surface/80 hover:bg-surface"
                 }`}
               >
                 <span className="size-2 rounded-full" style={{ background: meta.color }} />
                 <span className="font-medium">{meta.name}</span>
-                <span className={status === "working" ? "text-accent" : status === "error" ? "text-danger" : "text-muted"}>
-                  {offline && status === "idle" ? "ulaşılamıyor" : STATUS_TEXT[status]}
-                </span>
-                {status === "working" && a?.task && <span className="hidden max-w-40 truncate text-muted xl:inline">· {truncate(a.task, 40)}</span>}
+                <span className={working ? "text-accent" : error ? "text-danger" : "text-muted"}>{status}</span>
+                {queued > 0 && <span className="text-muted">· {queued} sırada</span>}
+                {working && task && running.length <= 1 && <span className="hidden max-w-40 truncate text-muted xl:inline">· {truncate(task, 40)}</span>}
               </button>
             </li>
           );

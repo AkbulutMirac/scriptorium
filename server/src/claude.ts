@@ -6,9 +6,10 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import path from "node:path";
 import { config } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
-import { createWorkerServer } from "./workerTools.js";
+import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
 
 /** Kullanıcı mesajlarını SDK'ya akış halinde veren basit kuyruk. Oturum açık kaldıkça yeni mesaj beklenir. */
 class MessageQueue implements AsyncIterable<SDKUserMessage> {
@@ -43,11 +44,9 @@ class MessageQueue implements AsyncIterable<SDKUserMessage> {
   }
 }
 
-const SYSTEM_APPEND = [
-  "Bu oturum Scriptorium arayüzünden açıldı. Sen baş yazıcısın (patron): mcp__workers__* araçlarıyla",
-  "DeepSeek ve local LLM işçilerine iş devredebilirsin (list_workers, ask_worker, uzun işler için start_job ve job_status).",
-  "Ne zaman devredeceğine sen karar verirsin; araç açıklamalarındaki kurallara uy. Kullanıcı bir işçiyi adıyla isterse onu kullan.",
-].join(" ");
+// Ne zaman devredileceği kullanıcının CLAUDE.md'sinde, araçların nasıl kullanılacağı MCP talimatında yazıyor.
+const SYSTEM_APPEND =
+  "Bu oturum Scriptorium arayüzünden açıldı. Kullanıcı yazdıklarını ve işçilerin (mcp__scriptorium__*) çalışmasını 3D ofiste canlı görüyor.";
 
 export type ClaudeSessionOptions = {
   cwd?: string;
@@ -59,9 +58,20 @@ export type ClaudeSessionOptions = {
   additionalDirectories?: string[];
   model?: string;
   effort?: EffortLevel;
+  /**
+   * İşçi araçları nereden gelsin. "http": çalışan Scriptorium sunucusunun /mcp adresi (bütün Claude Code
+   * oturumlarıyla aynı sıralar). "sdk": süreç içi sunucu (sunucusuz çalışan CLI için).
+   */
+  workerTools?: "http" | "sdk";
   onMessage: (msg: SDKMessage) => void;
   canUseTool: CanUseTool;
 };
+
+/**
+ * İzin sormadan çalışacak işçi araçları. Kullanıcının kendi eklediği (user) ya da bizim verdiğimiz
+ * (sdk, dynamic) "scriptorium" sunucusu; bir projenin .mcp.json'ındaki aynı adlı sunucu sayılmaz.
+ */
+const TRUSTED_WORKER_SOURCES = new Set(["sdk", "dynamic", "user"]);
 
 /** Arkada çalışan Claude Code'a bağlı tek bir sohbet oturumu. */
 export class ClaudeSession {
@@ -86,10 +96,16 @@ export class ClaudeSession {
         effort: opts.effort,
         includePartialMessages: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
-        mcpServers: { workers: createWorkerServer(cwd) },
+        // Kullanıcı sunucuyu genel ayarlarına eklediyse (claude mcp add) o kullanılır; ikisi de aynı adrese gider.
+        mcpServers: {
+          [WORKER_SERVER_NAME]:
+            opts.workerTools === "http"
+              ? { type: "http", url: `http://127.0.0.1:${config.port}/mcp` }
+              : createWorkerServer({ cwd, caller: { kind: "claude", label: path.basename(cwd) || "Claude" } }),
+        },
         canUseTool: (toolName, input, options) =>
-          // Kendi işçi araçlarımız (SDK içi sunucu) izin sormadan çalışır. Kaynağı isme göre değil `source`'a göre kontrol ediyoruz.
-          options.mcpServer?.source === "sdk" && options.mcpServer.name === "workers"
+          // Kendi işçi araçlarımız izin sormadan çalışır. Kaynağı sadece isme göre değil `source`'a göre de kontrol ediyoruz.
+          options.mcpServer?.name === WORKER_SERVER_NAME && TRUSTED_WORKER_SOURCES.has(options.mcpServer.source)
             ? Promise.resolve({ behavior: "allow", updatedInput: input })
             : opts.canUseTool(toolName, input, options),
       },

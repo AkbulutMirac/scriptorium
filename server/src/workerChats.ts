@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { findWorker } from "./agents.js";
 import { SERVER_ROOT } from "./config.js";
-import { reportActivity } from "./events.js";
+import { withWorkerSlot } from "./requests.js";
 import { chat, type ChatMessage, type ChatPart } from "./llm.js";
 import type { Attachment, WorkerChat, WorkerChatMessage, WorkerChatSummary, WorkerSettings } from "./protocol.js";
 import type { Worker } from "./agents.js";
@@ -98,13 +98,13 @@ export async function sendToWorker(args: {
       .map((m): ChatMessage => (m.role === "user" ? { role: "user", content: userContent(worker, m) } : { role: "assistant", content: m.content })),
   ];
 
-  reportActivity({ agentId: worker.id, status: "working", task: args.text || "Ek dosyaya bakıyor", by: "user" });
   let message: WorkerChatMessage;
   let partial = "";
   let partialReasoning = "";
   const model = settings.model || worker.model;
   try {
-    const result = await chat(worker, history, {
+    const task = args.text || "Ek dosyaya bakıyor";
+    const result = await withWorkerSlot(worker, { task, caller: { kind: "user", label: "Sen" }, signal: args.signal }, () => chat(worker, history, {
       signal: args.signal,
       model,
       reasoning: settings.reasoning,
@@ -119,7 +119,7 @@ export async function sendToWorker(args: {
         partialReasoning += t;
         args.onReasoning(c.id, t);
       },
-    });
+    }));
     message = {
       role: "assistant",
       content: result.content,
@@ -128,7 +128,6 @@ export async function sendToWorker(args: {
       model,
       at: Date.now(),
     };
-    reportActivity({ agentId: worker.id, status: "idle" });
   } catch (err) {
     const aborted = args.signal?.aborted;
     const reason = aborted ? "Durduruldu." : err instanceof Error ? err.message : String(err);
@@ -140,7 +139,6 @@ export async function sendToWorker(args: {
       at: Date.now(),
       error: !partial,
     };
-    reportActivity(aborted ? { agentId: worker.id, status: "idle" } : { agentId: worker.id, status: "error", error: reason });
   }
   c.messages.push(message);
   c.updatedAt = Date.now();

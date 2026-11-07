@@ -16,6 +16,7 @@ export const SEAT_HEIGHT = 0.18;
 export const CLAUDE_STATION: Workstation = { desk: [-3, 0, -3.95], seat: { pos: [-3, SEAT_HEIGHT, -4.75], rot: 0 } };
 
 const COLUMNS = [-4.6, -1.4, 1.8];
+export const DESKS_PER_ROW = COLUMNS.length;
 const FIRST_ROW_Z = -1.0;
 const ROW_GAP = 3.0;
 

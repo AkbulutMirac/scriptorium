@@ -26,6 +26,9 @@ Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyl
 - Yazma kutusunun altındaki çubukta model seçimi, düşünme seviyesi (Kapalı–Maks), sıcaklık, en fazla token, JSON çıktı ve sistem talimatı var. Ayarlar işçi başına hatırlanır.
 - Cevaplarda modelin düşüncesi açılır bir blokta, token kullanımı (önbellek ve düşünme dahil) mesajın altında görünür.
 - Claude işçilere araçlarla iş devreder: `ask_worker` için cevap beklenir, `start_job` ve `job_status` arka planda çalışır.
+- Araçlar sadece Scriptorium'da değil, terminaldeki ve masaüstü uygulamasındaki bütün Claude Code oturumlarında da kullanılabilir (aşağıda "Bütün Claude Code oturumlarında").
+- Birden fazla oturum aynı işçiyi aynı anda kullanabilir. 3D ofiste her iş için işçinin bir kopyası odaya girip ek masaya oturur, iş bitince çıkar. Local işçiler aynı anda tek iş yapar, diğerleri sıraya girer.
+- Bir işçinin üzerine gelince hangi işi, hangi proje için ve ne zamandır yaptığı görünür.
 - Gizli veri (`sensitive`) sadece local işçilere gider.
 - İşçiler arayüzden eklenir, düzenlenir, silinir (`server/agents.json`).
 - DeepSeek kalan bakiyesi üst barda ve DeepSeek sohbetinde görünür (5 dakikada bir ve her DeepSeek işinden sonra güncellenir).
@@ -84,6 +87,16 @@ npm start        # tek sunucu: http://localhost:7777
 ```bash
 npm run cli      # terminalden deneme (/yan <mesaj> ile yan sohbet)
 ```
+
+### Bütün Claude Code oturumlarında
+
+Scriptorium çalışırken işçi araçları `http://127.0.0.1:7777/mcp` adresinde bir MCP sunucusu olarak da açıktır. Terminaldeki ve masaüstü uygulamasındaki Claude Code oturumlarına bir kez eklemek yeterli:
+
+```bash
+claude mcp add --scope user --transport http scriptorium http://127.0.0.1:7777/mcp
+```
+
+Claude'un ne zaman iş devredeceğini bilmesi için [docs/CLAUDE-isciler.md](docs/CLAUDE-isciler.md) içeriğini kendi `~/.claude/CLAUDE.md` dosyana ekle. Bütün oturumların işleri aynı sıraya girer ve 3D ofiste proje adıyla görünür. Scriptorium kapalıyken bu sunucu Claude Code'da "bağlanamadı" görünür; başka bir şeyi etkilemez.
 
 **Windows kısayolu:** `scripts\Scriptorium.bat` arayüzü derleyip sunucuyu başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi bu dosya, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur ("Simge durumuna küçültülmüş" çalıştır). Açılan pencereyi kapatınca sunucu da kapanır.
 

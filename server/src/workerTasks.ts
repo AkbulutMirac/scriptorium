@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Worker } from "./agents.js";
-import { reportActivity } from "./events.js";
 import { chat } from "./llm.js";
+import type { WorkerCaller } from "./protocol.js";
+import { withWorkerSlot } from "./requests.js";
 
 /** İşçiye gönderilen dosyaların toplam karakter sınırı (maliyet güvenliği). */
 const MAX_FILE_CHARS = 200_000;
@@ -31,18 +32,20 @@ async function readProjectFiles(cwd: string, files: string[]): Promise<string> {
   return parts.join("\n\n");
 }
 
-/** Claude'un devrettiği bir işi işçiye yaptırır. 3D kütüphane için durum olayları yayar. */
+/** Claude'un devrettiği bir işi işçiye yaptırır. İstek 3D ofiste ayrı bir işçi kopyası olarak görünür. */
 export async function runWorkerTask(args: {
   worker: Worker;
   task: string;
   files?: string[];
-  cwd: string;
+  /** files yollarının göreli olduğu klasör */
+  cwd?: string;
+  caller: WorkerCaller;
   signal?: AbortSignal;
 }): Promise<string> {
   const { worker, task, files, cwd, signal } = args;
-  reportActivity({ agentId: worker.id, status: "working", task, by: "claude" });
-  try {
-    const fileText = files?.length ? await readProjectFiles(cwd, files) : "";
+  if (files?.length && !cwd) throw new Error("Dosya göndermek için project_dir ver (proje klasörünün tam yolu).");
+  return withWorkerSlot(worker, { task, caller: args.caller, signal }, async () => {
+    const fileText = files?.length && cwd ? await readProjectFiles(cwd, files) : "";
     const userContent = fileText ? `${task}\n\n## Dosyalar\n\n${fileText}` : task;
     const { content: answer } = await chat(
       worker,
@@ -52,11 +55,8 @@ export async function runWorkerTask(args: {
       ],
       { signal },
     );
-    reportActivity({ agentId: worker.id, status: "idle" });
     return answer || "(işçi boş cevap döndürdü)";
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    reportActivity({ agentId: worker.id, status: "error", error: message });
-    throw new Error(`${worker.name} hata verdi: ${message}`);
-  }
+  }).catch((err) => {
+    throw new Error(`${worker.name} hata verdi: ${err instanceof Error ? err.message : String(err)}`);
+  });
 }

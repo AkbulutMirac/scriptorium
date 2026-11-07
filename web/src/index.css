@@ -66,20 +66,52 @@ body {
   color: var(--foreground);
   border: 1px solid var(--border);
 }
-.agent-bubble {
+.agent-label.working { border-color: color-mix(in oklab, var(--accent) 70%, var(--border)); }
+.agent-label.working::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  vertical-align: 1px;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.agent-label.error { border-color: var(--danger); color: var(--danger); }
+.agent-label-sub { font-weight: 500; color: var(--muted); }
+@keyframes pulse-dot { 50% { opacity: 0.35; } }
+
+/* Karakterin üzerine gelince açılan iş kartı */
+.agent-card {
   pointer-events: none;
   width: max-content;
-  max-width: 220px;
-  font-size: 11px;
-  line-height: 1.35;
-  padding: 6px 9px;
+  max-width: 260px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  padding: 8px 10px;
   border-radius: 12px;
   background: var(--surface);
   color: var(--foreground);
   border: 1px solid var(--border);
   box-shadow: var(--overlay-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.agent-bubble.error { border-color: var(--danger); color: var(--danger); }
+.agent-card.error { border-color: var(--danger); }
+.agent-card-title { font-weight: 700; font-size: 12px; }
+.agent-card-caller { color: var(--accent); font-weight: 600; }
+.agent-card-task {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agent-card-meta { color: var(--muted); }
+.agent-card-error { color: var(--danger); overflow-wrap: anywhere; }
 .zzz { pointer-events: none; font-weight: 700; color: var(--muted); animation: zfloat 2.6s ease-in-out infinite; }
 @keyframes zfloat {
   0% { opacity: 0; transform: translateY(6px); }

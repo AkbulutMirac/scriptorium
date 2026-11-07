@@ -29,7 +29,7 @@ function render(msg: SDKMessage) {
   switch (msg.type) {
     case "system":
       if (msg.subtype === "init") {
-        const mcpTools = msg.tools.filter((t) => t.startsWith("mcp__workers__"));
+        const mcpTools = msg.tools.filter((t) => t.startsWith("mcp__scriptorium__"));
         const auth = msg.apiKeySource === "none" ? "abonelik girişi" : `API anahtarı (${msg.apiKeySource})`;
         console.log(dim(`[Claude Code ${msg.claude_code_version} · ${msg.model} · ${auth} · işçi araçları: ${mcpTools.join(", ") || "YOK"}]`));
       }

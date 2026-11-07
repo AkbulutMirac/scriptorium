@@ -1,13 +1,13 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
-import { truncate } from "../../lib/format";
 import { ACCENTS, useTheme } from "../../lib/theme";
+import type { WorkerRequest } from "../../protocol";
 import { actions, CLAUDE_ID, useApp } from "../../store";
 import { AgentFigure } from "./AgentFigure";
 import { anchors, labelEls, useHovered } from "./labels";
-import { claudePose, computePlacements, type Pose } from "./placement";
+import { claudePose, computeFigures, hotDeskCount, type Pose } from "./placement";
 import { CLAUDE_STATION, ROOM_BACK_Z, ROOM_HALF_X, roomFrontZ, workstations } from "./layout";
 import { ComputerDesk, Lounge, OfficeChair, palette, Room } from "./Office";
 
@@ -27,22 +27,35 @@ function CameraFit({ frontZ }: { frontZ: number }) {
   return null;
 }
 
-/** Ortadaki izometrik ofis-kütüphane: Claude arkada baş masada, işçiler sıra sıra, boştakiler dinlenme köşesinde */
+/**
+ * Ortadaki izometrik ofis-kütüphane: Claude arkada baş masada, işçiler sıra sıra, boştakiler
+ * dinlenme köşesinde. Aynı işçiye aynı anda birden fazla iş gelirse her iş için bir kopyası
+ * odaya girip ek masalardan birine oturur, işi bitince çıkar.
+ */
 export function LibraryScene() {
   const workers = useApp((s) => s.workers);
   const activity = useApp((s) => s.activity);
+  const requests = useApp((s) => s.workerRequests);
+  const copies = useApp((s) => s.workerCopies);
   const selected = useApp((s) => s.selected);
   const isDark = useTheme((s) => s.isDark);
   const pixel = useTheme((s) => s.pixel);
   const accentHex = useTheme((s) => ACCENTS[s.accent].hex);
 
-  const stations = useMemo(() => workstations(workers.length), [workers.length]);
-  const frontZ = roomFrontZ(workers.length);
+  const hot = hotDeskCount(workers.length, copies);
+  const deskCount = workers.length + hot;
+  const stations = useMemo(() => workstations(deskCount), [deskCount]);
+  const frontZ = roomFrontZ(deskCount);
   const centerZ = (frontZ + ROOM_BACK_Z) / 2;
   const p = palette(isDark);
   const bg = isDark ? "#15121b" : "#f1e7d8";
 
-  const placements = useMemo(() => computePlacements(workers, activity, stations), [workers, activity, stations]);
+  const figures = useMemo(() => computeFigures(workers, requests, copies, stations, frontZ), [workers, requests, copies, stations, frontZ]);
+  const occupied = new Set(
+    Object.values(copies.copies)
+      .filter((c) => !c.leavingAt)
+      .map((c) => c.desk),
+  );
 
   const claude = activity[CLAUDE_ID];
   const cPose = claudePose(claude);
@@ -95,27 +108,34 @@ export function LibraryScene() {
         onSelect={() => actions.selectAgent(CLAUDE_ID)}
       />
 
-      {/* İşçiler */}
-      {workers.map((w, i) => {
-        const st = stations[i];
-        const { pose, seat } = placements[i];
+      {/* Masalar: önce her işçinin kendi masası, sonra kopyalar için ek masalar */}
+      {stations.map((st, i) => {
+        const w = workers[i];
+        const busyHot = !w && occupied.has(i - workers.length);
+        const screenOn = w ? figures[i]?.pose === "working" : busyHot;
         return (
-          <group key={w.id}>
-            <ComputerDesk position={st.desk} p={p} screenOn={pose === "working"} accentHex={w.color} isDark={isDark} />
+          <group key={`desk-${i}`}>
+            <ComputerDesk position={st.desk} p={p} screenOn={screenOn} accentHex={w?.color ?? accentHex} isDark={isDark} />
             <OfficeChair position={[st.seat.pos[0], 0, st.seat.pos[2] - 0.15]} color={isDark ? "#3a4258" : "#556080"} />
-            <AgentFigure
-              id={w.id}
-              name={w.name}
-              color={w.color}
-              pose={pose}
-              seat={seat}
-              selected={selected === w.id}
-              accentHex={accentHex}
-              onSelect={() => actions.selectAgent(w.id)}
-            />
           </group>
         );
       })}
+
+      {/* İşçiler ve kopyaları */}
+      {figures.map((f) => (
+        <AgentFigure
+          key={f.key}
+          id={f.key}
+          name={f.worker.name}
+          color={f.worker.color}
+          pose={f.pose}
+          seat={f.seat}
+          spawn={f.spawn}
+          selected={selected === f.worker.id}
+          accentHex={accentHex}
+          onSelect={() => actions.selectAgent(f.worker.id)}
+        />
+      ))}
 
       <OrbitControls
         makeDefault
@@ -132,8 +152,15 @@ export function LibraryScene() {
     </Canvas>
     <SceneLabels
       items={[
-        { id: CLAUDE_ID, name: "Claude", pose: cPose, task: claude?.task, error: claude?.error, always: true },
-        ...workers.map((w, i) => ({ id: w.id, name: w.name, pose: placements[i].pose, task: activity[w.id]?.task, error: activity[w.id]?.error })),
+        { id: CLAUDE_ID, name: "Claude", pose: cPose, claudeTask: claude?.task, error: claude?.error, always: true, queued: 0 },
+        ...figures.map((f) => ({
+          id: f.key,
+          name: f.copy > 1 ? `${f.worker.name} #${f.copy}` : f.worker.name,
+          pose: f.pose,
+          request: f.request,
+          error: f.request?.error,
+          queued: f.queued,
+        })),
       ]}
       selected={selected}
     />
@@ -158,16 +185,82 @@ function LabelTracker() {
   return null;
 }
 
-type LabelItem = { id: string; name: string; pose: Pose; task?: string; error?: string; always?: boolean };
+type LabelItem = {
+  id: string;
+  name: string;
+  pose: Pose;
+  /** İşçinin üzerinde çalıştığı iş */
+  request?: WorkerRequest;
+  /** Claude'un şu anki işi */
+  claudeTask?: string;
+  error?: string;
+  queued: number;
+  always?: boolean;
+};
 
-/** Sahnenin üstündeki etiket katmanı: ad (seçili/üzerine gelinen/Claude), görev ya da hata baloncuğu, uyku "z"si */
+/** "2 dk 05 sn" — her saniye güncellenir (sadece kart açıkken) */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const s = Math.max(0, Math.round((now - since) / 1000));
+  return <>{s < 60 ? `${s} sn` : `${Math.floor(s / 60)} dk ${String(s % 60).padStart(2, "0")} sn`}</>;
+}
+
+function callerText(r: WorkerRequest) {
+  if (r.caller.kind === "user") return "Senin için (doğrudan sohbet)";
+  return r.caller.label ? `Claude · ${r.caller.label} için` : "Claude için";
+}
+
+/** Üzerine gelinince açılan kart: hangi işi, kimin için, ne zamandır yapıyor */
+function AgentCard({ it }: { it: LabelItem }) {
+  const r = it.request;
+  const working = it.pose === "working";
+  return (
+    <div className={`agent-card ${it.pose === "error" ? "error" : ""}`}>
+      <div className="agent-card-title">{it.name}</div>
+      {r ? (
+        <>
+          <div className="agent-card-caller">{callerText(r)}</div>
+          <div className="agent-card-task">{r.task}</div>
+          {it.pose === "error" ? (
+            <div className="agent-card-error">⚠ {it.error ?? "Hata"}</div>
+          ) : (
+            working && r.startedAt && (
+              <div className="agent-card-meta">
+                <Elapsed since={r.startedAt} />
+                {"'dir çalışıyor"}
+              </div>
+            )
+          )}
+        </>
+      ) : it.claudeTask && working ? (
+        <div className="agent-card-task">{it.claudeTask}</div>
+      ) : it.pose === "error" ? (
+        <div className="agent-card-error">⚠ {it.error ?? "Hata"}</div>
+      ) : (
+        <div className="agent-card-meta">{it.pose === "leaving" ? "İşini bitirdi, çıkıyor" : "Boşta"}</div>
+      )}
+      {it.queued > 0 && <div className="agent-card-meta">{it.queued} iş sırada bekliyor</div>}
+    </div>
+  );
+}
+
+/**
+ * Sahnenin üstündeki etiket katmanı. Çalışan ve hata veren karakterlerin adı hep görünür;
+ * üzerine gelince hangi işi kimin için yaptığını gösteren kart açılır.
+ */
 function SceneLabels({ items, selected }: { items: LabelItem[]; selected: string }) {
   const hovered = useHovered((s) => s.id);
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
       {items.map((it) => {
-        const tag = it.pose === "working" ? truncate(it.task ?? "Çalışıyor", 46) : it.pose === "error" ? `⚠ ${truncate(it.error ?? "Hata", 46)}` : null;
-        const showName = !tag && (it.always || selected === it.id || hovered === it.id);
+        const isHovered = hovered === it.id;
+        const busy = it.pose === "working" || it.pose === "error";
+        const showName = it.always || busy || selected === it.id || selected === it.id.split("#")[0];
+        const caller = it.request?.caller.kind === "user" ? "sen" : it.request?.caller.label;
         return (
           <div
             key={it.id}
@@ -176,16 +269,19 @@ function SceneLabels({ items, selected }: { items: LabelItem[]; selected: string
               else labelEls.delete(it.id);
             }}
             className="absolute left-0 top-0"
-            style={{ visibility: "hidden" }}
+            style={{ visibility: "hidden", zIndex: isHovered ? 2 : busy ? 1 : 0 }}
           >
             <div className="agent-tags">
-              {tag && (
-                <div className={`agent-bubble ${it.pose === "error" ? "error" : ""}`}>
-                  <b>{it.name}</b> · {tag}
+              {isHovered ? (
+                <AgentCard it={it} />
+              ) : (
+                <div className={`agent-label ${showName ? "" : "is-hidden"} ${it.pose === "working" ? "working" : ""} ${it.pose === "error" ? "error" : ""}`}>
+                  {it.pose === "error" && "⚠ "}
+                  {it.name}
+                  {it.pose === "working" && caller && <span className="agent-label-sub"> · {caller}</span>}
                 </div>
               )}
-              <div className={`agent-label ${showName ? "" : "is-hidden"}`}>{it.name}</div>
-              {it.pose === "sleeping" && <span className="zzz">z</span>}
+              {it.pose === "sleeping" && !isHovered && <span className="zzz">z</span>}
             </div>
           </div>
         );

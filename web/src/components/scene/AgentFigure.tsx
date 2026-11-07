@@ -2,7 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { anchors, useHovered } from "./labels";
-import type { Seat } from "./layout";
+import type { Seat, Vec3 } from "./layout";
 import type { Pose } from "./placement";
 
 export type { Pose };
@@ -17,6 +17,8 @@ type Props = {
   selected: boolean;
   accentHex: string;
   isClaude?: boolean;
+  /** İlk göründüğü yer (verilmezse oturma yeri). Kopyalar odaya buradan yürüyerek girer. */
+  spawn?: Vec3;
   onSelect: () => void;
 };
 
@@ -38,8 +40,8 @@ export function AgentFigure(p: Props) {
   // Başlangıç yeri sadece bir kez verilir. Konumu prop olarak vermek, poz değişince karakteri
   // yeni yere ışınlıyor ve yürüme animasyonunu eziyordu.
   useLayoutEffect(() => {
-    root.current?.position.set(...p.seat.pos);
-    if (root.current) root.current.rotation.y = p.seat.rot;
+    root.current?.position.set(...(p.spawn ?? p.seat.pos));
+    if (root.current) root.current.rotation.y = p.spawn ? Math.PI : p.seat.rot;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

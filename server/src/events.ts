@@ -5,6 +5,7 @@ import type { AgentActivity } from "./protocol.js";
 export const bus = new EventEmitter<{
   activity: [AgentActivity];
   jobs: [];
+  requests: [];
 }>();
 
 const ERROR_VISIBLE_MS = 12_000;
