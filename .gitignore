@@ -1,0 +1,25 @@
+# Bağımlılıklar
+node_modules/
+
+# Derleme çıktıları
+dist/
+*.tsbuildinfo
+
+# Sırlar ve kişisel ayarlar
+.env
+.env.*
+!.env.example
+server/agents.json
+server/data/
+
+# Loglar
+*.log
+npm-debug.log*
+
+# Editör ve işletim sistemi
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,29 @@
+{
+  "workers": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek Flash",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "color": "#4D6BFE",
+      "description": "Hızlı ve ucuz. Net tanımlı, kendi içinde kapalı kod görevleri; uzun belgeleri okuma (1M bağlam)."
+    },
+    {
+      "id": "deepseek-pro",
+      "name": "DeepSeek Pro",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "color": "#2B47D9",
+      "description": "Flash'tan pahalı ama daha güçlü. Zor kod ve akıl yürütme görevleri."
+    },
+    {
+      "id": "qwen-local",
+      "name": "Qwen3.8 (local)",
+      "provider": "ollama",
+      "model": "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_XS",
+      "color": "#7F77DD",
+      "description": "Bedava, veri bilgisayardan çıkmaz. Gizli veri ve acelesi olmayan toplu işler. Yavaş (~10-15 token/sn), pratik bağlam ~16K token.",
+      "local": true
+    }
+  ]
+}

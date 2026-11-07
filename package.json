@@ -1,0 +1,17 @@
+{
+  "name": "scriptorium",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı: çok ajanlı sohbet arayüzü ve 3D kütüphane",
+  "license": "MIT",
+  "workspaces": [
+    "server"
+  ],
+  "scripts": {
+    "cli": "npm run cli --workspace server",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,119 @@
+/**
+ * Arayüz ile arka uç arasındaki WebSocket mesajları. Arayüz bu dosyayı `import type` ile kullanır,
+ * o yüzden burada sadece tip olmalı (Node'a özel import yok).
+ */
+import type { PermissionMode, PermissionUpdate, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+
+export type { PermissionMode, SDKMessage };
+
+export type Provider = "deepseek" | "ollama";
+
+export type WorkerInfo = {
+  id: string;
+  name: string;
+  provider: Provider;
+  model: string;
+  color: string;
+  description: string;
+  /** true ise veri bilgisayardan çıkmaz */
+  local: boolean;
+  available?: { ok: boolean; reason?: string };
+};
+
+export type AgentStatus = "idle" | "working" | "error";
+
+/** 3D kütüphanedeki karakterleri hareket ettiren olay. agentId "claude" ya da bir işçi id'si. */
+export type AgentActivity = {
+  agentId: string;
+  status: AgentStatus;
+  task?: string;
+  error?: string;
+  /** İşi kim verdi: "claude" (devretme) ya da "user" (doğrudan sohbet) */
+  by?: "claude" | "user";
+};
+
+export type SessionSummary = {
+  id: string;
+  title: string;
+  updatedAt: number;
+  cwd?: string;
+  gitBranch?: string;
+};
+
+/** Claude oturum geçmişinden okunan mesaj (canlı SDK mesajlarıyla aynı şekilde çizilir). */
+export type HistoryMessage = {
+  type: "user" | "assistant" | "system";
+  uuid: string;
+  message: unknown;
+  parent_tool_use_id: string | null;
+};
+
+export type WorkerChatMessage = { role: "user" | "assistant"; content: string; at: number; error?: boolean };
+
+export type WorkerChatSummary = { id: string; workerId: string; title: string; updatedAt: number };
+
+export type WorkerChat = WorkerChatSummary & { messages: WorkerChatMessage[] };
+
+export type JobInfo = {
+  id: string;
+  workerId: string;
+  task: string;
+  status: "queued" | "running" | "done" | "error";
+  createdAt: number;
+  finishedAt?: number;
+  result?: string;
+  error?: string;
+};
+
+export type ClientMsg =
+  | { type: "claude.open"; chatId: string; resume?: string; fork?: boolean; cwd?: string }
+  | { type: "claude.send"; chatId: string; text: string }
+  | { type: "claude.interrupt"; chatId: string }
+  | { type: "claude.close"; chatId: string }
+  | { type: "claude.setMode"; chatId: string; mode: PermissionMode }
+  | { type: "claude.setModel"; chatId: string; model?: string }
+  | { type: "claude.permission"; requestId: string; allow: boolean; always?: boolean }
+  | { type: "claude.sessions"; cwd?: string }
+  | { type: "claude.history"; sessionId: string }
+  | { type: "claude.rename"; sessionId: string; title: string }
+  | { type: "claude.delete"; sessionId: string }
+  | { type: "worker.send"; workerId: string; chatId?: string; text: string }
+  | { type: "worker.stop"; chatId: string }
+  | { type: "worker.chats"; workerId: string }
+  | { type: "worker.chat"; chatId: string }
+  | { type: "worker.deleteChat"; chatId: string }
+  | { type: "workers.list" }
+  | { type: "workers.save"; worker: WorkerInfo }
+  | { type: "workers.delete"; workerId: string }
+  | { type: "jobs.list" };
+
+export type ServerMsg =
+  | { type: "welcome"; cwd: string; claudeCodeVersion?: string }
+  | { type: "claude.message"; chatId: string; message: SDKMessage }
+  | { type: "claude.session"; chatId: string; sessionId: string }
+  | { type: "claude.busy"; chatId: string; busy: boolean }
+  | { type: "claude.closed"; chatId: string; error?: string }
+  | {
+      type: "claude.permissionRequest";
+      chatId: string;
+      requestId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      title?: string;
+      description?: string;
+      canAlwaysAllow: boolean;
+    }
+  | { type: "claude.permissionResolved"; requestId: string }
+  | { type: "claude.sessions"; sessions: SessionSummary[] }
+  | { type: "claude.history"; sessionId: string; messages: HistoryMessage[] }
+  | { type: "worker.chats"; workerId: string; chats: WorkerChatSummary[] }
+  | { type: "worker.chat"; chat: WorkerChat }
+  | { type: "worker.token"; chatId: string; text: string }
+  | { type: "worker.done"; chatId: string; message: WorkerChatMessage }
+  | { type: "workers"; workers: WorkerInfo[] }
+  | { type: "activity"; activity: AgentActivity }
+  | { type: "jobs"; jobs: JobInfo[] }
+  | { type: "error"; message: string };
+
+/** Sunucu tarafında saklanan izin önerileri (arayüze gönderilmez). */
+export type PendingPermission = { suggestions?: PermissionUpdate[] };
