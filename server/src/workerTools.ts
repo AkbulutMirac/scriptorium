@@ -18,6 +18,7 @@ const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }],
 /** MCP sunucusunun Claude'a verdiği kullanım özeti (Claude Code bunu sistem talimatına ekler) */
 export const WORKER_INSTRUCTIONS = [
   "Scriptorium işçileri: DeepSeek (API, ucuz ve hızlı) ve local LLM'ler (Ollama, veri bilgisayardan çıkmaz).",
+  "Varsayılan deepseek-pro; kolay işler deepseek (Flash). Local işçiler küçük modeldir: önce list_workers ile modeline bak, sadece kısa ve tek adımlı işler ver.",
   "list_workers ile kimin hazır olduğuna bak. ask_worker cevabı bekler; birkaç dakikadan uzun işler için start_job, sonra job_status.",
   "İşçi dosya okuyamaz, yazamaz, komut çalıştıramaz: gereken dosyaları files ile ver ve project_dir olarak çalışma klasörünün tam yolunu yaz.",
   "Gelen kodu dosyaya yazmak ve test etmek senin işin. Gizli veri için sensitive: true (sadece local işçiler kabul eder).",

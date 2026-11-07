@@ -98,7 +98,7 @@ claude mcp add --scope user --transport http scriptorium http://127.0.0.1:7777/m
 
 Claude'un ne zaman iş devredeceğini bilmesi için [docs/CLAUDE-isciler.md](docs/CLAUDE-isciler.md) içeriğini kendi `~/.claude/CLAUDE.md` dosyana ekle. Bütün oturumların işleri aynı sıraya girer ve 3D ofiste proje adıyla görünür. Scriptorium kapalıyken bu sunucu Claude Code'da "bağlanamadı" görünür; başka bir şeyi etkilemez.
 
-**Windows kısayolu:** `scripts\Scriptorium.bat` arayüzü derleyip sunucuyu başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi bu dosya, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur ("Simge durumuna küçültülmüş" çalıştır). Açılan pencereyi kapatınca sunucu da kapanır.
+**Windows kısayolu:** `scripts\Scriptorium.vbs` pencere açmadan arayüzü derler, sunucuyu arka planda başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi `wscript.exe "<repo>\scripts\Scriptorium.vbs"`, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur. Sunucuyu kapatmak için arayüzde Ayarlar → "Scriptorium'u kapat". Çıktılar `server\data\server.log` ve `build.log` dosyalarına yazılır.
 
 ## Güvenlik
 

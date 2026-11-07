@@ -140,7 +140,7 @@ export const useApp = create<State>(() => ({
   permissions: [],
   workerChatLists: {},
   workerChats: {},
-  activeWorkerChat: {},
+  activeWorkerChat: load<Record<string, string | undefined>>("activeWorkerChat", {}),
   workerSettings: load<Record<string, WorkerSettings>>("workerSettings", {}),
   workerModels: {},
   quotes: {},
@@ -156,6 +156,18 @@ export const useApp = create<State>(() => ({
 
 const get = useApp.getState;
 const set = useApp.setState;
+
+// Her işçide en son açık olan sohbet hatırlanır: uygulama açılınca kaldığın sohbet gelir
+useApp.subscribe((s, prev) => {
+  if (s.activeWorkerChat !== prev.activeWorkerChat) save("activeWorkerChat", s.activeWorkerChat);
+});
+
+/** İşçinin sohbet listesini ve en son açık sohbetini yükler */
+function loadWorker(workerId: string) {
+  socket.send({ type: "worker.chats", workerId });
+  const chatId = get().activeWorkerChat[workerId];
+  if (chatId && !get().workerChats[chatId]) socket.send({ type: "worker.chat", chatId });
+}
 
 // ─── Yardımcılar ───────────────────────────────────────────────────────────────
 
@@ -453,15 +465,16 @@ export function startConnection() {
   socket.onOpen(() => {
     const { mainChatId, chats, selected } = get();
     if (!mainChatId) {
+      // Kapatırken açık olan sohbet geri gelir; seçili ajan (Claude ya da bir işçi) değişmez
       if (savedMain?.sessionId) actions.openClaudeSession(savedMain.sessionId, savedMain.chatId, true);
-      else actions.newClaudeChat();
+      else actions.newClaudeChat(undefined, true);
     } else {
       // Yeniden bağlandık: açık sohbetlere yeniden bağlan (sunucu yeniden başladıysa oturum devam ettirilir)
       for (const c of Object.values(chats)) {
         if (c.opened) reattach(c.chatId);
       }
     }
-    if (selected !== CLAUDE_ID) socket.send({ type: "worker.chats", workerId: selected });
+    if (selected !== CLAUDE_ID) loadWorker(selected);
   });
   socket.connect();
 }
@@ -472,7 +485,7 @@ export const actions = {
   selectAgent(id: string) {
     set({ selected: id });
     save("selected", id);
-    if (id !== CLAUDE_ID) socket.send({ type: "worker.chats", workerId: id });
+    if (id !== CLAUDE_ID) loadWorker(id);
   },
 
   setCwd(cwd: string) {
@@ -490,14 +503,15 @@ export const actions = {
   // Claude ─────────────────────────────────────
 
   /** Yeni Claude sohbeti. cwd verilirse o klasörde açılır ve varsayılan klasör olarak hatırlanır. */
-  newClaudeChat(cwd?: string) {
+  newClaudeChat(cwd?: string, keepSelection = false) {
     const prev = get().chats[get().mainChatId ?? ""];
     closeChat(get().sideChatId);
     closeChat(get().mainChatId);
     if (cwd) actions.setCwd(cwd);
     const chatId = uuid();
     const chat = emptyChat(chatId, cwd || effectiveCwd(), { wantModel: prev?.wantModel, wantEffort: prev?.wantEffort ?? prev?.effort });
-    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, selected: CLAUDE_ID });
+    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, ...(keepSelection ? {} : { selected: CLAUDE_ID }) });
+    if (!keepSelection) save("selected", CLAUDE_ID);
     persistMain();
   },
 
@@ -528,6 +542,11 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setFastMode", chatId, on });
     updateChat(chatId, (x) => ({ ...x, fastMode: on, wantFast: on }));
+  },
+
+  /** Arka planda çalışan sunucuyu kapatır (kısayol pencere açmadan çalıştırıyor) */
+  shutdownServer() {
+    socket.send({ type: "app.shutdown" });
   },
 
   refreshDeepseekBalance() {

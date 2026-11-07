@@ -451,6 +451,10 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "deepseek.balance":
       return refreshBalance();
+
+    case "app.shutdown":
+      console.log("Arayüzden kapatıldı.");
+      return shutdown();
   }
 }
 

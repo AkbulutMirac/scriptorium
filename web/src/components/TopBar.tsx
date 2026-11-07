@@ -1,5 +1,5 @@
 import { Button, Chip, Input, Label, Popover, Switch, TextField, Tooltip } from "@heroui/react";
-import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Settings, Sun } from "lucide-react";
+import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Power, Settings, Sun } from "lucide-react";
 import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
 import { pct, UsageCard } from "./chat/UsageCard";
@@ -130,6 +130,13 @@ function SettingsPopover() {
             <Button size="sm" variant="secondary" isDisabled={draft === cwd} onPress={() => actions.setCwd(draft.trim())}>
               Kaydet
             </Button>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-separator pt-3">
+            <Button size="sm" variant="danger-soft" onPress={() => actions.shutdownServer()}>
+              <Power size={14} /> Scriptorium'u kapat
+            </Button>
+            <p className="text-xs text-muted">Arka planda çalışan sunucuyu kapatır. Açık Claude oturumları da kapanır. Tekrar açmak için masaüstü kısayolu.</p>
           </div>
         </Popover.Dialog>
       </Popover.Content>

@@ -229,6 +229,7 @@ export type ClientMsg =
   | { type: "worker.chats"; workerId: string }
   | { type: "worker.chat"; chatId: string }
   | { type: "worker.deleteChat"; chatId: string }
+  | { type: "app.shutdown" }
   | { type: "workers.list" }
   | { type: "workers.save"; worker: WorkerInfo }
   | { type: "workers.delete"; workerId: string }
