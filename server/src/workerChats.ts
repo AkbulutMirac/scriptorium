@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { findWorker } from "./agents.js";
 import { SERVER_ROOT } from "./config.js";
-import { bus } from "./events.js";
+import { reportActivity } from "./events.js";
 import { chat } from "./llm.js";
 import type { WorkerChat, WorkerChatMessage, WorkerChatSummary } from "./protocol.js";
 
@@ -66,7 +66,7 @@ export async function sendToWorker(args: {
   await saveChat(c);
   args.onStart(c);
 
-  bus.emit("activity", { agentId: worker.id, status: "working", task: args.text, by: "user" });
+  reportActivity({ agentId: worker.id, status: "working", task: args.text, by: "user" });
   let message: WorkerChatMessage;
   let partial = "";
   try {
@@ -82,12 +82,12 @@ export async function sendToWorker(args: {
       },
     );
     message = { role: "assistant", content: answer, at: Date.now() };
-    bus.emit("activity", { agentId: worker.id, status: "idle" });
+    reportActivity({ agentId: worker.id, status: "idle" });
   } catch (err) {
     const aborted = args.signal?.aborted;
     const reason = aborted ? "Durduruldu." : err instanceof Error ? err.message : String(err);
     message = { role: "assistant", content: partial ? `${partial}\n\n_(${reason})_` : reason, at: Date.now(), error: !partial };
-    bus.emit("activity", aborted ? { agentId: worker.id, status: "idle" } : { agentId: worker.id, status: "error", error: reason });
+    reportActivity(aborted ? { agentId: worker.id, status: "idle" } : { agentId: worker.id, status: "error", error: reason });
   }
   c.messages.push(message);
   c.updatedAt = Date.now();

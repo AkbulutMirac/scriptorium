@@ -19,8 +19,9 @@ import { WebSocket, WebSocketServer } from "ws";
 import { loadWorkers, saveWorkers } from "./agents.js";
 import { ClaudeSession } from "./claude.js";
 import { config, SERVER_ROOT } from "./config.js";
-import { bus } from "./events.js";
+import { bus, reportActivity } from "./events.js";
 import { listJobs } from "./jobs.js";
+import { gitDiff, gitInfo } from "./git.js";
 import { isAvailable } from "./llm.js";
 import type { AgentActivity, ClientMsg, ServerMsg, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
@@ -61,6 +62,7 @@ bus.on("jobs", () => broadcast({ type: "jobs", jobs: listJobs() }));
 type ChatState = {
   session: ClaudeSession;
   cwd: string;
+  dirs: string[];
   busy: boolean;
   task?: string;
   announcedSessionId?: string;
@@ -78,7 +80,7 @@ const pending = new Map<string, Pending>();
 
 function updateClaudeActivity() {
   const busy = [...chats.values()].find((c) => c.busy);
-  bus.emit("activity", busy ? { agentId: "claude", status: "working", task: busy.task } : { agentId: "claude", status: "idle" });
+  reportActivity(busy ? { agentId: "claude", status: "working", task: busy.task } : { agentId: "claude", status: "idle" });
 }
 
 function denyPendingOf(chatId: string, message: string) {
@@ -90,7 +92,7 @@ function denyPendingOf(chatId: string, message: string) {
   }
 }
 
-function openChat(chatId: string, opts: { resume?: string; fork?: boolean; cwd?: string }) {
+function openChat(chatId: string, opts: { resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[] }) {
   const existing = chats.get(chatId);
   if (existing) {
     // Sayfa yenilendi: aynı oturuma yeniden bağlan
@@ -100,12 +102,13 @@ function openChat(chatId: string, opts: { resume?: string; fork?: boolean; cwd?:
   }
 
   const cwd = opts.cwd || config.claudeCwd;
-  const state = { cwd, busy: false } as ChatState;
+  const state = { cwd, dirs: opts.additionalDirectories ?? [], busy: false } as ChatState;
 
   state.session = new ClaudeSession({
     cwd,
     resume: opts.resume,
     fork: opts.fork,
+    additionalDirectories: state.dirs,
     onMessage: (message) => {
       broadcast({ type: "claude.message", chatId, message });
       const sid = state.session.sessionId;
@@ -180,8 +183,50 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       c.task = msg.text.slice(0, 120);
       broadcast({ type: "claude.busy", chatId: msg.chatId, busy: true });
       updateClaudeActivity();
-      return c.session.send(msg.text);
+      return c.session.send(msg.text, msg.attachments);
     }
+
+    case "claude.info": {
+      const c = chats.get(msg.chatId);
+      if (!c) return;
+      return reply(ws, { type: "claude.info", ...(await c.session.info(msg.chatId)) });
+    }
+
+    case "claude.setDirs": {
+      const dirs: string[] = [];
+      for (const d of msg.dirs) {
+        const ok = await stat(d).then((st) => st.isDirectory()).catch(() => false);
+        if (!ok) throw new Error(`Klasör bulunamadı: ${d}`);
+        dirs.push(d);
+      }
+      const c = chats.get(msg.chatId);
+      if (c) {
+        if (c.busy) throw new Error("Claude çalışırken klasör eklenemez. Bitmesini bekle.");
+        // Ek klasörler oturum açılırken verilir: oturumu kaldığı yerden yeni klasörlerle yeniden aç
+        const sessionId = c.session.sessionId;
+        chats.delete(msg.chatId);
+        c.session.close();
+        openChat(msg.chatId, { resume: sessionId, cwd: c.cwd, additionalDirectories: dirs });
+      }
+      return broadcast({ type: "claude.dirs", chatId: msg.chatId, dirs });
+    }
+
+    case "claude.mcpToggle":
+      await chatOrThrow(msg.chatId).session.toggleMcp(msg.server, msg.enabled);
+      return reply(ws, { type: "claude.info", ...(await chatOrThrow(msg.chatId).session.info(msg.chatId)) });
+
+    case "claude.mcpReconnect":
+      await chatOrThrow(msg.chatId).session.reconnectMcp(msg.server);
+      return reply(ws, { type: "claude.info", ...(await chatOrThrow(msg.chatId).session.info(msg.chatId)) });
+
+    case "claude.stopTask":
+      return chatOrThrow(msg.chatId).session.stopTask(msg.taskId);
+
+    case "git.info":
+      return reply(ws, { type: "git.info", ...(await gitInfo(msg.cwd)) });
+
+    case "git.diff":
+      return reply(ws, { type: "git.diff", cwd: msg.cwd, file: msg.file, diff: await gitDiff(msg.cwd, msg.file) });
 
     case "claude.interrupt": {
       const c = chatOrThrow(msg.chatId);
@@ -212,7 +257,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       pending.delete(msg.requestId);
       p.resolve(
         msg.allow
-          ? { behavior: "allow", updatedInput: p.input, updatedPermissions: msg.always ? p.suggestions : undefined }
+          ? { behavior: "allow", updatedInput: msg.updatedInput ?? p.input, updatedPermissions: msg.always ? p.suggestions : undefined }
           : { behavior: "deny", message: "Kullanıcı izin vermedi." },
       );
       broadcast({ type: "claude.permissionResolved", requestId: msg.requestId });
@@ -355,6 +400,7 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({
   server,
   path: "/ws",
+  maxPayload: 60 * 1024 * 1024, // ek dosyalar için
   verifyClient: ({ origin }: { origin?: string }) => !!origin && ALLOWED_ORIGINS.has(origin),
 });
 

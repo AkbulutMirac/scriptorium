@@ -1,0 +1,242 @@
+/**
+ * Claude Code'dan (SDK) gelen mesajları sohbet ekranındaki öğelere çevirir.
+ * Canlı mesajlar ve geçmişten okunan mesajlar aynı fonksiyondan geçer.
+ * Tanınmayan yeni bir mesaj türü gelirse "unknown" kartı olarak görünür; Claude Code güncellenince arayüz bozulmaz.
+ */
+
+export type ToolResult = { text: string; isError: boolean };
+
+export type ChatItem =
+  | { kind: "user"; id: string; text: string }
+  | { kind: "text"; id: string; text: string; parent: string | null }
+  | { kind: "thinking"; id: string; text: string; parent: string | null }
+  | { kind: "tool"; id: string; name: string; input: Record<string, unknown>; result?: ToolResult; parent: string | null }
+  | { kind: "notice"; id: string; text: string; tone: "info" | "danger" }
+  | { kind: "result"; id: string; durationMs?: number; costUsd?: number }
+  | { kind: "unknown"; id: string; label: string; data: unknown };
+
+type Block = { type: string; [k: string]: unknown };
+type AnyMsg = { type: string; subtype?: string; uuid?: string; message?: unknown; parent_tool_use_id?: string | null; [k: string]: unknown };
+
+/** Sessizce geçilen iç olaylar */
+const IGNORED_TYPES = new Set([
+  "stream_event",
+  "tool_progress",
+  "auth_status",
+  "tool_use_summary",
+  "rate_limit_event",
+  "prompt_suggestion",
+  "keep_alive",
+]);
+const IGNORED_SYSTEM = new Set([
+  "init",
+  "status",
+  "control_request_progress",
+  "hook_started",
+  "hook_progress",
+  "hook_response",
+  "plugin_install",
+  "task_started",
+  "task_updated",
+  "task_progress",
+  "task_notification",
+  "background_tasks_changed",
+  "thinking_tokens",
+  "session_state_changed",
+  "worker_shutting_down",
+  "commands_changed",
+  "files_persisted",
+  "memory_recall",
+  "elicitation_complete",
+  "post_turn_summary",
+  "task_summary",
+]);
+/** Bilgi notu olarak gösterilen sistem olayları */
+const NOTICE_SYSTEM: Record<string, { text: string; tone: "info" | "danger" }> = {
+  compact_boundary: { text: "Sohbet özetlendi, bağlam sıkıştırıldı.", tone: "info" },
+  api_retry: { text: "API'ye ulaşılamadı, yeniden deneniyor…", tone: "info" },
+  model_refusal_fallback: { text: "Model isteği reddetti, yedek modele geçildi.", tone: "info" },
+  model_refusal_no_fallback: { text: "Model isteği reddetti.", tone: "danger" },
+  permission_denied: { text: "Bir araç izni reddedildi.", tone: "danger" },
+  mirror_error: { text: "Oturum kaydında hata oluştu.", tone: "danger" },
+  session_writes_lost: { text: "Oturumun bir kısmı diske yazılamadı.", tone: "danger" },
+};
+
+let seq = 0;
+const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
+
+function contentOf(message: unknown): Block[] | string | undefined {
+  const content = (message as { content?: unknown } | undefined)?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content as Block[];
+  return undefined;
+}
+
+export function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return (content as Block[])
+      .map((c) => (c.type === "text" ? String(c.text ?? "") : c.type === "image" ? "[görsel]" : `[${c.type}]`))
+      .join("\n");
+  }
+  return "";
+}
+
+/** Mesajdaki ilk anlamlı metin alanı (bilgi notları için) */
+function firstText(msg: AnyMsg): string | undefined {
+  for (const key of ["content", "text", "message", "error", "reason", "title"]) {
+    const v = msg[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
+/** Claude Code'un kullanıcı mesajlarına eklediği iç etiketleri temizler */
+function cleanUserText(text: string): string {
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<(command-name|command-message|command-args|local-command-stdout|local-command-caveat)>[\s\S]*?<\/\1>/g, "")
+    .trim();
+}
+
+function attachResult(items: ChatItem[], toolUseId: string, result: ToolResult): ChatItem[] {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.kind === "tool" && it.id === toolUseId) {
+      const copy = [...items];
+      copy[i] = { ...it, result };
+      return copy;
+    }
+  }
+  return items;
+}
+
+function userTextItem(text: string, idSource?: string): ChatItem | null {
+  if (/^\[Request interrupted/i.test(text)) return { kind: "notice", id: idSource ?? uid("n"), text: "Durduruldu.", tone: "info" };
+  const clean = cleanUserText(text);
+  return clean ? { kind: "user", id: idSource ?? uid("u"), text: clean } : null;
+}
+
+/**
+ * Bir SDK mesajını öğe listesine uygular ve yeni liste döndürür.
+ * live=true: canlı akış (kullanıcının kendi yazdığı mesaj zaten ekranda olduğu için tekrar eklenmez).
+ * live=false: geçmişten yükleme.
+ */
+export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): ChatItem[] {
+  const msg = raw as AnyMsg;
+  const parent = msg.parent_tool_use_id ?? null;
+
+  switch (msg.type) {
+    case "assistant": {
+      const blocks = contentOf(msg.message);
+      if (!Array.isArray(blocks)) return items;
+      let out = [...items];
+      blocks.forEach((b, i) => {
+        const id = `${msg.uuid ?? uid("a")}:${i}`;
+        if (out.some((x) => x.id === id)) return;
+        if (b.type === "text") {
+          if (String(b.text ?? "").trim()) out.push({ kind: "text", id, text: String(b.text), parent });
+        } else if (b.type === "thinking") {
+          if (String(b.thinking ?? "").trim()) out.push({ kind: "thinking", id, text: String(b.thinking), parent });
+        } else if (b.type === "redacted_thinking") {
+          // gösterilecek içerik yok
+        } else if (b.type === "tool_use" || b.type === "server_tool_use" || b.type === "mcp_tool_use") {
+          out.push({ kind: "tool", id: String(b.id), name: String(b.name), input: (b.input ?? {}) as Record<string, unknown>, parent });
+        } else if (b.type.endsWith("_tool_result")) {
+          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error });
+        } else {
+          out.push({ kind: "unknown", id, label: `İçerik bloğu: ${b.type}`, data: b });
+        }
+      });
+      return out;
+    }
+
+    case "user": {
+      const content = contentOf(msg.message);
+      const showText = !live || msg.isSynthetic === true;
+      if (typeof content === "string") {
+        if (!showText) return items;
+        const item = userTextItem(content, msg.uuid);
+        return item ? [...items, item] : items;
+      }
+      if (!Array.isArray(content)) return items;
+      let out = items;
+      const texts: string[] = [];
+      for (const b of content) {
+        if (b.type === "tool_result") {
+          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error });
+        } else if (b.type === "text") {
+          texts.push(String(b.text ?? ""));
+        } else if (b.type === "image") {
+          texts.push("[görsel]");
+        }
+      }
+      if (texts.length && showText && parent === null) {
+        const item = userTextItem(texts.join("\n"), msg.uuid);
+        if (item) out = [...out, item];
+      }
+      return out;
+    }
+
+    case "result": {
+      if (msg.is_error) {
+        const errors = Array.isArray(msg.errors) ? (msg.errors as string[]).join("\n") : "";
+        const text = (typeof msg.result === "string" && msg.result) || errors || `Tur hatayla bitti (${msg.subtype}).`;
+        return [...items, { kind: "notice", id: uid("r"), text, tone: "danger" }];
+      }
+      return [
+        ...items,
+        { kind: "result", id: uid("r"), durationMs: msg.duration_ms as number | undefined, costUsd: msg.total_cost_usd as number | undefined },
+      ];
+    }
+
+    case "system": {
+      const sub = msg.subtype ?? "";
+      if (IGNORED_SYSTEM.has(sub)) return items;
+      const known = NOTICE_SYSTEM[sub];
+      if (known) return [...items, { kind: "notice", id: uid("s"), text: known.text, tone: known.tone }];
+      if (sub === "local_command_output" || sub === "notification" || sub === "informational") {
+        const text = firstText(msg);
+        return text ? [...items, { kind: "notice", id: uid("s"), text, tone: "info" }] : items;
+      }
+      return [...items, { kind: "unknown", id: uid("s"), label: `Sistem olayı: ${sub || "?"}`, data: msg }];
+    }
+
+    case "conversation_reset":
+      return [...items, { kind: "notice", id: uid("s"), text: "Sohbet sıfırlandı.", tone: "info" }];
+
+    default:
+      if (IGNORED_TYPES.has(msg.type)) return items;
+      return [...items, { kind: "unknown", id: uid("x"), label: `Mesaj türü: ${msg.type}`, data: msg }];
+  }
+}
+
+export function historyToItems(messages: unknown[]): ChatItem[] {
+  return messages.reduce<ChatItem[]>((items, m) => applyMessage(items, m, false), []);
+}
+
+/** Akış halindeki metin parçasını döndürür (sadece ana ajan, alt ajanlar değil) */
+export function streamDelta(raw: unknown): { text?: string; thinking?: string } | null {
+  const msg = raw as AnyMsg;
+  if (msg.type !== "stream_event" || msg.parent_tool_use_id) return null;
+  const ev = msg.event as { type?: string; delta?: { type?: string; text?: string; thinking?: string } } | undefined;
+  if (ev?.type !== "content_block_delta" || !ev.delta) return null;
+  if (ev.delta.type === "text_delta") return { text: ev.delta.text ?? "" };
+  if (ev.delta.type === "thinking_delta") return { thinking: ev.delta.thinking ?? "" };
+  return null;
+}
+
+/** Bir öğenin düz metin hali (kopyalama ve alıntı için) */
+export function itemPlainText(item: ChatItem): string {
+  switch (item.kind) {
+    case "user":
+    case "text":
+    case "thinking":
+    case "notice":
+      return item.text;
+    case "tool":
+      return `${item.name} ${JSON.stringify(item.input)}`;
+    default:
+      return "";
+  }
+}

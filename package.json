@@ -5,13 +5,20 @@
   "description": "Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı: çok ajanlı sohbet arayüzü ve 3D kütüphane",
   "license": "MIT",
   "workspaces": [
-    "server"
+    "server",
+    "web"
   ],
   "scripts": {
-    "cli": "npm run cli --workspace server",
+    "dev": "concurrently -k -n server,web -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web",
+    "start": "npm run start -w server",
+    "cli": "npm run cli -w server",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
   }
 }

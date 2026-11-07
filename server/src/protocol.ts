@@ -65,14 +65,51 @@ export type JobInfo = {
   error?: string;
 };
 
+/** Mesaja eklenen dosya. Görseller ve PDF'ler Claude'a dosya olarak, metin dosyaları içerik olarak gider. */
+export type Attachment = { name: string; mediaType: string; /** base64 */ data: string };
+
+export type McpServerInfo = { name: string; status: string; error?: string; toolCount?: number; scope?: string };
+export type SlashCommandInfo = { name: string; description: string; argumentHint?: string };
+export type ContextInfo = { percentage: number; totalTokens: number; maxTokens: number };
+
+export type ClaudeInfo = {
+  chatId: string;
+  context?: ContextInfo;
+  mcp?: McpServerInfo[];
+  commands?: SlashCommandInfo[];
+};
+
+export type GitInfo = {
+  cwd: string;
+  isRepo: boolean;
+  branch?: string;
+  added: number;
+  removed: number;
+  files: { path: string; added: number; removed: number; untracked?: boolean }[];
+};
+
 export type ClientMsg =
-  | { type: "claude.open"; chatId: string; resume?: string; fork?: boolean; cwd?: string }
-  | { type: "claude.send"; chatId: string; text: string }
+  | { type: "claude.open"; chatId: string; resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[] }
+  | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
+  | { type: "claude.info"; chatId: string }
+  | { type: "claude.setDirs"; chatId: string; dirs: string[] }
+  | { type: "claude.mcpToggle"; chatId: string; server: string; enabled: boolean }
+  | { type: "claude.mcpReconnect"; chatId: string; server: string }
+  | { type: "claude.stopTask"; chatId: string; taskId: string }
+  | { type: "git.info"; cwd: string }
+  | { type: "git.diff"; cwd: string; file?: string }
   | { type: "claude.interrupt"; chatId: string }
   | { type: "claude.close"; chatId: string }
   | { type: "claude.setMode"; chatId: string; mode: PermissionMode }
   | { type: "claude.setModel"; chatId: string; model?: string }
-  | { type: "claude.permission"; requestId: string; allow: boolean; always?: boolean }
+  | {
+      type: "claude.permission";
+      requestId: string;
+      allow: boolean;
+      always?: boolean;
+      /** Aracın girdisini değiştirerek izin ver (örneğin AskUserQuestion cevapları: { answers: { soru: cevap } }) */
+      updatedInput?: Record<string, unknown>;
+    }
   | { type: "claude.sessions"; cwd?: string }
   | { type: "claude.history"; sessionId: string }
   | { type: "claude.rename"; sessionId: string; title: string }
@@ -89,6 +126,10 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { type: "welcome"; cwd: string; claudeCodeVersion?: string }
+  | ({ type: "claude.info" } & ClaudeInfo)
+  | { type: "claude.dirs"; chatId: string; dirs: string[] }
+  | ({ type: "git.info" } & GitInfo)
+  | { type: "git.diff"; cwd: string; file?: string; diff: string }
   | { type: "claude.message"; chatId: string; message: SDKMessage }
   | { type: "claude.session"; chatId: string; sessionId: string }
   | { type: "claude.busy"; chatId: string; busy: boolean }

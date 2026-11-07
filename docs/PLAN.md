@@ -1,6 +1,6 @@
 # Scriptorium — Plan
 
-**Durum:** Aşama 1 devam ediyor (başlangıç 2026-11-07).
+**Durum:** Tüm aşamalar tamam (2026-11-07). Kalan tek iş: DeepSeek anahtarı ve Ollama kurulumu, ardından uçtan uca işçi testi.
 **Ad:** Scriptorium. Ortaçağ manastırlarında yazıcıların masalarında el yazması kopyaladığı oda. Claude baş yazıcı, işçiler yazıcılar. (Eski çalışma adı: isci-mcp)
 **Geri dönünce:** Claude'a "Scriptorium planına devam" de.
 **Arayüz kararı:** Kendi arayüzümüz, HeroUI ile (aşağıda, "Arayüz tasarımı" bölümünde).
@@ -119,54 +119,55 @@ scriptorium/
 
 ## "Eksiksiz entegrasyon" kontrol listesi (sohbet paneli)
 
-- [ ] Ajan seçici: Claude (varsayılan), DeepSeek veya herhangi bir local model. Her ajanın ayrı sohbet geçmişi olur.
-- [ ] Akış halinde cevap (streaming), düşünme bloklarını açıp kapatma
-- [ ] Claude'un araç çağrılarını gösterme: okuduğu dosya, çalıştırdığı komut, diff
-- [ ] İzin onayı: Claude bir komut çalıştırmak istediğinde arayüzde Onayla / Reddet
-- [ ] Durdurma butonu (cevabı yarıda kesme)
-- [ ] Oturum geçmişi, eski sohbete dönme
-- [ ] Claude bir işçiye iş verdiğinde sohbette "→ DeepSeek'e devredildi" kartı görünmesi ve 3D sahnede ilgili karakterin hareket etmesi
-- [ ] Tanınmayan mesaj türleri için genel kart (Claude Code güncellemelerinde arayüz bozulmasın diye)
-- [ ] Yan sohbet (side chat), ana sohbetten çatallanan ayrı oturum
-- [ ] Mesaja yanıt verme (alıntı)
-- [ ] Tema seçici (açık/koyu + vurgu rengi)
-- [ ] Terminal sekmesi (opsiyonel): gerçek Claude Code ekranı
+- [x] Ajan seçici: Claude, DeepSeek ve local modeller. Her ajanın ayrı sohbet geçmişi var.
+- [x] Akış halinde cevap, düşünme blokları açılıp kapanıyor.
+- [x] Claude'un araç çağrıları kartlarla gösteriliyor: okuma, komut, Edit/Write için kırmızı-yeşil fark, yapılacaklar listesi, alt ajan adımları girintili.
+- [x] İzin onayı: İzin ver / Her zaman izin ver / Reddet. Claude'un seçenekli soruları (AskUserQuestion) da cevaplanabiliyor.
+- [x] Durdurma butonu
+- [x] Oturum geçmişi: terminaldeki Claude Code oturumlarıyla ortak. Açılabiliyor, yeniden adlandırılabiliyor, silinebiliyor. Sayfa yenilenince kaldığı yerden devam ediyor.
+- [x] "→ DeepSeek'e devredildi" kartı ve 3D'de karakterin masaya yürümesi
+- [x] Tanınmayan mesaj türleri genel kartla gösteriliyor (Claude Code güncellemelerine dayanıklı).
+- [x] Yan sohbet (forkSession): ana sohbetin bağlamını biliyor, ana sohbete karışmıyor.
+- [x] Mesaja alıntıyla yanıt verme (seçili metin ya da mesajın tamamı)
+- [x] Tema seçici (açık/koyu/sistem + 6 vurgu rengi) ve pixel görünüm anahtarı
+- [x] **Oturum bilgi paneli** (sağ üst): ortam ve git dalı, ek klasörler, bağlam doluluğu, bağlayıcılar (aç/kapa, yeniden bağlan), çıktılar (yazılan dosyalar), git değişiklikleri (+/− ve diff), arka plan görevleri (durdurulabilir) ve işçi işleri
+- [x] **"+" menüsü** (sol alt): dosya veya fotoğraf ekle (görsel, PDF, metin; yapıştırma ve sürükle-bırak da çalışıyor), klasör ekle, slash komutları, bağlayıcılar, eklentiler
+- [x] Slash komut önerileri: `/` yazınca açılıyor, ok tuşları ve Tab/Enter ile seçiliyor.
+- [ ] Terminal sekmesi (opsiyonel, sonraya bırakıldı): gerçek Claude Code ekranı. node-pty yerel derleme gerektiriyor.
 
-## Başlamadan önce senin yapacakların (~15 dk)
+## Senin yapacakların (en son, ~15 dk)
 
 1. Bankadan sanal kart aç. Limiti 2-5 $, internet ve yurtdışı işlemleri açık olsun.
 2. platform.deepseek.com üzerinde hesap aç, bakiye yükle, bir API anahtarı oluştur.
-3. Anahtarı ortam değişkenine ekle (anahtarı sohbete yapıştırma):
-   `setx DEEPSEEK_API_KEY "anahtarın"`
-4. Ollama'yı kur ve modelleri indir:
+3. Anahtarı proje kökündeki `.env` dosyasına ekle (anahtarı sohbete yapıştırma): `DEEPSEEK_API_KEY=sk-...`
+4. Ollama'yı kur ve modeli indir:
    `winget install Ollama.Ollama`, ardından `ollama pull hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_XS`
+5. Sunucuyu yeniden başlat (`npm run dev`). İşçilerin yanındaki kırmızı nokta yeşile dönmeli.
 
 ## Aşamalar
 
-### Aşama 1: Arka uç iskeleti + işçi araçları (~2-3 saat)
-- [x] Node/TS projesi. Agent SDK, `pathToClaudeCodeExecutable` ile kurulu `claude`'a bağlanıyor (Claude Code 2.1.263, işçi araçları kayıtlı). `npm run cli` ile test ediliyor.
-  - [x] Canlı sohbet testi: abonelik girişiyle bağlanıyor, Claude `list_workers`'ı kendisi çağırıp doğru cevap veriyor. İşçi araçları `alwaysLoad` ile en baştan yüklü.
-  - [x] Yan sohbet (forkSession) testi: yan sohbet ana bağlamı biliyor, yan sohbette söylenenler ana sohbete sızmıyor, oturum kimlikleri farklı.
-  - [ ] Uçtan uca DeepSeek testi ("DeepSeek'e fonksiyon yazdır, test geçsin"). DeepSeek anahtarı gelince yapılacak.
-- [x] DeepSeek ve Ollama için tek bir sohbet istemcisi (OpenAI uyumlu), `max_tokens` limiti. DeepSeek anahtarı ve Ollama gelince test edilecek.
-- [x] `agents.json` ve işçi araçları (SDK içi MCP, sunucu adı `workers`)
-- **Bitti sayılması için:** Terminalden Claude'a "DeepSeek'e şu fonksiyonu yazdır" denince kodun gelmesi ve testin geçmesi.
+### Aşama 1: Arka uç iskeleti + işçi araçları ✅
+- [x] Agent SDK, `pathToClaudeCodeExecutable` ile kurulu `claude`'a bağlanıyor. Abonelik girişiyle, CLI kendini güncellediğinde yeni sürüm otomatik kullanılıyor.
+- [x] SDK içi MCP işçi araçları: `list_workers`, `ask_worker`, `start_job`, `job_status` (`alwaysLoad`). Gizlilik kuralı: `sensitive: true` sadece local işçilere gider.
+- [x] DeepSeek ve Ollama için tek bir OpenAI uyumlu istemci, `max_tokens` limiti
+- [ ] Uçtan uca DeepSeek testi ("DeepSeek'e fonksiyon yazdır, test geçsin"). **DeepSeek anahtarı gelince yapılacak.** Anahtarsız hata yolu test edildi.
 
-### Aşama 2: Sohbet arayüzü (~1-2 gün)
-- [ ] WebSocket köprüsü. SDK mesajları arayüze ham haliyle iletilir: arayüz tanıdıklarını özel gösterir, tanımadıklarını genel kartla.
-- [ ] Geçmiş paneli için SDK'nın oturum fonksiyonları: `listSessions`, `getSessionMessages`, `renameSession`, `deleteSession`. Bunlar terminaldeki Claude Code oturumlarıyla ortak.
-- [ ] Yukarıdaki "eksiksiz entegrasyon" listesinin tamamı
-- **Bitti sayılması için:** Tarayıcıdan Claude'la Claude Code'daki gibi çalışılabilmesi ve işçilerle doğrudan sohbet edilebilmesi.
+### Aşama 2: Sohbet arayüzü ✅
+- [x] WebSocket köprüsü: sadece 127.0.0.1'e açık, yalnızca izinli arayüz adreslerinden bağlantı kabul ediyor.
+- [x] Yukarıdaki kontrol listesi (terminal sekmesi hariç)
 
-### Aşama 3: 3D kütüphane (~3-5 saat)
-- [ ] react-three-fiber ile sahne: Claude ortada kütüphaneci, her işçi bir karakter
-- [ ] Durumlar: boşta (koltukta kitap okuyor 💤), çalışıyor (masada, kafasının üstünde görev baloncuğu), hata (kırmızı)
-- **Bitti sayılması için:** Claude iş verdiğinde karakterin masaya geçmesi, iş bitince koltuğa dönmesi.
+### Aşama 3: 3D sahne ✅
+- [x] İzometrik ofis-kütüphane (ortografik kamera, pixel görünüm). Claude arkada baş masada, işçiler sıra sıra monitörlü masalarda.
+- [x] Durumlar:
+  - çalışıyor: masada yazıyor, ekran yanıyor, görev etiketi görünüyor
+  - boşta: dinlenme köşesinde kitap okuyor
+  - yer kalmazsa: masada uyukluyor
+  - hata: kırmızı etiket, 12 sn sonra kendiliğinden boşta durumuna dönüyor
+- [x] Karaktere tıklamak o ajanı seçiyor. Açık ve koyu modda aydınlatma farklı.
 
-### Aşama 4: İşçi ekleme + arka plan işleri + cila (~3-4 saat)
-- [ ] "+" butonu ve form. Form `agents.json`'a yazar, Claude yeni işçiyi `list_workers` ile görür.
-- [ ] `start_job` / `job_status`: iş kuyruğu, hassas işlerin yalnızca local'e yönlendirilmesi
-- **Bitti sayılması için:** Arayüzden eklenen işçiye Claude'un iş verebilmesi, uzun bir local işin arka planda bitmesi.
+### Aşama 4: İşçi ekleme + arka plan işleri ✅
+- [x] "İşçi ekle" penceresi: ekle, düzenle, sil. `agents.json`'a yazıyor, Claude yeni işçiyi hemen görüyor.
+- [x] `start_job` / `job_status` iş kuyruğu. Aynı işçinin işleri sırayla çalışıyor.
 
 ## Sınırlar (unutma)
 

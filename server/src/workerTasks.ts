@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Worker } from "./agents.js";
-import { bus } from "./events.js";
+import { reportActivity } from "./events.js";
 import { chat } from "./llm.js";
 
 /** İşçiye gönderilen dosyaların toplam karakter sınırı (maliyet güvenliği). */
@@ -40,7 +40,7 @@ export async function runWorkerTask(args: {
   signal?: AbortSignal;
 }): Promise<string> {
   const { worker, task, files, cwd, signal } = args;
-  bus.emit("activity", { agentId: worker.id, status: "working", task, by: "claude" });
+  reportActivity({ agentId: worker.id, status: "working", task, by: "claude" });
   try {
     const fileText = files?.length ? await readProjectFiles(cwd, files) : "";
     const userContent = fileText ? `${task}\n\n## Dosyalar\n\n${fileText}` : task;
@@ -52,11 +52,11 @@ export async function runWorkerTask(args: {
       ],
       { signal },
     );
-    bus.emit("activity", { agentId: worker.id, status: "idle" });
+    reportActivity({ agentId: worker.id, status: "idle" });
     return answer || "(işçi boş cevap döndürdü)";
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    bus.emit("activity", { agentId: worker.id, status: "error", error: message });
+    reportActivity({ agentId: worker.id, status: "error", error: message });
     throw new Error(`${worker.name} hata verdi: ${message}`);
   }
 }

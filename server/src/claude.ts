@@ -7,6 +7,7 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { config } from "./config.js";
+import type { Attachment, ClaudeInfo, McpServerInfo } from "./protocol.js";
 import { createWorkerServer } from "./workerTools.js";
 
 /** Kullanıcı mesajlarını SDK'ya akış halinde veren basit kuyruk. Oturum açık kaldıkça yeni mesaj beklenir. */
@@ -54,6 +55,8 @@ export type ClaudeSessionOptions = {
   resume?: string;
   /** true ise `resume` edilen oturum kopyalanır, asıl oturum değişmez (yan sohbet için) */
   fork?: boolean;
+  /** Claude'un erişebileceği ek klasörler */
+  additionalDirectories?: string[];
   onMessage: (msg: SDKMessage) => void;
   canUseTool: CanUseTool;
 };
@@ -76,6 +79,7 @@ export class ClaudeSession {
         pathToClaudeCodeExecutable: config.claudeCodePath,
         resume: opts.resume,
         forkSession: opts.fork,
+        additionalDirectories: opts.additionalDirectories?.length ? opts.additionalDirectories : undefined,
         includePartialMessages: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
         mcpServers: { workers: createWorkerServer(cwd) },
@@ -96,12 +100,52 @@ export class ClaudeSession {
     })();
   }
 
-  send(text: string) {
+  send(text: string, attachments: Attachment[] = []) {
+    const content = attachments.length ? [...attachments.map(attachmentBlock), { type: "text" as const, text }] : text;
     this.inbox.push({
       type: "user",
-      message: { role: "user", content: text },
+      message: { role: "user", content: content as SDKUserMessage["message"]["content"] },
       parent_tool_use_id: null,
     });
+  }
+
+  /** Bilgi panelinin verileri: bağlam doluluğu, MCP sunucuları, slash komutları */
+  async info(chatId: string): Promise<ClaudeInfo> {
+    const withTimeout = <T,>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("zaman aşımı")), 15_000))]);
+    const [ctx, mcp, cmds] = await Promise.allSettled([
+      withTimeout(this.q.getContextUsage()),
+      withTimeout(this.q.mcpServerStatus()),
+      withTimeout(this.q.supportedCommands()),
+    ]);
+    return {
+      chatId,
+      context:
+        ctx.status === "fulfilled"
+          ? { percentage: ctx.value.percentage, totalTokens: ctx.value.totalTokens, maxTokens: ctx.value.maxTokens }
+          : undefined,
+      mcp:
+        mcp.status === "fulfilled"
+          ? mcp.value.map(
+              (m): McpServerInfo => ({ name: m.name, status: m.status, error: m.error, toolCount: m.tools?.length, scope: m.scope }),
+            )
+          : undefined,
+      commands:
+        cmds.status === "fulfilled"
+          ? cmds.value.map((c) => ({ name: c.name, description: c.description, argumentHint: c.argumentHint || undefined }))
+          : undefined,
+    };
+  }
+
+  toggleMcp(server: string, enabled: boolean) {
+    return this.q.toggleMcpServer(server, enabled);
+  }
+
+  reconnectMcp(server: string) {
+    return this.q.reconnectMcpServer(server);
+  }
+
+  stopTask(taskId: string) {
+    return this.q.stopTask(taskId);
   }
 
   interrupt() {
@@ -120,4 +164,20 @@ export class ClaudeSession {
     this.inbox.end();
     this.q.close();
   }
+}
+
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+/** Ek dosyayı Claude'un anlayacağı içerik bloğuna çevirir */
+function attachmentBlock(a: Attachment) {
+  if (IMAGE_TYPES.has(a.mediaType)) {
+    return { type: "image" as const, source: { type: "base64" as const, media_type: a.mediaType, data: a.data } };
+  }
+  if (a.mediaType === "application/pdf") {
+    return { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: a.data }, title: a.name };
+  }
+  const text = Buffer.from(a.data, "base64").toString("utf8");
+  return { type: "text" as const, text: `<ek-dosya ad="${a.name}">
+${text}
+</ek-dosya>` };
 }
