@@ -71,7 +71,7 @@ function ClaudeHistory() {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
-  const [confirm, setConfirm] = useState<{ title: string; text: string; ids: string[] } | null>(null);
+  const [confirm, setConfirm] = useState<{ title: string; text: string; ids: string[]; hideKey?: string } | null>(null);
   const [hidden, setHidden] = useState<string[]>(() => load<string[]>("hiddenProjects", []));
   const [showHidden, setShowHidden] = useState(false);
   const [editReq, setEditReq] = useState<{ id: string; n: number } | null>(null);
@@ -136,8 +136,9 @@ function ClaudeHistory() {
               onSelect: () =>
                 setConfirm({
                   title: `"${g.name}" sohbetleri silinsin mi?`,
-                  text: `Bu klasördeki ${g.sessions.length} Claude sohbeti kalıcı olarak silinecek. Geri alınamaz. Diskteki klasöre ve dosyalarına dokunulmaz, sadece sohbet kayıtları silinir.`,
+                  text: `Bu klasördeki ${g.sessions.length} Claude sohbeti kalıcı olarak silinecek. Geri alınamaz. Diskteki klasöre ve dosyalarına dokunulmaz, sadece sohbet kayıtları silinir. Proje listeden de gizlenir.`,
                   ids: g.sessions.map((s) => s.id),
+                  hideKey: k,
                 }),
             }] as MenuItem[])
           : []),
@@ -184,7 +185,11 @@ function ClaudeHistory() {
                 size="sm"
                 variant="danger"
                 onPress={() => {
-                  if (confirm) actions.deleteSessions(confirm.ids);
+                  if (confirm) {
+                    actions.deleteSessions(confirm.ids);
+                    // Diskte duran proje klasörü listede kalmasın
+                    if (confirm.hideKey) hide(confirm.hideKey, true);
+                  }
                   setConfirm(null);
                 }}
               >

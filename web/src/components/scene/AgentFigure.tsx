@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { anchors, useHovered } from "./labels";
 import type { Seat } from "./layout";
@@ -28,9 +28,20 @@ export function AgentFigure(p: Props) {
   const root = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
   const head = useRef<THREE.Group>(null);
+  const footL = useRef<THREE.Mesh>(null);
+  const footR = useRef<THREE.Mesh>(null);
   const target = useMemo(() => new THREE.Vector3(), []);
+  const dir = useMemo(() => new THREE.Vector3(), []);
   const hatColor = useMemo(() => new THREE.Color(p.color).multiplyScalar(0.62).getStyle(), [p.color]);
   const anchor = useRef<THREE.Group>(null);
+
+  // Başlangıç yeri sadece bir kez verilir. Konumu prop olarak vermek, poz değişince karakteri
+  // yeni yere ışınlıyor ve yürüme animasyonunu eziyordu.
+  useLayoutEffect(() => {
+    root.current?.position.set(...p.seat.pos);
+    if (root.current) root.current.rotation.y = p.seat.rot;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Baş üstü noktasını etiket katmanına kaydet
   useEffect(() => {
@@ -47,27 +58,49 @@ export function AgentFigure(p: Props) {
     if (!g || !body.current || !head.current) return;
     target.set(...p.seat.pos);
     const dist = g.position.distanceTo(target);
-    const k = 1 - Math.pow(0.03, dt); // kare hızından bağımsız yumuşak geçiş
-    g.position.lerp(target, k * 0.8);
-    let dr = p.seat.rot - g.rotation.y;
+    const walking = dist > 0.06;
+
+    // Sabit hızla yürür (uzak yerlere daha uzun sürer), varınca yumuşakça yerine oturur
+    if (walking) {
+      dir.subVectors(target, g.position);
+      const step = Math.min(dist, 2.4 * dt);
+      g.position.addScaledVector(dir.normalize(), step);
+    } else {
+      g.position.lerp(target, 1 - Math.pow(0.001, dt));
+    }
+
+    // Yürürken gittiği yöne, varınca oturma yönüne döner
+    const desired = walking ? Math.atan2(target.x - g.position.x, target.z - g.position.z) : p.seat.rot;
+    let dr = desired - g.rotation.y;
     dr = Math.atan2(Math.sin(dr), Math.cos(dr));
-    g.rotation.y += dr * k;
+    g.rotation.y += dr * (1 - Math.pow(0.0005, dt));
 
     const t = state.clock.elapsedTime;
     const h = head.current;
-    if (dist > 0.06) {
-      body.current.position.y = Math.abs(Math.sin(t * 12)) * 0.14; // zıplayarak yürür
-      h.rotation.set(0, 0, 0);
+    const swing = Math.sin(t * 13);
+    if (footL.current && footR.current) {
+      // Ayaklar: yürürken sırayla öne-arkaya ve yukarı, otururken toplu
+      footL.current.position.set(-0.12, 0.06 + (walking ? Math.max(0, swing) * 0.08 : 0), walking ? swing * 0.14 : 0.08);
+      footR.current.position.set(0.12, 0.06 + (walking ? Math.max(0, -swing) * 0.08 : 0), walking ? -swing * 0.14 : 0.08);
+    }
+    if (walking) {
+      body.current.position.y = Math.abs(swing) * 0.06; // her adımda hafif sekme
+      body.current.rotation.set(0.12, 0, swing * 0.07); // öne eğik, iki yana sallanarak
+      h.rotation.set(-0.05, 0, 0);
     } else if (p.pose === "working") {
+      body.current.rotation.set(0, 0, 0);
       body.current.position.y = Math.abs(Math.sin(t * 8)) * 0.025; // hızlı hızlı yazıyor
       h.rotation.set(0.12 + Math.sin(t * 3) * 0.04, Math.sin(t * 0.8) * 0.15, 0);
     } else if (p.pose === "error") {
+      body.current.rotation.set(0, 0, 0);
       body.current.position.y = 0;
       h.rotation.set(0, 0, Math.sin(t * 16) * 0.08); // kafa sallıyor
     } else if (p.pose === "sleeping") {
+      body.current.rotation.set(0, 0, 0);
       body.current.position.y = Math.sin(t * 1.2) * 0.012;
       h.rotation.set(0.55, 0, 0.15); // masaya kapanmış
     } else {
+      body.current.rotation.set(0, 0, 0);
       body.current.position.y = Math.sin(t * 1.4) * 0.012; // sakin nefes
       h.rotation.set(0.32, 0, Math.sin(t * 0.6) * 0.05); // kitaba bakıyor
     }
@@ -76,8 +109,6 @@ export function AgentFigure(p: Props) {
   return (
     <group
       ref={root}
-      position={p.seat.pos}
-      rotation-y={p.seat.rot}
       onClick={(e) => {
         e.stopPropagation();
         p.onSelect();
@@ -99,6 +130,13 @@ export function AgentFigure(p: Props) {
         </mesh>
       )}
 
+      {/* Ayaklar */}
+      {[footL, footR].map((ref, i) => (
+        <mesh key={i} ref={ref} position={[i ? 0.12 : -0.12, 0.06, 0.08]} castShadow>
+          <sphereGeometry args={[0.085, 10, 8]} />
+          <meshStandardMaterial color={hatColor} roughness={0.8} />
+        </mesh>
+      ))}
       <group ref={body}>
         {/* Gövde */}
         <mesh castShadow position-y={0.5}>
