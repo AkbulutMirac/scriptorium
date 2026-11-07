@@ -47,11 +47,11 @@ export function InfoPanel({ chatId }: { chatId: string }) {
           <X size={16} />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2 text-sm">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 text-sm">
         <Environment chat={chat} branch={git?.branch} />
         <ContextSection chat={chat} />
         <Section id="usage" title="Kullanım">
-          <UsageCard usage={chat.info?.usage} />
+          <UsageCard usage={chat.info?.usage} fluid />
         </Section>
         <Connectors chat={chat} />
         <Outputs chat={chat} isRepo={!!git?.isRepo} />
