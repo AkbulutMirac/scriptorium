@@ -96,6 +96,19 @@ export type UsageInfo = {
   sessionCostUsd?: number;
 };
 
+/** DeepSeek hesap bakiyesi (GET /user/balance) */
+export type DeepSeekBalance = {
+  ok: boolean;
+  error?: string;
+  /** Bakiye API çağrısı için yeterli mi */
+  available?: boolean;
+  currency?: string;
+  total?: number;
+  granted?: number;
+  toppedUp?: number;
+  checkedAt: number;
+};
+
 export type ProjectInfo = { path: string; name: string; lastUsed: number; sessionCount: number };
 
 export type DirListing = { path: string; parent?: string; dirs: { name: string; path: string }[] };
@@ -134,6 +147,7 @@ export type ClientMsg =
   | { type: "claude.setEffort"; chatId: string; effort: EffortLevel }
   | { type: "claude.setFastMode"; chatId: string; on: boolean }
   | { type: "projects.list" }
+  | { type: "deepseek.balance" }
   | { type: "fs.list"; path?: string }
   | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
   | { type: "claude.info"; chatId: string }
@@ -175,6 +189,7 @@ export type ServerMsg =
   | { type: "welcome"; cwd: string; claudeCodeVersion?: string }
   | ({ type: "claude.info" } & ClaudeInfo)
   | { type: "projects"; projects: ProjectInfo[] }
+  | { type: "deepseek.balance"; balance: DeepSeekBalance }
   | ({ type: "fs.list" } & DirListing)
   | { type: "claude.allSessions"; sessions: SessionSummary[] }
   | { type: "claude.dirs"; chatId: string; dirs: string[] }

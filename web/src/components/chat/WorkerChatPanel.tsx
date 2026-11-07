@@ -3,6 +3,7 @@ import { Settings2, SquarePen, TriangleAlert } from "lucide-react";
 import { useRef } from "react";
 import { actions, useApp } from "../../store";
 import type { WorkerChatMessage } from "../../protocol";
+import { DeepSeekBalanceChip } from "../DeepSeekBalance";
 import { AgentSelect } from "./AgentSelect";
 import { StreamingDots, useAutoScroll } from "./common";
 import { Composer } from "./Composer";
@@ -47,6 +48,11 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
             <Chip size="sm" variant="soft" color="success">
               veri dışarı çıkmaz
             </Chip>
+          )}
+          {worker.provider === "deepseek" && (
+            <span className="ml-auto">
+              <DeepSeekBalanceChip compact />
+            </span>
           )}
         </div>
       </div>

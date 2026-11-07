@@ -2,7 +2,7 @@
 
 Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyle konuşabildiğin, Claude'un işleri diğer modellere kendi kararıyla dağıttığı çok ajanlı bir çalışma alanı. Kimin ne yaptığı izometrik, piksel görünümlü bir ofis-kütüphanede canlı olarak görünüyor.
 
-> **Durum:** Arayüz ve Claude tarafı tamam. DeepSeek ve Ollama işçileri, anahtar ve kurulum yapılınca çalışır. Ayrıntılı plan: [docs/PLAN.md](docs/PLAN.md)
+> **Durum:** Claude ve DeepSeek tarafı çalışıyor. Local işçiler Ollama kurulunca çalışır. Ayrıntılı plan: [docs/PLAN.md](docs/PLAN.md)
 
 ## Özellikler
 
@@ -26,6 +26,7 @@ Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyl
 - Claude işçilere araçlarla iş devreder: `ask_worker` için cevap beklenir, `start_job` ve `job_status` arka planda çalışır.
 - Gizli veri (`sensitive`) sadece local işçilere gider.
 - İşçiler arayüzden eklenir, düzenlenir, silinir (`server/agents.json`).
+- DeepSeek kalan bakiyesi üst barda ve DeepSeek sohbetinde görünür (5 dakikada bir ve her DeepSeek işinden sonra güncellenir).
 
 **Arayüz:** React, HeroUI v3 ve react-three-fiber ile yapıldı. Açık, koyu ya da sistem teması ve 6 vurgu rengi var. Piksel görünüm açılıp kapatılabilir.
 
@@ -81,6 +82,8 @@ npm start        # tek sunucu: http://localhost:7777
 ```bash
 npm run cli      # terminalden deneme (/yan <mesaj> ile yan sohbet)
 ```
+
+**Windows kısayolu:** `scripts\Scriptorium.bat` arayüzü derleyip sunucuyu başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi bu dosya, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur ("Simge durumuna küçültülmüş" çalıştır). Açılan pencereyi kapatınca sunucu da kapanır.
 
 ## Güvenlik
 

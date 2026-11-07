@@ -1,6 +1,6 @@
 # Scriptorium — Plan
 
-**Durum:** Tüm aşamalar tamam (2026-11-07). Kalan tek iş: DeepSeek anahtarı ve Ollama kurulumu, ardından uçtan uca işçi testi.
+**Durum:** Tüm aşamalar tamam ve DeepSeek bağlı (2026-11-07). Kalan: Ollama kurulumu (local işçi). Başlatma: masaüstündeki Scriptorium kısayolu (scripts\Scriptorium.bat).
 **Ad:** Scriptorium. Ortaçağ manastırlarında yazıcıların masalarında el yazması kopyaladığı oda. Claude baş yazıcı, işçiler yazıcılar. (Eski çalışma adı: isci-mcp)
 **Geri dönünce:** Claude'a "Scriptorium planına devam" de.
 **Arayüz kararı:** Kendi arayüzümüz, HeroUI ile (aşağıda, "Arayüz tasarımı" bölümünde).
@@ -155,7 +155,7 @@ scriptorium/
 - [x] Agent SDK, `pathToClaudeCodeExecutable` ile kurulu `claude`'a bağlanıyor. Abonelik girişiyle, CLI kendini güncellediğinde yeni sürüm otomatik kullanılıyor.
 - [x] SDK içi MCP işçi araçları: `list_workers`, `ask_worker`, `start_job`, `job_status` (`alwaysLoad`). Gizlilik kuralı: `sensitive: true` sadece local işçilere gider.
 - [x] DeepSeek ve Ollama için tek bir OpenAI uyumlu istemci, `max_tokens` limiti
-- [ ] Uçtan uca DeepSeek testi ("DeepSeek'e fonksiyon yazdır, test geçsin"). **DeepSeek anahtarı gelince yapılacak.** Anahtarsız hata yolu test edildi.
+- [x] DeepSeek bağlandı (2026-11-07): bakiye okunuyor, doğrudan sohbet uçtan uca çalışıyor (cevap 1,1 sn), 3D durumları doğru. Claude'un devretme testi kullanıcıyla yapılacak.
 
 ### Aşama 2: Sohbet arayüzü ✅
 - [x] WebSocket köprüsü: sadece 127.0.0.1'e açık, yalnızca izinli arayüz adreslerinden bağlantı kabul ediyor.

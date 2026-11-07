@@ -3,6 +3,7 @@ import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Settings, Sun } from "lucide
 import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
 import { pct, UsageCard } from "./chat/UsageCard";
+import { DeepSeekBalanceChip } from "./DeepSeekBalance";
 import { actions, useApp } from "../store";
 
 export function TopBar() {
@@ -37,6 +38,7 @@ export function TopBar() {
           {runningJobs} arka plan işi
         </Chip>
       )}
+      <DeepSeekBalanceChip />
       <UsageChip />
       <ConnectionDot status={connection} />
       <SettingsPopover />

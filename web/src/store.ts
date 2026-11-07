@@ -7,6 +7,7 @@ import type {
   AgentActivity,
   Attachment,
   ClaudeInfo,
+  DeepSeekBalance,
   DirListing,
   EffortLevel,
   GitInfo,
@@ -99,6 +100,7 @@ type State = {
   projects: ProjectInfo[];
   /** Tüm projelerin Claude oturumları (geçmiş panelinde projelere göre gruplanır) */
   allSessions: SessionSummary[];
+  deepseekBalance?: DeepSeekBalance;
   /** Sohbetten bağımsız bilgi: modeller, kullanım limitleri, komutlar */
   globalInfo?: ClaudeInfo;
   /** Bilgi panelinde açılıp görünür kılınacak bölüm ("Tümünü gör" gibi) */
@@ -295,6 +297,10 @@ function onServer(msg: ServerMsg) {
       set({ projects: msg.projects });
       return;
 
+    case "deepseek.balance":
+      set({ deepseekBalance: msg.balance });
+      return;
+
     case "fs.list":
       set({ folderPicker: { ...s.folderPicker, listing: { path: msg.path, parent: msg.parent, dirs: msg.dirs } } });
       return;
@@ -486,6 +492,10 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setFastMode", chatId, on });
     updateChat(chatId, (x) => ({ ...x, fastMode: on, wantFast: on }));
+  },
+
+  refreshDeepseekBalance() {
+    socket.send({ type: "deepseek.balance" });
   },
 
   loadProjects() {

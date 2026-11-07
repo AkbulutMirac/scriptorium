@@ -24,7 +24,7 @@ import { bus, reportActivity } from "./events.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { isIgnoredPath, listDir, listProjects } from "./projects.js";
-import { isAvailable } from "./llm.js";
+import { deepseekBalance, isAvailable } from "./llm.js";
 import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
 
@@ -58,6 +58,22 @@ bus.on("activity", (a) => {
   broadcast({ type: "activity", activity: a });
 });
 bus.on("jobs", () => broadcast({ type: "jobs", jobs: listJobs() }));
+
+// ─── DeepSeek bakiyesi: açılışta, 5 dakikada bir ve her DeepSeek işinden sonra ─────
+let lastBalance: Awaited<ReturnType<typeof deepseekBalance>> | null = null;
+let balanceTimer: ReturnType<typeof setTimeout> | null = null;
+async function refreshBalance() {
+  lastBalance = await deepseekBalance();
+  broadcast({ type: "deepseek.balance", balance: lastBalance });
+}
+setInterval(refreshBalance, 5 * 60_000);
+bus.on("activity", async (a) => {
+  if (a.status === "working") return;
+  const w = (await loadWorkers()).find((x) => x.id === a.agentId);
+  if (w?.provider !== "deepseek") return;
+  if (balanceTimer) clearTimeout(balanceTimer);
+  balanceTimer = setTimeout(refreshBalance, 2000); // harcama bakiyeye birkaç saniyede yansır
+});
 
 // ─── Claude oturumları ─────────────────────────────────────────────────────────
 
@@ -414,6 +430,9 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "jobs.list":
       return reply(ws, { type: "jobs", jobs: listJobs() });
+
+    case "deepseek.balance":
+      return refreshBalance();
   }
 }
 
@@ -485,6 +504,8 @@ wss.on("connection", async (ws) => {
   reply(ws, { type: "workers", workers: await workersWithAvailability() });
   reply(ws, { type: "jobs", jobs: listJobs() });
   for (const a of lastActivity.values()) reply(ws, { type: "activity", activity: a });
+  if (lastBalance) reply(ws, { type: "deepseek.balance", balance: lastBalance });
+  else refreshBalance();
 });
 
 server.listen(config.port, HOST, () => {
