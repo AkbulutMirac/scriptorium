@@ -54,6 +54,7 @@ export type ClaudeChat = {
   effort?: EffortLevel;
   wantEffort?: EffortLevel;
   fastMode?: boolean;
+  wantFast?: boolean;
   cwd: string;
   /** Claude'un erişebileceği ek klasörler */
   dirs: string[];
@@ -65,7 +66,7 @@ export type ClaudeChat = {
 
 export type PermissionReq = Extract<ServerMsg, { type: "claude.permissionRequest" }>;
 export type LiveWorkerChat = WorkerChat & { stream: string; busy: boolean };
-export type Overlay = { title: string; body: string; mono?: boolean; diff?: boolean };
+export type Overlay = { title: string; body: string; mono?: boolean; diff?: boolean; image?: string };
 export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: number; infoOpen: boolean };
 
 type State = {
@@ -98,6 +99,8 @@ type State = {
   projects: ProjectInfo[];
   /** Tüm projelerin Claude oturumları (geçmiş panelinde projelere göre gruplanır) */
   allSessions: SessionSummary[];
+  /** Sohbetten bağımsız bilgi: modeller, kullanım limitleri, komutlar */
+  globalInfo?: ClaudeInfo;
   /** Bilgi panelinde açılıp görünür kılınacak bölüm ("Tümünü gör" gibi) */
   infoFocus: { section: string; n: number } | null;
   /** Klasör gezgini */
@@ -182,7 +185,15 @@ function refreshSessions() {
   socket.send({ type: "claude.sessions", all: true });
 }
 
-/** Sohbetin Claude Code sürecini gerekiyorsa açar (ilk mesajda ya da yeniden bağlanınca). */
+/** Sunucuda hâlâ açıksa sohbete yeniden bağlanır; değilse hiçbir şey başlatmaz (sayfa yenilenince / yeniden bağlanınca). */
+function reattach(chatId: string) {
+  const c = get().chats[chatId];
+  if (!c) return;
+  socket.send({ type: "claude.open", chatId, resume: c.sessionId, cwd: c.cwd || undefined, attachOnly: true });
+  updateChat(chatId, (x) => ({ ...x, opened: true }));
+}
+
+/** Sohbetin Claude Code sürecini gerekiyorsa açar (ilk mesajda). */
 function ensureOpen(chatId: string) {
   const c = get().chats[chatId];
   if (!c || c.opened) return;
@@ -197,6 +208,7 @@ function ensureOpen(chatId: string) {
     effort: c.wantEffort,
   });
   if (c.wantMode) socket.send({ type: "claude.setMode", chatId, mode: c.wantMode });
+  if (c.wantFast !== undefined) socket.send({ type: "claude.setFastMode", chatId, on: c.wantFast });
   updateChat(chatId, (x) => ({ ...x, opened: true }));
 }
 
@@ -216,6 +228,7 @@ function onServer(msg: ServerMsg) {
   switch (msg.type) {
     case "welcome": {
       socket.send({ type: "projects.list" });
+      socket.send({ type: "claude.globalInfo" });
       // Sohbet, sunucunun varsayılan klasörü gelmeden açılmış olabilir: boş klasörleri doldur
       const chats = Object.fromEntries(Object.entries(s.chats).map(([id, c]) => [id, c.cwd ? c : { ...c, cwd: msg.cwd }]));
       set({ serverCwd: msg.cwd, chats });
@@ -260,6 +273,7 @@ function onServer(msg: ServerMsg) {
       if (m.type === "result") {
         if (msg.chatId === s.mainChatId) refreshSessions();
         socket.send({ type: "claude.info", chatId: msg.chatId });
+        socket.send({ type: "claude.globalInfo" });
         const cwd = get().chats[msg.chatId]?.cwd;
         if (cwd) socket.send({ type: "git.info", cwd });
       }
@@ -268,7 +282,8 @@ function onServer(msg: ServerMsg) {
 
     case "claude.info": {
       const { type: _t, ...info } = msg;
-      updateChat(msg.chatId, (c) => ({ ...c, info }));
+      if (msg.chatId === "__global") set({ globalInfo: info });
+      else updateChat(msg.chatId, (c) => ({ ...c, info }));
       return;
     }
 
@@ -338,7 +353,10 @@ function onServer(msg: ServerMsg) {
     case "claude.history":
       for (const c of Object.values(s.chats)) {
         if (c.sessionId === msg.sessionId && c.loadingHistory) {
-          updateChat(c.chatId, (x) => ({ ...x, items: historyToItems(msg.messages), loadingHistory: false }));
+          // Oturum başka bir klasöre aitse doğru klasörde devam ettirilsin
+          const cwd = msg.cwd && !c.opened ? msg.cwd : c.cwd;
+          updateChat(c.chatId, (x) => ({ ...x, items: historyToItems(msg.messages), loadingHistory: false, cwd }));
+          if (cwd !== c.cwd) socket.send({ type: "git.info", cwd });
         }
       }
       return;
@@ -398,10 +416,7 @@ export function startConnection() {
     } else {
       // Yeniden bağlandık: açık sohbetlere yeniden bağlan (sunucu yeniden başladıysa oturum devam ettirilir)
       for (const c of Object.values(chats)) {
-        if (c.opened) {
-          updateChat(c.chatId, (x) => ({ ...x, opened: false }));
-          ensureOpen(c.chatId);
-        }
+        if (c.opened) reattach(c.chatId);
       }
     }
     if (selected !== CLAUDE_ID) socket.send({ type: "worker.chats", workerId: selected });
@@ -469,9 +484,8 @@ export const actions = {
   setFastMode(chatId: string, on: boolean) {
     const c = get().chats[chatId];
     if (!c) return;
-    ensureOpen(chatId);
-    socket.send({ type: "claude.setFastMode", chatId, on });
-    updateChat(chatId, (x) => ({ ...x, fastMode: on }));
+    if (c.opened) socket.send({ type: "claude.setFastMode", chatId, on });
+    updateChat(chatId, (x) => ({ ...x, fastMode: on, wantFast: on }));
   },
 
   loadProjects() {
@@ -492,31 +506,40 @@ export const actions = {
   },
 
   /** Geçmişteki bir oturumu açar. reattach=true: sayfa yenilendi, sunucuda hâlâ açık olabilir. */
-  openClaudeSession(sessionId: string, chatId = uuid(), reattach = false) {
-    if (get().chats[get().mainChatId ?? ""]?.sessionId === sessionId && !reattach) return;
+  openClaudeSession(sessionId: string, chatId = uuid(), reattachToServer = false) {
+    if (get().chats[get().mainChatId ?? ""]?.sessionId === sessionId && !reattachToServer) return;
     closeChat(get().sideChatId);
     closeChat(get().mainChatId);
-    const session = get().sessions.find((x) => x.id === sessionId);
+    const session = get().sessions.find((x) => x.id === sessionId) ?? get().allSessions.find((x) => x.id === sessionId);
     const chat = emptyChat(chatId, session?.cwd || effectiveCwd(), { sessionId, loadingHistory: true });
     set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null });
     persistMain();
     socket.send({ type: "claude.history", sessionId });
-    if (reattach) ensureOpen(chatId);
+    if (reattachToServer) reattach(chatId);
   },
 
   sendClaude(chatId: string, text: string, attachments: Attachment[] = []) {
     ensureOpen(chatId);
-    const shown = attachments.length ? `${attachments.map((a) => `📎 ${a.name}`).join("\n")}\n\n${text}` : text;
-    updateChat(chatId, (c) => ({ ...c, busy: true, items: [...c.items, { kind: "user", id: uuid(), text: shown }] }));
+    const images = attachments.filter((a) => a.mediaType.startsWith("image/")).map((a) => ({ src: `data:${a.mediaType};base64,${a.data}`, name: a.name }));
+    const files = attachments.filter((a) => !a.mediaType.startsWith("image/"));
+    const shown = files.length ? `${files.map((a) => `📎 ${a.name}`).join("\n")}\n\n${text}` : text;
+    updateChat(chatId, (c) => ({
+      ...c,
+      busy: true,
+      items: [...c.items, { kind: "user", id: uuid(), text: shown, images: images.length ? images : undefined }],
+    }));
     socket.send({ type: "claude.send", chatId, text, attachments: attachments.length ? attachments : undefined });
   },
 
-  /** Bilgi paneli ve + menüsü için verileri iste (gerekirse oturumu açar) */
+  /**
+   * Bilgi paneli ve menüler için verileri iste. Sohbeti açmaz: geçmişteki bir sohbete bakmak onu
+   * yeniden başlatmasın. Sohbet açık değilse modeller, kullanım ve komutlar ortak bilgiden gelir.
+   */
   requestInfo(chatId: string) {
-    ensureOpen(chatId);
-    socket.send({ type: "claude.info", chatId });
-    const cwd = get().chats[chatId]?.cwd;
-    if (cwd) socket.send({ type: "git.info", cwd });
+    const c = get().chats[chatId];
+    if (c?.opened) socket.send({ type: "claude.info", chatId });
+    socket.send({ type: "claude.globalInfo" });
+    if (c?.cwd) socket.send({ type: "git.info", cwd: c.cwd });
   },
 
   refreshGit(cwd: string) {

@@ -25,6 +25,7 @@ const fmt = (n: number) => n.toLocaleString("tr-TR");
 export function InfoPanel({ chatId }: { chatId: string }) {
   const chat = useApp((s) => s.chats[chatId]);
   const git = useApp((s) => s.git[s.chats[chatId]?.cwd ?? ""]);
+  const globalUsage = useApp((s) => s.globalInfo?.usage);
 
   useEffect(() => {
     actions.requestInfo(chatId);
@@ -51,7 +52,7 @@ export function InfoPanel({ chatId }: { chatId: string }) {
         <Environment chat={chat} branch={git?.branch} />
         <ContextSection chat={chat} />
         <Section id="usage" title="Kullanım">
-          <UsageCard usage={chat.info?.usage} fluid />
+          <UsageCard usage={chat.info?.usage ?? globalUsage} fluid />
         </Section>
         <Connectors chat={chat} />
         <Outputs chat={chat} isRepo={!!git?.isRepo} />
@@ -201,8 +202,10 @@ function ContextSection({ chat }: { chat: ClaudeChat }) {
             {fmt(ctx.totalTokens)} / {fmt(ctx.maxTokens)} token
           </p>
         </>
-      ) : (
+      ) : chat.opened ? (
         <Loading />
+      ) : (
+        <p className="text-xs text-muted">Sohbet başlayınca görünür.</p>
       )}
     </Section>
   );
@@ -224,8 +227,11 @@ const STATUS_TEXT: Record<string, string> = {
 };
 
 export function ConnectorList({ chat }: { chat: ClaudeChat }) {
-  const list = chat.info?.mcp ?? chat.init?.mcpServers ?? [];
-  if (!chat.info && !chat.init) return <Loading />;
+  const globalMcp = useApp((s) => s.globalInfo?.mcp);
+  const list = chat.info?.mcp ?? chat.init?.mcpServers ?? globalMcp ?? [];
+  if (!chat.info && !chat.init && !globalMcp) return <Loading />;
+  // Sohbet açık değilken liste ortak bilgiden gelir; aç/kapa ve yeniden bağlanma sohbet açılınca çalışır
+  const live = chat.opened;
   if (!list.length) return <p className="text-xs text-muted">Bağlayıcı yok.</p>;
   return (
     <ul className="flex flex-col gap-1.5">
@@ -242,7 +248,7 @@ export function ConnectorList({ chat }: { chat: ClaudeChat }) {
                 {extra.error && ` · ${extra.error}`}
               </div>
             </div>
-            {(m.status === "failed" || m.status === "needs-auth") && (
+            {live && (m.status === "failed" || m.status === "needs-auth") && (
               <Tooltip delay={300}>
                 <Button isIconOnly size="sm" variant="ghost" aria-label="Yeniden bağlan" onPress={() => actions.reconnectMcp(chat.chatId, m.name)}>
                   <RotateCw size={13} />
@@ -250,7 +256,7 @@ export function ConnectorList({ chat }: { chat: ClaudeChat }) {
                 <Tooltip.Content>Yeniden bağlan</Tooltip.Content>
               </Tooltip>
             )}
-            {m.name !== "workers" && (
+            {live && m.name !== "workers" && (
               <Switch size="sm" isSelected={m.status !== "disabled"} onChange={(on) => actions.toggleMcp(chat.chatId, m.name, on)} aria-label={`${m.name} aç/kapat`}>
                 <Switch.Control>
                   <Switch.Thumb />

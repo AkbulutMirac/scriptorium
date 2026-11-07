@@ -29,7 +29,11 @@ export function ExpandOverlay() {
           </Button>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          {overlay.mono ? (
+          {overlay.image ? (
+            <div className="flex h-full items-center justify-center">
+              <img src={overlay.image} alt={overlay.title} className="max-h-full max-w-full rounded-lg object-contain" />
+            </div>
+          ) : overlay.mono ? (
             <pre className="font-code text-[13px] leading-relaxed">
               {overlay.body.split("\n").map((line, i) => (
                 <div

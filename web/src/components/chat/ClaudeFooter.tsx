@@ -146,7 +146,8 @@ const MAIN_MODEL_COUNT = 5;
 function ModelMenu({ chat }: { chat: ClaudeChat }) {
   const [open, setOpen] = useState(false);
   const [more, setMore] = useState(false);
-  const models = chat.info?.models ?? [];
+  const globalInfo = useApp((s) => s.globalInfo);
+  const models = chat.info?.models ?? globalInfo?.models ?? [];
   const current = currentModel(chat, models);
   const efforts = current?.efforts.length ? current.efforts : ALL_EFFORTS;
   const effort = chat.wantEffort ?? chat.effort;
@@ -282,7 +283,8 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
 
 /** Kullanım halkası: 5 saatlik limit (yoksa bağlam doluluğu). Üzerine gelince kart, tıklayınca ayrıntı. */
 function UsageRing({ chat }: { chat: ClaudeChat }) {
-  const usage = chat.info?.usage;
+  const globalUsage = useApp((s) => s.globalInfo?.usage);
+  const usage = chat.info?.usage ?? globalUsage;
   const ctx = chat.info?.context;
   const five = pct(usage?.fiveHour);
   const value = five ?? (ctx ? Math.round(ctx.percentage) : null);

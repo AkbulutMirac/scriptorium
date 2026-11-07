@@ -128,6 +128,8 @@ export type ClientMsg =
       additionalDirectories?: string[];
       model?: string;
       effort?: EffortLevel;
+      /** true: sadece sunucuda zaten açıksa yeniden bağlan, değilse hiçbir şey başlatma (sayfa yenilenince) */
+      attachOnly?: boolean;
     }
   | { type: "claude.setEffort"; chatId: string; effort: EffortLevel }
   | { type: "claude.setFastMode"; chatId: string; on: boolean }
@@ -135,6 +137,8 @@ export type ClientMsg =
   | { type: "fs.list"; path?: string }
   | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
   | { type: "claude.info"; chatId: string }
+  /** Sohbetten bağımsız bilgi (modeller, kullanım, komutlar): sunucunun boş yardımcı oturumundan */
+  | { type: "claude.globalInfo" }
   | { type: "claude.setDirs"; chatId: string; dirs: string[] }
   | { type: "claude.mcpToggle"; chatId: string; server: string; enabled: boolean }
   | { type: "claude.mcpReconnect"; chatId: string; server: string }
@@ -192,7 +196,7 @@ export type ServerMsg =
     }
   | { type: "claude.permissionResolved"; requestId: string }
   | { type: "claude.sessions"; sessions: SessionSummary[] }
-  | { type: "claude.history"; sessionId: string; messages: HistoryMessage[] }
+  | { type: "claude.history"; sessionId: string; messages: HistoryMessage[]; /** Oturumun ait olduğu klasör */ cwd?: string }
   | { type: "worker.chats"; workerId: string; chats: WorkerChatSummary[] }
   | { type: "worker.chat"; chat: WorkerChat }
   | { type: "worker.token"; chatId: string; text: string }

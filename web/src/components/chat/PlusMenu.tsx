@@ -10,6 +10,7 @@ type View = "main" | "folder" | "commands" | "connectors" | "plugins";
 /** Yazma kutusunun solundaki "+" menüsü (Claude uygulamasındaki gibi) */
 export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPickCommand: (c: SlashCommandInfo) => void }) {
   const chat = useApp((s) => s.chats[props.chatId]);
+  const globalCommands = useApp((s) => s.globalInfo?.commands);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("main");
   const [path, setPath] = useState("");
@@ -19,7 +20,8 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
     setOpen(false);
     setView("main");
   };
-  const commands: SlashCommandInfo[] = chat?.info?.commands ?? chat?.init?.slashCommands.map((name) => ({ name, description: "" })) ?? [];
+  const commands: SlashCommandInfo[] =
+    chat?.info?.commands ?? globalCommands ?? chat?.init?.slashCommands.map((name) => ({ name, description: "" })) ?? [];
   const shownCommands = commands.filter((c) => c.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (

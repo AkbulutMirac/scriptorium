@@ -137,7 +137,7 @@ function SettingsPopover() {
 
 /** Claude aboneliğinin kullanım limitleri (ana sohbetin bilgisinden). Üzerine gelince kart, tıklayınca ayrıntı. */
 function UsageChip() {
-  const usage = useApp((s) => s.chats[s.mainChatId ?? ""]?.info?.usage);
+  const usage = useApp((s) => s.chats[s.mainChatId ?? ""]?.info?.usage ?? s.globalInfo?.usage);
   if (!usage?.available) return null;
   const five = pct(usage.fiveHour);
   const week = pct(usage.sevenDay);

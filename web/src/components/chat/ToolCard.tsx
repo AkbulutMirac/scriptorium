@@ -21,6 +21,7 @@ import type { ToolResult } from "../../lib/claudeItems";
 import { diffLineClass } from "../../lib/diff";
 import { truncate } from "../../lib/format";
 import { actions, agentMeta, useApp } from "../../store";
+import { Thumbs } from "./Thumbs";
 
 type Props = { name: string; input: Record<string, unknown>; result?: ToolResult };
 
@@ -81,7 +82,7 @@ function GenericToolCard({ name, input, result }: Props) {
   const isEdit = name === "Edit" || name === "MultiEdit" || name === "Write";
 
   return (
-    <div className={`rounded-lg border text-sm ${result?.isError ? "border-danger/40" : "border-separator"}`}>
+    <div className={`min-w-0 rounded-lg border text-sm ${result?.isError ? "border-danger/40" : "border-separator"}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -89,8 +90,8 @@ function GenericToolCard({ name, input, result }: Props) {
       >
         <ChevronRight size={14} className={`shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`} />
         <Icon size={14} className="shrink-0 text-muted" />
-        <span className="shrink-0 font-medium">{d.title}</span>
-        {d.detail && <span className="font-code min-w-0 truncate text-xs text-muted">{d.detail}</span>}
+        <span className="min-w-0 max-w-[60%] shrink-0 truncate font-medium">{d.title}</span>
+        {d.detail && <span className="font-code min-w-0 flex-1 truncate text-xs text-muted">{d.detail}</span>}
         <span className="flex-1" />
         {pending && <Spinner size="sm" />}
         {result?.isError && <span className="text-xs text-danger">hata</span>}
@@ -98,7 +99,10 @@ function GenericToolCard({ name, input, result }: Props) {
       {open && (
         <div className="flex flex-col gap-2 border-t border-separator p-2.5">
           {isEdit ? <EditPreview name={name} input={input} /> : <Block label="Girdi" text={JSON.stringify(input, null, 2)} />}
-          {result && <Block label={result.isError ? "Hata" : "Sonuç"} text={result.text || "(boş)"} danger={result.isError} />}
+          {result && (result.text || !result.images?.length) && (
+            <Block label={result.isError ? "Hata" : "Sonuç"} text={result.text || "(boş)"} danger={result.isError} />
+          )}
+          <Thumbs images={result?.images} />
         </div>
       )}
     </div>
@@ -200,7 +204,7 @@ function DelegationCard({ input, result, background }: { input: Record<string, u
         style={{ background: `${meta.color}14` }}
       >
         <Send size={14} style={{ color: meta.color }} className="shrink-0" />
-        <span className="shrink-0 font-medium">
+        <span className="min-w-0 max-w-[55%] shrink-0 truncate font-medium">
           {meta.name}'e {background ? "arka plan işi verildi" : "devredildi"}
         </span>
         {input.sensitive === true && <span className="shrink-0 rounded bg-warning-soft px-1.5 text-[10px] text-warning-soft-foreground">hassas</span>}

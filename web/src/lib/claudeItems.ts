@@ -4,10 +4,13 @@
  * Tanınmayan yeni bir mesaj türü gelirse "unknown" kartı olarak görünür; Claude Code güncellenince arayüz bozulmaz.
  */
 
-export type ToolResult = { text: string; isError: boolean };
+/** Mesajdaki görsel: base64 ise data: adresi, değilse doğrudan adres */
+export type ChatImage = { src: string; name?: string };
+
+export type ToolResult = { text: string; isError: boolean; images?: ChatImage[] };
 
 export type ChatItem =
-  | { kind: "user"; id: string; text: string }
+  | { kind: "user"; id: string; text: string; images?: ChatImage[] }
   | { kind: "text"; id: string; text: string; parent: string | null }
   | { kind: "thinking"; id: string; text: string; parent: string | null }
   | { kind: "tool"; id: string; name: string; input: Record<string, unknown>; result?: ToolResult; parent: string | null }
@@ -72,11 +75,26 @@ function contentOf(message: unknown): Block[] | string | undefined {
   return undefined;
 }
 
+/** Anthropic içerik bloğundaki görseli gösterilebilir adrese çevirir */
+export function imageOf(b: Block): ChatImage | null {
+  const src = b.source as { type?: string; media_type?: string; data?: string; url?: string } | undefined;
+  if (!src) return null;
+  if (src.type === "base64" && src.data) return { src: `data:${src.media_type ?? "image/png"};base64,${src.data}` };
+  if (src.type === "url" && src.url) return { src: src.url };
+  return null;
+}
+
+function imagesOf(content: unknown): ChatImage[] {
+  if (!Array.isArray(content)) return [];
+  return (content as Block[]).filter((c) => c.type === "image").map(imageOf).filter((x): x is ChatImage => !!x);
+}
+
 export function toolResultText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return (content as Block[])
-      .map((c) => (c.type === "text" ? String(c.text ?? "") : c.type === "image" ? "[görsel]" : `[${c.type}]`))
+      .filter((c) => c.type !== "image")
+      .map((c) => (c.type === "text" ? String(c.text ?? "") : `[${c.type}]`))
       .join("\n");
   }
   return "";
@@ -111,10 +129,11 @@ function attachResult(items: ChatItem[], toolUseId: string, result: ToolResult):
   return items;
 }
 
-function userTextItem(text: string, idSource?: string): ChatItem | null {
+function userTextItem(text: string, idSource?: string, images: ChatImage[] = []): ChatItem | null {
   if (/^\[Request interrupted/i.test(text)) return { kind: "notice", id: idSource ?? uid("n"), text: "Durduruldu.", tone: "info" };
   const clean = cleanUserText(text);
-  return clean ? { kind: "user", id: idSource ?? uid("u"), text: clean } : null;
+  if (!clean && !images.length) return null;
+  return { kind: "user", id: idSource ?? uid("u"), text: clean, images: images.length ? images : undefined };
 }
 
 /**
@@ -143,7 +162,7 @@ export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): Ch
         } else if (b.type === "tool_use" || b.type === "server_tool_use" || b.type === "mcp_tool_use") {
           out.push({ kind: "tool", id: String(b.id), name: String(b.name), input: (b.input ?? {}) as Record<string, unknown>, parent });
         } else if (b.type.endsWith("_tool_result")) {
-          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error });
+          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error, images: imagesOf(b.content) });
         } else {
           out.push({ kind: "unknown", id, label: `İçerik bloğu: ${b.type}`, data: b });
         }
@@ -162,17 +181,19 @@ export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): Ch
       if (!Array.isArray(content)) return items;
       let out = items;
       const texts: string[] = [];
+      const images: ChatImage[] = [];
       for (const b of content) {
         if (b.type === "tool_result") {
-          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error });
+          out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error, images: imagesOf(b.content) });
         } else if (b.type === "text") {
           texts.push(String(b.text ?? ""));
         } else if (b.type === "image") {
-          texts.push("[görsel]");
+          const img = imageOf(b);
+          if (img) images.push(img);
         }
       }
-      if (texts.length && showText && parent === null) {
-        const item = userTextItem(texts.join("\n"), msg.uuid);
+      if ((texts.length || images.length) && showText && parent === null) {
+        const item = userTextItem(texts.join("\n"), msg.uuid, images);
         if (item) out = [...out, item];
       }
       return out;

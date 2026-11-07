@@ -74,6 +74,7 @@ export function Composer(props: {
   const [slashClosed, setSlashClosed] = useState(false);
   const quote = useApp((s) => s.quotes[props.quoteKey]);
   const chat = useApp((s) => (props.claudeChatId ? s.chats[props.claudeChatId] : undefined));
+  const globalCommands = useApp((s) => s.globalInfo?.commands);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const claude = !!props.claudeChatId;
@@ -92,15 +93,15 @@ export function Composer(props: {
 
   // Slash komut önerileri: "/" ile başlayan, henüz boşluk içermeyen metin
   const commands: SlashCommandInfo[] = useMemo(
-    () => chat?.info?.commands ?? chat?.init?.slashCommands.map((name) => ({ name, description: "" })) ?? [],
-    [chat?.info?.commands, chat?.init?.slashCommands],
+    () => chat?.info?.commands ?? globalCommands ?? chat?.init?.slashCommands.map((name) => ({ name, description: "" })) ?? [],
+    [chat?.info?.commands, globalCommands, chat?.init?.slashCommands],
   );
   const slashQuery = claude && /^\/\S*$/.test(text) ? text.slice(1).toLowerCase() : null;
   const suggestions = slashQuery === null || slashClosed ? [] : rankCommands(commands, slashQuery).slice(0, 8);
 
   useEffect(() => {
     setSlashIndex(0);
-    if (slashQuery === "" && claude && props.claudeChatId && !chat?.info?.commands) actions.requestInfo(props.claudeChatId);
+    if (slashQuery === "" && claude && props.claudeChatId && !commands.length) actions.requestInfo(props.claudeChatId);
     if (slashQuery === null) setSlashClosed(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slashQuery]);

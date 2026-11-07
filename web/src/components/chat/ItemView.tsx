@@ -4,6 +4,7 @@ import { memo, useRef, useState, type ReactNode } from "react";
 import { itemPlainText, type ChatItem } from "../../lib/claudeItems";
 import { seconds } from "../../lib/format";
 import { CopyButton, Markdown } from "./Markdown";
+import { Thumbs } from "./Thumbs";
 import { ToolCard } from "./ToolCard";
 
 type Handlers = {
@@ -48,10 +49,13 @@ export const ItemView = memo(function ItemView({ item, ...handlers }: Handlers &
   switch (item.kind) {
     case "user":
       return (
-        <div className="group flex flex-col items-end gap-0.5">
-          <div ref={ref} className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-[0.9375rem]">
-            {item.text}
-          </div>
+        <div className="group flex min-w-0 flex-col items-end gap-1">
+          <Thumbs images={item.images} align="end" />
+          {item.text && (
+            <div ref={ref} className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-[0.9375rem] [overflow-wrap:anywhere]">
+              {item.text}
+            </div>
+          )}
           <MessageActions text={item.text} elRef={ref} onReply={handlers.onReply} />
         </div>
       );

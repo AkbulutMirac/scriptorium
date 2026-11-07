@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import path from "node:path";
 import {
   deleteSession,
+  getSessionInfo,
   getSessionMessages,
   listSessions,
   renameSession,
@@ -95,9 +96,22 @@ function denyPendingOf(chatId: string, message: string) {
 
 function openChat(
   chatId: string,
-  opts: { resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[]; model?: string; effort?: EffortLevel },
+  opts: {
+    resume?: string;
+    fork?: boolean;
+    cwd?: string;
+    additionalDirectories?: string[];
+    model?: string;
+    effort?: EffortLevel;
+    attachOnly?: boolean;
+  },
 ) {
   const existing = chats.get(chatId);
+  if (!existing && opts.attachOnly) {
+    // Sayfa yenilendi ama oturum sunucuda açık değil: yeniden başlatma, ilk mesajda açılır
+    broadcast({ type: "claude.closed", chatId });
+    return;
+  }
   if (existing) {
     // Sayfa yenilendi: aynı oturuma yeniden bağlan
     if (existing.session.sessionId) broadcast({ type: "claude.session", chatId, sessionId: existing.session.sessionId });
@@ -161,6 +175,27 @@ function openChat(
     });
 }
 
+/**
+ * Model listesi, kullanım limitleri ve slash komutları için tek, boş bir yardımcı oturum.
+ * Hiç mesaj göndermez ve var olan bir sohbeti devam ettirmez: geçmişteki bir sohbete sadece bakmak
+ * o sohbeti ikinci bir süreçte açmasın diye.
+ */
+let infoSession: ClaudeSession | null = null;
+function getInfoSession(): ClaudeSession {
+  if (!infoSession) {
+    const s = new ClaudeSession({
+      cwd: config.claudeCwd,
+      onMessage: () => {},
+      canUseTool: async () => ({ behavior: "deny", message: "Bilgi oturumu araç kullanmaz." }),
+    });
+    s.done.catch(() => {}).finally(() => {
+      if (infoSession === s) infoSession = null;
+    });
+    infoSession = s;
+  }
+  return infoSession;
+}
+
 function chatOrThrow(chatId: string): ChatState {
   const c = chats.get(chatId);
   if (!c) throw new Error("Bu sohbet açık değil. Sayfayı yenileyip tekrar dene.");
@@ -197,6 +232,9 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       if (!c) return;
       return reply(ws, { type: "claude.info", ...(await c.session.info(msg.chatId)) });
     }
+
+    case "claude.globalInfo":
+      return reply(ws, { type: "claude.info", ...(await getInfoSession().info("__global")) });
 
     case "claude.setDirs": {
       const dirs: string[] = [];
@@ -300,10 +338,11 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       return reply(ws, { type: "fs.list", ...(await listDir(msg.path)) });
 
     case "claude.history": {
-      const messages = await getSessionMessages(msg.sessionId);
+      const [messages, info] = await Promise.all([getSessionMessages(msg.sessionId), getSessionInfo(msg.sessionId).catch(() => undefined)]);
       return reply(ws, {
         type: "claude.history",
         sessionId: msg.sessionId,
+        cwd: info?.cwd,
         messages: messages.map(({ type, uuid, message, parent_tool_use_id }) => ({ type, uuid, message, parent_tool_use_id })),
       });
     }
@@ -454,6 +493,7 @@ server.listen(config.port, HOST, () => {
 
 function shutdown() {
   for (const c of chats.values()) c.session.close();
+  infoSession?.close();
   process.exit(0);
 }
 process.on("SIGINT", shutdown);
