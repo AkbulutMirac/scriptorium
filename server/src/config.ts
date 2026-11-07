@@ -16,6 +16,11 @@ export const config = {
   claudeCwd: path.resolve(process.env.CLAUDE_CWD || path.join(SERVER_ROOT, "..")),
   /** Proje klasörlerinin durduğu yer (klasör seçicide otomatik listelenir). Boşsa bu reponun bir üst klasörü. */
   projectsDir: path.resolve(process.env.PROJECTS_DIR || path.join(SERVER_ROOT, "..", "..")),
+  /** Listelerde hiç görünmeyecek klasörler: PROJECTS_DIR altındaki adlar ya da tam yollar, virgülle. Klasörlere dokunulmaz. */
+  projectsExclude: (process.env.PROJECTS_EXCLUDE ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
   workerMaxTokens: Number(process.env.WORKER_MAX_TOKENS) || 4000,
   port: Number(process.env.PORT) || 7777,
 };

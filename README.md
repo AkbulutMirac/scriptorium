@@ -71,6 +71,7 @@ cp .env.example .env   # değerleri doldur (Windows: copy .env.example .env)
 | `CLAUDE_CODE_PATH` | Kurulu `claude` programının yolu. Boş bırakılırsa SDK'nın kendi sürümü kullanılır. |
 | `CLAUDE_CWD` | Claude'un varsayılan çalışma klasörü (arayüzden de değiştirilebilir) |
 | `PROJECTS_DIR` | Proje klasörlerinin durduğu yer. Klasör seçicide ve geçmişte otomatik listelenir. |
+| `PROJECTS_EXCLUDE` | Listelerde hiç görünmeyecek klasörler (adlar ya da tam yollar, virgülle). Klasörlere dokunulmaz. |
 | `WORKER_MAX_TOKENS` | İşçi çağrısı başına en fazla çıktı (maliyet güvenliği) |
 
 ## Çalıştırma

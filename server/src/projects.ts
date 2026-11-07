@@ -12,7 +12,14 @@ const norm = (p: string) => path.resolve(p).normalize("NFC").toLowerCase();
  * Proje sayılmayacak klasörler: geçici klasörler, uygulama verileri (Claude uygulamasının scratch çalışma alanları
  * AppData\\Roaming\\Claude altında) ve Windows sistem klasörü.
  */
-const IGNORED_ROOTS = [os.tmpdir(), process.env.APPDATA, process.env.LOCALAPPDATA, process.env.SystemRoot ?? "C:\\Windows"]
+const IGNORED_ROOTS = [
+  os.tmpdir(),
+  process.env.APPDATA,
+  process.env.LOCALAPPDATA,
+  process.env.SystemRoot ?? "C:\\Windows",
+  // Kullanıcının listeden tamamen çıkardığı klasörler (PROJECTS_EXCLUDE); klasörlere dokunulmaz
+  ...config.projectsExclude.map((p) => (path.isAbsolute(p) ? p : path.join(config.projectsDir, p))),
+]
   .filter((p): p is string => !!p)
   .map(norm);
 export const isIgnoredPath = (p: string) => IGNORED_ROOTS.some((root) => norm(p) === root || norm(p).startsWith(root + path.sep));
@@ -43,7 +50,7 @@ export async function listProjects(): Promise<ProjectInfo[]> {
       if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
       const full = path.join(config.projectsDir, e.name);
       const key = norm(full);
-      if (byPath.has(key)) continue;
+      if (byPath.has(key) || isIgnoredPath(full)) continue;
       const mtime = await stat(full).then((s) => s.mtimeMs).catch(() => 0);
       byPath.set(key, { path: full, name: e.name, lastUsed: mtime, sessionCount: 0 });
     }
