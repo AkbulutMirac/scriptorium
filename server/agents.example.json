@@ -20,9 +20,9 @@
       "id": "qwen-local",
       "name": "Qwen3.8 (local)",
       "provider": "ollama",
-      "model": "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_XS",
+      "model": "qwen3.8-27b-metin",
       "color": "#7F77DD",
-      "description": "Bedava, veri bilgisayardan çıkmaz. Gizli veri ve acelesi olmayan toplu işler. Yavaş (~10-15 token/sn), pratik bağlam ~16K token.",
+      "description": "Qwen3.8-27B, 2-bit sıkıştırılmış (GSQ-RCO IQ2_S), sadece metin. Bedava, veri bilgisayardan çıkmaz. Yavaş: çıktı ~4 token/sn, girdi okuma ~200 token/sn, ilk yükleme ~15 sn. Bağlam 4K token. Sadece kısa, tek adımlı işler: sınıflandırma, kısa özet, basit dönüştürme, gizli veri içeren küçük işler.",
       "local": true
     }
   ]

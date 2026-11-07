@@ -20,6 +20,7 @@ import type {
   WorkerChat,
   WorkerChatSummary,
   WorkerInfo,
+  WorkerModel,
   WorkerRequest,
   WorkerSettings,
 } from "./protocol";
@@ -98,7 +99,7 @@ type State = {
   activeWorkerChat: Record<string, string | undefined>;
   /** İşçi başına sohbet ayarları (model, düşünme, sıcaklık, JSON, sistem talimatı) */
   workerSettings: Record<string, WorkerSettings>;
-  workerModels: Record<string, string[]>;
+  workerModels: Record<string, WorkerModel[]>;
 
   /** Sohbet paneline göre alıntı: Claude için chatId, işçi için "w:<id>" */
   quotes: Record<string, string | undefined>;

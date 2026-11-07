@@ -2,7 +2,7 @@
 
 Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyle konuşabildiğin, Claude'un işleri diğer modellere kendi kararıyla dağıttığı çok ajanlı bir çalışma alanı. Kimin ne yaptığı izometrik, piksel görünümlü bir ofis-kütüphanede canlı olarak görünüyor.
 
-> **Durum:** Claude ve DeepSeek tarafı çalışıyor. Local işçiler Ollama kurulunca çalışır. Ayrıntılı plan: [docs/PLAN.md](docs/PLAN.md)
+> **Durum:** Claude, DeepSeek ve local (Ollama) işçiler çalışıyor. Ayrıntılı plan: [docs/PLAN.md](docs/PLAN.md)
 
 ## Özellikler
 
@@ -98,6 +98,23 @@ claude mcp add --scope user --transport http scriptorium http://127.0.0.1:7777/m
 ```
 
 Claude'un ne zaman iş devredeceğini bilmesi için [docs/CLAUDE-isciler.md](docs/CLAUDE-isciler.md) içeriğini kendi `~/.claude/CLAUDE.md` dosyana ekle. Bütün oturumların işleri aynı sıraya girer ve 3D ofiste proje adıyla görünür. Scriptorium kapalıyken bu sunucu Claude Code'da "bağlanamadı" görünür; başka bir şeyi etkilemez.
+
+### Local model
+
+Örnek ayarlardaki local işçi Qwen3.8-27B'nin 2-bit sıkıştırılmış hâlini kullanır (8 GB ekran kartında çalışır). Görsel modülünü çıkarmak modeli hızlandırır, ek disk yeri harcamaz:
+
+```bash
+ollama pull hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S
+ollama show --modelfile hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S > qwen.Modelfile
+```
+
+`qwen.Modelfile` içindeki ikinci `FROM` satırını (görsel modülü) sil, sonra:
+
+```bash
+ollama create qwen3.8-27b-metin -f qwen.Modelfile
+```
+
+RTX 4060 Laptop'ta ölçülen: çıktı ~4 token/sn, girdi ~200 token/sn. Local işçilerde düşünme varsayılan olarak kapalıdır.
 
 **Windows kısayolu:** `scripts\Scriptorium.vbs` pencere açmadan arayüzü derler, sunucuyu arka planda başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi `wscript.exe "<repo>\scripts\Scriptorium.vbs"`, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur. Sunucuyu kapatmak için arayüzde Ayarlar → "Scriptorium'u kapat". Çıktılar `server\data\server.log` ve `build.log` dosyalarına yazılır.
 

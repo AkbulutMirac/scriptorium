@@ -67,6 +67,15 @@ export type HistoryMessage = {
   parent_tool_use_id: string | null;
 };
 
+/** İşçi model menüsündeki bir model */
+export type WorkerModel = {
+  id: string;
+  /** Görsel okuyabiliyor mu (Ollama'nın bildirdiği yeteneklerden) */
+  vision?: boolean;
+  /** Parametre sayısı, örn. "26.9B" */
+  size?: string;
+};
+
 /** İşçinin düşünme seviyesi. "none" düşünmeyi kapatır. */
 export type ReasoningLevel = "none" | "low" | "medium" | "high" | "max";
 
@@ -266,7 +275,7 @@ export type ServerMsg =
   | { type: "worker.chat"; chat: WorkerChat }
   | { type: "worker.token"; chatId: string; text: string }
   | { type: "worker.reasoning"; chatId: string; text: string }
-  | { type: "worker.models"; workerId: string; models: string[] }
+  | { type: "worker.models"; workerId: string; models: WorkerModel[] }
   | { type: "worker.done"; chatId: string; message: WorkerChatMessage }
   | { type: "workers"; workers: WorkerInfo[] }
   | { type: "activity"; activity: AgentActivity }

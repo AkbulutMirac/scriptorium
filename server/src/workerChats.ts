@@ -107,7 +107,8 @@ export async function sendToWorker(args: {
     const result = await withWorkerSlot(worker, { task, caller: { kind: "user", label: "Sen" }, signal: args.signal }, () => chat(worker, history, {
       signal: args.signal,
       model,
-      reasoning: settings.reasoning,
+      // Local model düşünürken çok yavaş: seçilmediyse kapalı
+      reasoning: settings.reasoning ?? (worker.local ? "none" : undefined),
       temperature: settings.temperature,
       json: settings.json,
       maxTokens: settings.maxTokens,

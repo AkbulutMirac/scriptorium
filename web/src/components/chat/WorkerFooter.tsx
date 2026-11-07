@@ -126,10 +126,15 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
   const models = useApp((s) => s.workerModels[worker.id]);
   const [modelOpen, setModelOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
-  const model = settings.model || worker.model;
+  // Ollama aynı modeli "ad" ve "ad:latest" diye ikisiyle de tanır
+  const norm = (m: string) => m.replace(/:latest$/, "");
+  const model = norm(settings.model || worker.model);
+  const defaultModel = norm(worker.model);
   const shortModel = model.split("/").pop()?.replace(/^hf\.co\//, "") ?? model;
-  const reasoning = REASONING.find((r) => r.value === (settings.reasoning ?? "")) ?? REASONING[0];
-  const thinkingOff = settings.reasoning === "none";
+  // Local işçilerde seçilmediyse düşünme kapalı (sunucu da öyle gönderir)
+  const effective = settings.reasoning ?? (worker.local ? "none" : "");
+  const reasoning = REASONING.find((r) => r.value === effective) ?? REASONING[0];
+  const thinkingOff = effective === "none";
 
   return (
     <div className="mt-1.5 flex min-w-0 items-center gap-1 text-xs">
@@ -154,18 +159,26 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
             ) : (
               <ul className="flex max-h-72 flex-col overflow-y-auto">
                 {models.map((m) => (
-                  <li key={m}>
+                  <li key={m.id}>
                     <button
                       type="button"
                       onClick={() => {
-                        actions.setWorkerSettings(worker.id, { model: m === worker.model ? undefined : m });
+                        actions.setWorkerSettings(worker.id, { model: m.id === defaultModel ? undefined : m.id });
                         setModelOpen(false);
                       }}
-                      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${m === model ? "bg-accent-soft" : "hover:bg-default-soft"}`}
+                      title={m.id}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${m.id === model ? "bg-accent-soft" : "hover:bg-default-soft"}`}
                     >
-                      <span className="font-code min-w-0 flex-1 truncate text-xs">{m}</span>
-                      {m === worker.model && <span className="text-[10px] text-muted">varsayılan</span>}
-                      {m === model && <Check size={14} className="text-accent" />}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-code truncate text-xs">{m.id}</div>
+                        {worker.provider === "ollama" && (
+                          <div className="text-[10px] text-muted">
+                            {[m.size, m.vision ? "görsel de okur, daha yavaş" : "sadece metin, daha hızlı"].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                      {m.id === defaultModel && <span className="text-[10px] text-muted">varsayılan</span>}
+                      {m.id === model && <Check size={14} className="text-accent" />}
                     </button>
                   </li>
                 ))}

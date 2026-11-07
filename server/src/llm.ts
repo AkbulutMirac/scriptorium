@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import type { Worker } from "./agents.js";
-import type { DeepSeekBalance, ReasoningLevel, TokenUsage } from "./protocol.js";
+import type { DeepSeekBalance, ReasoningLevel, TokenUsage, WorkerModel } from "./protocol.js";
 
 export type ChatPart =
   | { type: "text"; text: string }
@@ -97,13 +97,22 @@ export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOp
 }
 
 /** İşçinin kullanabileceği modeller: DeepSeek için sabit liste, Ollama için kurulu modeller */
-export async function listModels(worker: Worker): Promise<string[]> {
-  if (worker.provider === "deepseek") return ["deepseek-flash", "deepseek-v4-pro"];
+export async function listModels(worker: Worker): Promise<WorkerModel[]> {
+  if (worker.provider === "deepseek") return [{ id: "deepseek-flash" }, { id: "deepseek-v4-pro" }];
+  // Ollama'nın kendi API'si (OpenAI uyumlu /v1 değil): boyut ve görsel okuma bilgisi de gelir
+  const root = config.ollamaBaseUrl.replace(/\/v1\/?$/, "");
   try {
-    const res = await fetch(`${config.ollamaBaseUrl}/models`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${root}/api/tags`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return [];
-    const j = (await res.json()) as { data?: { id: string }[] };
-    return (j.data ?? []).map((m) => m.id);
+    const j = (await res.json()) as { models?: { name: string; details?: { parameter_size?: string } }[] };
+    return await Promise.all(
+      (j.models ?? []).map(async (m) => {
+        const show = await fetch(`${root}/api/show`, { method: "POST", body: JSON.stringify({ model: m.name }), signal: AbortSignal.timeout(3000) })
+          .then((r) => r.json() as Promise<{ capabilities?: string[] }>)
+          .catch(() => ({ capabilities: undefined }));
+        return { id: m.name.replace(/:latest$/, ""), size: m.details?.parameter_size, vision: show.capabilities?.includes("vision") };
+      }),
+    );
   } catch {
     return [];
   }

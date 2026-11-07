@@ -53,7 +53,8 @@ export async function runWorkerTask(args: {
         { role: "system", content: WORKER_SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
-      { signal },
+      // Local model küçük ve yavaş: Claude'un verdiği kısa işlerde düşünme kapalı (açıkken dakikalar sürüyor)
+      { signal, reasoning: worker.local ? "none" : undefined },
     );
     return answer || "(işçi boş cevap döndürdü)";
   }).catch((err) => {

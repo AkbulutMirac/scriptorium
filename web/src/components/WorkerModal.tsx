@@ -7,7 +7,8 @@ const COLORS = ["#4D6BFE", "#7F77DD", "#22A06B", "#E8A23A", "#E5487A", "#14B8A6"
 
 const MODEL_HINTS: Record<Provider, string[]> = {
   deepseek: ["deepseek-flash", "deepseek-v4-pro"],
-  ollama: ["hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_XS"],
+  // İlki görsel modülü çıkarılmış hızlı kopya (README: "Local model"), ikincisi Hugging Face'teki asıl model
+  ollama: ["qwen3.8-27b-metin", "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S"],
 };
 
 /** Türkçe karakterleri sadeleştirip id üretir: "Kod Ustası" → "kod-ustasi" */
