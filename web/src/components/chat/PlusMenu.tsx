@@ -59,7 +59,18 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
 
           {view === "folder" && chat && (
             <SubView title="Klasör ekle" onBack={() => setView("main")}>
-              <p className="text-xs text-muted">Claude bu klasörlerdeki dosyalara da erişebilir. Tam yolu yaz.</p>
+              <p className="text-xs text-muted">Claude bu klasörlerdeki dosyalara da erişebilir.</p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  close();
+                  actions.openFolderPicker("dir", props.chatId);
+                }}
+              >
+                <FolderPlus size={14} /> Klasöre gözat…
+              </Button>
+              <p className="text-[11px] text-muted">ya da tam yolu yaz:</p>
               {chat.dirs.map((d) => (
                 <div key={d} className="flex items-center gap-1 rounded-md bg-default-soft px-2 py-1">
                   <span className="font-code min-w-0 flex-1 truncate text-xs" title={d}>

@@ -133,6 +133,11 @@ scriptorium/
 - [x] **Oturum bilgi paneli** (sağ üst): ortam ve git dalı, ek klasörler, bağlam doluluğu, bağlayıcılar (aç/kapa, yeniden bağlan), çıktılar (yazılan dosyalar), git değişiklikleri (+/− ve diff), arka plan görevleri (durdurulabilir) ve işçi işleri
 - [x] **"+" menüsü** (sol alt): dosya veya fotoğraf ekle (görsel, PDF, metin; yapıştırma ve sürükle-bırak da çalışıyor), klasör ekle, slash komutları, bağlayıcılar, eklentiler
 - [x] Slash komut önerileri: `/` yazınca açılıyor, ok tuşları ve Tab/Enter ile seçiliyor.
+- [x] Yazma kutusu altında çubuk: klasör seçici (projeler + klasör gezgini), model / efor / hızlı mod menüsü, izin modu, kullanım halkası
+- [x] Üst barda abonelik kullanım limitleri (5 saatlik, 7 günlük)
+- [x] Geçmiş paneli projelere göre gruplu (PROJECTS_DIR otomatik). Sağ tık menüsü: yeni sohbet, yolu kopyala, gizle/göster, tüm sohbetleri sil (onaylı, dosyalara dokunmaz), sohbet aç/yeniden adlandır/sil.
+- [x] 3D etiketleri drei <Html> yerine sahne üstü katmanda: React 19'da kaybolma sorunu çözüldü
+- [x] Karanlık modda meşaleler ve mangal (titreyen sıcak ışık)
 - [ ] Terminal sekmesi (opsiyonel, sonraya bırakıldı): gerçek Claude Code ekranı. node-pty yerel derleme gerektiriyor.
 
 ## Senin yapacakların (en son, ~15 dk)

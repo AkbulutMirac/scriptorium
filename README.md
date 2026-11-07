@@ -17,7 +17,9 @@ Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyl
   - yazılan dosyalar ve git değişiklikleri (diff)
   - arka plan görevleri
 - **"+" menüsü:** dosya veya fotoğraf ekleme (yapıştırma ve sürükle-bırak dahil), klasör ekleme, slash komutları (`/` ile öneri), bağlayıcılar ve eklentiler.
-- Oturum geçmişi terminaldeki Claude Code ile ortaktır. Model ve izin modu seçilebilir.
+- Yazma kutusunun altında Claude uygulamasındaki gibi bir çubuk var: çalışma klasörü seçici (projeler ve klasör gezgini), model, efor (Düşük–Maks) ve hızlı mod menüsü, izin modu, kullanım halkası.
+- Üst barda Claude aboneliğinin kullanım limitleri görünür (5 saatlik ve 7 günlük).
+- Geçmiş paneli projelere göre gruplanmıştır ve terminaldeki Claude Code oturumlarıyla ortaktır. `PROJECTS_DIR` altındaki klasörler otomatik gelir. Sağ tık menüsünden yeni sohbet açılabilir, proje listeden gizlenebilir, sohbetler yeniden adlandırılıp silinebilir.
 
 **İşçiler (DeepSeek, Ollama)**
 - Her işçiyle doğrudan sohbet edilebilir.
@@ -62,6 +64,7 @@ cp .env.example .env   # değerleri doldur (Windows: copy .env.example .env)
 | `DEEPSEEK_API_KEY` | DeepSeek işçileri için |
 | `CLAUDE_CODE_PATH` | Kurulu `claude` programının yolu. Boş bırakılırsa SDK'nın kendi sürümü kullanılır. |
 | `CLAUDE_CWD` | Claude'un varsayılan çalışma klasörü (arayüzden de değiştirilebilir) |
+| `PROJECTS_DIR` | Proje klasörlerinin durduğu yer. Klasör seçicide ve geçmişte otomatik listelenir. |
 | `WORKER_MAX_TOKENS` | İşçi çağrısı başına en fazla çıktı (maliyet güvenliği) |
 
 ## Çalıştırma

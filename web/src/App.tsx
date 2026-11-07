@@ -2,6 +2,7 @@ import { ClaudeChatPanel } from "./components/chat/ClaudeChatPanel";
 import { InfoPanel } from "./components/chat/InfoPanel";
 import { WorkerChatPanel } from "./components/chat/WorkerChatPanel";
 import { ExpandOverlay } from "./components/ExpandOverlay";
+import { FolderPicker } from "./components/FolderPicker";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { LibraryScene } from "./components/scene/LibraryScene";
@@ -54,6 +55,7 @@ export default function App() {
         )}
       </div>
       <WorkerModal />
+      <FolderPicker />
     </div>
   );
 }

@@ -7,8 +7,11 @@ import type {
   AgentActivity,
   Attachment,
   ClaudeInfo,
+  DirListing,
+  EffortLevel,
   GitInfo,
   JobInfo,
+  ProjectInfo,
   PermissionMode,
   ServerMsg,
   SessionSummary,
@@ -48,6 +51,9 @@ export type ClaudeChat = {
   /** Kullanıcının seçtiği ama henüz sunucuya iletilmemiş ayarlar */
   wantModel?: string;
   wantMode?: PermissionMode;
+  effort?: EffortLevel;
+  wantEffort?: EffortLevel;
+  fastMode?: boolean;
   cwd: string;
   /** Claude'un erişebileceği ek klasörler */
   dirs: string[];
@@ -88,6 +94,12 @@ type State = {
   workerModal: { open: boolean; worker?: WorkerInfo };
   ui: UiPrefs;
   git: Record<string, GitInfo>;
+  /** Bilinen proje klasörleri (oturumu olanlar + projeler klasörü) */
+  projects: ProjectInfo[];
+  /** Tüm projelerin Claude oturumları (geçmiş panelinde projelere göre gruplanır) */
+  allSessions: SessionSummary[];
+  /** Klasör gezgini */
+  folderPicker: { open: boolean; purpose: "cwd" | "dir"; chatId?: string; listing?: DirListing };
 };
 
 const uuid = (): string => crypto.randomUUID();
@@ -115,6 +127,9 @@ export const useApp = create<State>(() => ({
   workerModal: { open: false },
   ui: { historyOpen: true, chatWidth: 520, sideWidth: 440, infoOpen: false, ...load<Partial<UiPrefs>>("ui", {}) },
   git: {},
+  projects: [],
+  allSessions: [],
+  folderPicker: { open: false, purpose: "cwd" },
 }));
 
 const get = useApp.getState;
@@ -161,6 +176,7 @@ function persistMain() {
 
 function refreshSessions() {
   socket.send({ type: "claude.sessions", cwd: effectiveCwd() || undefined });
+  socket.send({ type: "claude.sessions", all: true });
 }
 
 /** Sohbetin Claude Code sürecini gerekiyorsa açar (ilk mesajda ya da yeniden bağlanınca). */
@@ -174,9 +190,10 @@ function ensureOpen(chatId: string) {
     fork: !c.sessionId && !!c.forkFrom,
     cwd: c.cwd || undefined,
     additionalDirectories: c.dirs.length ? c.dirs : undefined,
+    model: c.wantModel || undefined,
+    effort: c.wantEffort,
   });
   if (c.wantMode) socket.send({ type: "claude.setMode", chatId, mode: c.wantMode });
-  if (c.wantModel !== undefined) socket.send({ type: "claude.setModel", chatId, model: c.wantModel || undefined });
   updateChat(chatId, (x) => ({ ...x, opened: true }));
 }
 
@@ -195,6 +212,7 @@ function onServer(msg: ServerMsg) {
   const s = get();
   switch (msg.type) {
     case "welcome": {
+      socket.send({ type: "projects.list" });
       // Sohbet, sunucunun varsayılan klasörü gelmeden açılmış olabilir: boş klasörleri doldur
       const chats = Object.fromEntries(Object.entries(s.chats).map(([id, c]) => [id, c.cwd ? c : { ...c, cwd: msg.cwd }]));
       set({ serverCwd: msg.cwd, chats });
@@ -220,6 +238,8 @@ function onServer(msg: ServerMsg) {
         if (m.type === "system" && m.subtype === "init") {
           next.model = m.model;
           next.permissionMode = m.permissionMode;
+          if (sys.effort) next.effort = sys.effort as EffortLevel;
+          if (typeof sys.fast_mode_state === "string") next.fastMode = sys.fast_mode_state === "on";
           next.init = {
             version: String(sys.claude_code_version ?? ""),
             slashCommands: (sys.slash_commands as string[]) ?? [],
@@ -248,6 +268,18 @@ function onServer(msg: ServerMsg) {
       updateChat(msg.chatId, (c) => ({ ...c, info }));
       return;
     }
+
+    case "claude.allSessions":
+      set({ allSessions: msg.sessions });
+      return;
+
+    case "projects":
+      set({ projects: msg.projects });
+      return;
+
+    case "fs.list":
+      set({ folderPicker: { ...s.folderPicker, listing: { path: msg.path, parent: msg.parent, dirs: msg.dirs } } });
+      return;
 
     case "claude.dirs":
       updateChat(msg.chatId, (c) => ({ ...c, dirs: msg.dirs }));
@@ -397,12 +429,63 @@ export const actions = {
 
   // Claude ─────────────────────────────────────
 
-  newClaudeChat() {
+  /** Yeni Claude sohbeti. cwd verilirse o klasörde açılır ve varsayılan klasör olarak hatırlanır. */
+  newClaudeChat(cwd?: string) {
+    const prev = get().chats[get().mainChatId ?? ""];
     closeChat(get().sideChatId);
     closeChat(get().mainChatId);
+    if (cwd) actions.setCwd(cwd);
     const chatId = uuid();
-    set({ chats: { ...get().chats, [chatId]: emptyChat(chatId, effectiveCwd()) }, mainChatId: chatId, sideChatId: null });
+    const chat = emptyChat(chatId, cwd || effectiveCwd(), { wantModel: prev?.wantModel, wantEffort: prev?.wantEffort ?? prev?.effort });
+    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, selected: CLAUDE_ID });
     persistMain();
+  },
+
+  /** Henüz başlamamış sohbetin klasörünü değiştirir; başlamışsa o klasörde yeni sohbet açar. */
+  setChatCwd(chatId: string, cwd: string) {
+    const c = get().chats[chatId];
+    if (!c) return;
+    if (c.sessionId || c.items.length) {
+      actions.newClaudeChat(cwd);
+      return;
+    }
+    // Henüz mesaj yok: önceden açılmış boş oturumu kapat, ilk mesajda yeni klasörde açılır
+    if (c.opened) socket.send({ type: "claude.close", chatId });
+    actions.setCwd(cwd);
+    updateChat(chatId, (x) => ({ ...x, cwd, opened: false, info: undefined, init: undefined }));
+    actions.requestInfo(chatId);
+  },
+
+  setEffort(chatId: string, effort: EffortLevel) {
+    const c = get().chats[chatId];
+    if (!c) return;
+    if (c.opened) socket.send({ type: "claude.setEffort", chatId, effort });
+    updateChat(chatId, (x) => ({ ...x, effort, wantEffort: effort }));
+  },
+
+  setFastMode(chatId: string, on: boolean) {
+    const c = get().chats[chatId];
+    if (!c) return;
+    ensureOpen(chatId);
+    socket.send({ type: "claude.setFastMode", chatId, on });
+    updateChat(chatId, (x) => ({ ...x, fastMode: on }));
+  },
+
+  loadProjects() {
+    socket.send({ type: "projects.list" });
+  },
+
+  openFolderPicker(purpose: "cwd" | "dir", chatId?: string, startPath?: string) {
+    set({ folderPicker: { open: true, purpose, chatId } });
+    socket.send({ type: "fs.list", path: startPath });
+  },
+
+  browse(path?: string) {
+    socket.send({ type: "fs.list", path });
+  },
+
+  closeFolderPicker() {
+    set({ folderPicker: { open: false, purpose: "cwd" } });
   },
 
   /** Geçmişteki bir oturumu açar. reattach=true: sayfa yenilendi, sunucuda hâlâ açık olabilir. */
@@ -473,6 +556,7 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setModel", chatId, model: model || undefined });
     updateChat(chatId, (x) => ({ ...x, wantModel: model }));
+    socket.send({ type: "claude.info", chatId });
   },
 
   respondPermission(requestId: string, allow: boolean, always = false, updatedInput?: Record<string, unknown>) {
@@ -513,6 +597,13 @@ export const actions = {
   renameSession(sessionId: string, title: string) {
     socket.send({ type: "claude.rename", sessionId, title });
     setTimeout(refreshSessions, 300);
+  },
+
+  /** Birden çok sohbeti kalıcı olarak siler (klasöre ve dosyalara dokunmaz) */
+  deleteSessions(ids: string[]) {
+    for (const id of ids) socket.send({ type: "claude.delete", sessionId: id });
+    if (ids.includes(get().chats[get().mainChatId ?? ""]?.sessionId ?? "")) actions.newClaudeChat();
+    setTimeout(refreshSessions, 500);
   },
 
   deleteSession(sessionId: string) {

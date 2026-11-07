@@ -72,11 +72,41 @@ export type McpServerInfo = { name: string; status: string; error?: string; tool
 export type SlashCommandInfo = { name: string; description: string; argumentHint?: string };
 export type ContextInfo = { percentage: number; totalTokens: number; maxTokens: number };
 
+export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max";
+
+export type ModelOption = {
+  value: string;
+  resolvedModel?: string;
+  displayName: string;
+  description: string;
+  efforts: EffortLevel[];
+  fastMode: boolean;
+};
+
+export type LimitWindow = { utilization: number | null; resetsAt: string | null };
+
+/** Claude aboneliğinin kullanım limitleri (sadece abonelik girişinde dolu gelir) */
+export type UsageInfo = {
+  subscription: string | null;
+  available: boolean;
+  fiveHour?: LimitWindow;
+  sevenDay?: LimitWindow;
+  sevenDayOpus?: LimitWindow;
+  sevenDaySonnet?: LimitWindow;
+  sessionCostUsd?: number;
+};
+
+export type ProjectInfo = { path: string; name: string; lastUsed: number; sessionCount: number };
+
+export type DirListing = { path: string; parent?: string; dirs: { name: string; path: string }[] };
+
 export type ClaudeInfo = {
   chatId: string;
   context?: ContextInfo;
   mcp?: McpServerInfo[];
   commands?: SlashCommandInfo[];
+  models?: ModelOption[];
+  usage?: UsageInfo;
 };
 
 export type GitInfo = {
@@ -89,7 +119,20 @@ export type GitInfo = {
 };
 
 export type ClientMsg =
-  | { type: "claude.open"; chatId: string; resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[] }
+  | {
+      type: "claude.open";
+      chatId: string;
+      resume?: string;
+      fork?: boolean;
+      cwd?: string;
+      additionalDirectories?: string[];
+      model?: string;
+      effort?: EffortLevel;
+    }
+  | { type: "claude.setEffort"; chatId: string; effort: EffortLevel }
+  | { type: "claude.setFastMode"; chatId: string; on: boolean }
+  | { type: "projects.list" }
+  | { type: "fs.list"; path?: string }
   | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
   | { type: "claude.info"; chatId: string }
   | { type: "claude.setDirs"; chatId: string; dirs: string[] }
@@ -110,7 +153,7 @@ export type ClientMsg =
       /** Aracın girdisini değiştirerek izin ver (örneğin AskUserQuestion cevapları: { answers: { soru: cevap } }) */
       updatedInput?: Record<string, unknown>;
     }
-  | { type: "claude.sessions"; cwd?: string }
+  | { type: "claude.sessions"; cwd?: string; all?: boolean }
   | { type: "claude.history"; sessionId: string }
   | { type: "claude.rename"; sessionId: string; title: string }
   | { type: "claude.delete"; sessionId: string }
@@ -127,6 +170,9 @@ export type ClientMsg =
 export type ServerMsg =
   | { type: "welcome"; cwd: string; claudeCodeVersion?: string }
   | ({ type: "claude.info" } & ClaudeInfo)
+  | { type: "projects"; projects: ProjectInfo[] }
+  | ({ type: "fs.list" } & DirListing)
+  | { type: "claude.allSessions"; sessions: SessionSummary[] }
   | { type: "claude.dirs"; chatId: string; dirs: string[] }
   | ({ type: "git.info" } & GitInfo)
   | { type: "git.diff"; cwd: string; file?: string; diff: string }

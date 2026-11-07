@@ -100,10 +100,110 @@ export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark
       <TaskBoard position={[5.3, 2.5, ROOM_BACK_Z + 0.05]} />
       <WallClock position={[2.1, 3.1, ROOM_BACK_Z + 0.05]} />
 
+      {/* Meşaleler: karanlıkta odayı sıcak, titreyen bir ışıkla aydınlatır */}
+      <Torch position={[-3.0, 2.55, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={1} />
+      <Torch position={[1.5, 2.45, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={2} />
+      <Torch position={[7.15, 2.45, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={3} />
+      <Torch position={[-ROOM_HALF_X + 0.02, 2.45, -4.5]} rotation={Math.PI / 2} isDark={isDark} seed={4} />
+      <Torch position={[-ROOM_HALF_X + 0.02, 2.45, 4.3]} rotation={Math.PI / 2} isDark={isDark} seed={5} />
+      <Brazier position={[ROOM_HALF_X - 0.6, 0, frontZ - 0.7]} isDark={isDark} />
+
       <Plant position={[-6.9, 0, frontZ - 0.8]} size={1.1} />
       <Plant position={[2.0, 0, ROOM_BACK_Z + 0.6]} size={0.9} />
       <Plant position={[7.0, 0, -0.4]} size={1} />
       <WaterCooler position={[6.8, 0, 1.4]} />
+    </group>
+  );
+}
+
+/** Alevin titremesi: birkaç farklı hızda sinüsün toplamı, her meşalede farklı faz */
+function flicker(t: number, seed: number) {
+  return 0.82 + Math.sin(t * 11.3 + seed * 1.7) * 0.07 + Math.sin(t * 17.9 + seed * 3.1) * 0.06 + Math.sin(t * 5.1 + seed) * 0.05;
+}
+
+/** Duvar meşalesi: braket, kâse, iki katmanlı alev ve turuncu titreyen ışık */
+function Torch({ position, rotation = 0, isDark, seed }: { position: Vec3; rotation?: number; isDark: boolean; seed: number }) {
+  const light = useRef<THREE.PointLight>(null);
+  const flame = useRef<THREE.Group>(null);
+  const base = isDark ? 4.2 : 0.9;
+
+  useFrame((state) => {
+    const f = flicker(state.clock.elapsedTime, seed);
+    if (light.current) light.current.intensity = base * f;
+    if (flame.current) {
+      flame.current.scale.set(1, 0.85 + (f - 0.82) * 2.2, 1);
+      flame.current.rotation.z = Math.sin(state.clock.elapsedTime * 6 + seed) * 0.08;
+    }
+  });
+
+  return (
+    <group position={position} rotation-y={rotation}>
+      {/* Duvar plakası ve kol */}
+      <mesh position={[0, 0, 0.03]}>
+        <boxGeometry args={[0.16, 0.3, 0.05]} />
+        <meshStandardMaterial color="#3a2a20" roughness={0.6} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.02, 0.17]} rotation-x={-0.5}>
+        <cylinderGeometry args={[0.025, 0.035, 0.32, 8]} />
+        <meshStandardMaterial color="#4a3426" roughness={0.6} metalness={0.4} />
+      </mesh>
+      {/* Kâse */}
+      <mesh position={[0, 0.17, 0.27]}>
+        <cylinderGeometry args={[0.09, 0.05, 0.1, 10]} />
+        <meshStandardMaterial color="#2b201a" roughness={0.5} metalness={0.5} />
+      </mesh>
+      {/* Alev */}
+      <group ref={flame} position={[0, 0.24, 0.27]}>
+        <mesh position-y={0.1}>
+          <coneGeometry args={[0.075, 0.26, 10]} />
+          <meshBasicMaterial color="#ff7a1a" transparent opacity={0.9} />
+        </mesh>
+        <mesh position-y={0.06}>
+          <coneGeometry args={[0.04, 0.15, 8]} />
+          <meshBasicMaterial color="#ffd36b" />
+        </mesh>
+      </group>
+      <pointLight ref={light} position={[0, 0.4, 0.55]} color="#ff9a3c" intensity={base} distance={7.5} decay={1.8} />
+    </group>
+  );
+}
+
+/** Köşede ayaklı mangal */
+function Brazier({ position, isDark }: { position: Vec3; isDark: boolean }) {
+  const light = useRef<THREE.PointLight>(null);
+  const flame = useRef<THREE.Group>(null);
+  const base = isDark ? 5.5 : 1.1;
+  useFrame((state) => {
+    const f = flicker(state.clock.elapsedTime, 9);
+    if (light.current) light.current.intensity = base * f;
+    if (flame.current) flame.current.scale.set(1, 0.85 + (f - 0.82) * 2.4, 1);
+  });
+  return (
+    <group position={position}>
+      {[0, (Math.PI * 2) / 3, (Math.PI * 4) / 3].map((a) => (
+        <mesh key={a} position={[Math.cos(a) * 0.18, 0.4, Math.sin(a) * 0.18]} rotation={[Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25]}>
+          <cylinderGeometry args={[0.025, 0.03, 0.85, 6]} />
+          <meshStandardMaterial color="#2b201a" roughness={0.5} metalness={0.5} />
+        </mesh>
+      ))}
+      <mesh position-y={0.86} castShadow>
+        <cylinderGeometry args={[0.3, 0.18, 0.18, 14]} />
+        <meshStandardMaterial color="#3a2a20" roughness={0.5} metalness={0.5} />
+      </mesh>
+      <group ref={flame} position-y={0.95}>
+        {[
+          [0, 0, 0.13, 0.42, "#ff7a1a"],
+          [0.09, 0.03, 0.07, 0.28, "#ff9a3c"],
+          [-0.08, -0.04, 0.07, 0.3, "#ff9a3c"],
+          [0, 0, 0.07, 0.24, "#ffd36b"],
+        ].map(([x, z, r, h, c], i) => (
+          <mesh key={i} position={[x as number, (h as number) / 2, z as number]}>
+            <coneGeometry args={[r as number, h as number, 9]} />
+            <meshBasicMaterial color={c as string} transparent opacity={0.92} />
+          </mesh>
+        ))}
+      </group>
+      <pointLight ref={light} position={[0, 1.4, 0]} color="#ff9a3c" intensity={base} distance={8} decay={1.8} />
     </group>
   );
 }

@@ -7,7 +7,7 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import { config } from "./config.js";
-import type { Attachment, ClaudeInfo, McpServerInfo } from "./protocol.js";
+import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
 import { createWorkerServer } from "./workerTools.js";
 
 /** Kullanıcı mesajlarını SDK'ya akış halinde veren basit kuyruk. Oturum açık kaldıkça yeni mesaj beklenir. */
@@ -57,6 +57,8 @@ export type ClaudeSessionOptions = {
   fork?: boolean;
   /** Claude'un erişebileceği ek klasörler */
   additionalDirectories?: string[];
+  model?: string;
+  effort?: EffortLevel;
   onMessage: (msg: SDKMessage) => void;
   canUseTool: CanUseTool;
 };
@@ -80,6 +82,8 @@ export class ClaudeSession {
         resume: opts.resume,
         forkSession: opts.fork,
         additionalDirectories: opts.additionalDirectories?.length ? opts.additionalDirectories : undefined,
+        model: opts.model || undefined,
+        effort: opts.effort,
         includePartialMessages: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
         mcpServers: { workers: createWorkerServer(cwd) },
@@ -112,10 +116,13 @@ export class ClaudeSession {
   /** Bilgi panelinin verileri: bağlam doluluğu, MCP sunucuları, slash komutları */
   async info(chatId: string): Promise<ClaudeInfo> {
     const withTimeout = <T,>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("zaman aşımı")), 15_000))]);
-    const [ctx, mcp, cmds] = await Promise.allSettled([
+    const [ctx, mcp, cmds, models, usage] = await Promise.allSettled([
       withTimeout(this.q.getContextUsage()),
       withTimeout(this.q.mcpServerStatus()),
       withTimeout(this.q.supportedCommands()),
+      withTimeout(this.q.supportedModels()),
+      // Deneysel API: değişirse ya da hata verirse kullanım bilgisi sadece görünmez
+      withTimeout(this.q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })),
     ]);
     return {
       chatId,
@@ -133,7 +140,29 @@ export class ClaudeSession {
         cmds.status === "fulfilled"
           ? cmds.value.map((c) => ({ name: c.name, description: c.description, argumentHint: c.argumentHint || undefined }))
           : undefined,
+      models:
+        models.status === "fulfilled"
+          ? models.value.map(
+              (m): ModelOption => ({
+                value: m.value,
+                resolvedModel: m.resolvedModel,
+                displayName: m.displayName,
+                description: m.description,
+                efforts: m.supportedEffortLevels ?? [],
+                fastMode: !!m.supportsFastMode,
+              }),
+            )
+          : undefined,
+      usage: usage.status === "fulfilled" ? toUsage(usage.value) : undefined,
     };
+  }
+
+  setEffort(effort: EffortLevel) {
+    return this.q.applyFlagSettings({ effortLevel: effort });
+  }
+
+  setFastMode(on: boolean) {
+    return this.q.applyFlagSettings({ fastMode: on });
   }
 
   toggleMcp(server: string, enabled: boolean) {
@@ -180,4 +209,25 @@ function attachmentBlock(a: Attachment) {
   return { type: "text" as const, text: `<ek-dosya ad="${a.name}">
 ${text}
 </ek-dosya>` };
+}
+
+type RawWindow = { utilization: number | null; resets_at: string | null } | undefined | null;
+const win = (w: RawWindow): LimitWindow | undefined => (w ? { utilization: w.utilization, resetsAt: w.resets_at } : undefined);
+
+function toUsage(u: {
+  subscription_type: string | null;
+  rate_limits_available: boolean;
+  rate_limits: Record<string, unknown> | null;
+  session?: { total_cost_usd?: number };
+}): UsageInfo {
+  const r = (u.rate_limits ?? {}) as Record<string, RawWindow>;
+  return {
+    subscription: u.subscription_type,
+    available: u.rate_limits_available,
+    fiveHour: win(r.five_hour),
+    sevenDay: win(r.seven_day),
+    sevenDayOpus: win(r.seven_day_opus),
+    sevenDaySonnet: win(r.seven_day_sonnet),
+    sessionCostUsd: u.session?.total_cost_usd,
+  };
 }

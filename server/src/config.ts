@@ -14,6 +14,8 @@ export const config = {
   claudeCodePath: process.env.CLAUDE_CODE_PATH || undefined,
   /** Claude'un varsayılan çalışma klasörü. Boşsa bu repo. Arayüzden sohbet başına değiştirilebilir. */
   claudeCwd: path.resolve(process.env.CLAUDE_CWD || path.join(SERVER_ROOT, "..")),
+  /** Proje klasörlerinin durduğu yer (klasör seçicide otomatik listelenir). Boşsa bu reponun bir üst klasörü. */
+  projectsDir: path.resolve(process.env.PROJECTS_DIR || path.join(SERVER_ROOT, "..", "..")),
   workerMaxTokens: Number(process.env.WORKER_MAX_TOKENS) || 4000,
   port: Number(process.env.PORT) || 7777,
 };

@@ -1,20 +1,19 @@
-import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { truncate } from "../../lib/format";
+import { anchors, useHovered } from "./labels";
 import type { Seat } from "./layout";
+import type { Pose } from "./placement";
 
-/** working: masada yazıyor · reading: koltukta kitap okuyor · sleeping: masada uyukluyor · error: hata */
-export type Pose = "working" | "reading" | "sleeping" | "error";
+export type { Pose };
 
 type Props = {
+  /** Ajan id'si ("claude" ya da işçi id'si); etiket katmanı bununla eşleşir */
+  id: string;
   name: string;
   color: string;
   pose: Pose;
   seat: Seat;
-  task?: string;
-  error?: string;
   selected: boolean;
   accentHex: string;
   isClaude?: boolean;
@@ -31,7 +30,17 @@ export function AgentFigure(p: Props) {
   const head = useRef<THREE.Group>(null);
   const target = useMemo(() => new THREE.Vector3(), []);
   const hatColor = useMemo(() => new THREE.Color(p.color).multiplyScalar(0.62).getStyle(), [p.color]);
-  const [hovered, setHovered] = useState(false);
+  const anchor = useRef<THREE.Group>(null);
+
+  // Baş üstü noktasını etiket katmanına kaydet
+  useEffect(() => {
+    const obj = anchor.current;
+    if (!obj) return;
+    anchors.set(p.id, obj);
+    return () => {
+      if (anchors.get(p.id) === obj) anchors.delete(p.id);
+    };
+  }, [p.id]);
 
   useFrame((state, dt) => {
     const g = root.current;
@@ -64,9 +73,6 @@ export function AgentFigure(p: Props) {
     }
   });
 
-  const tag =
-    p.pose === "working" ? truncate(p.task ?? "Çalışıyor", 46) : p.pose === "error" ? `⚠ ${truncate(p.error ?? "Hata", 46)}` : null;
-
   return (
     <group
       ref={root}
@@ -78,11 +84,11 @@ export function AgentFigure(p: Props) {
       }}
       onPointerOver={(e) => {
         e.stopPropagation();
-        setHovered(true);
+        useHovered.setState({ id: p.id });
         document.body.style.cursor = "pointer";
       }}
       onPointerOut={() => {
-        setHovered(false);
+        if (useHovered.getState().id === p.id) useHovered.setState({ id: null });
         document.body.style.cursor = "";
       }}
     >
@@ -160,24 +166,8 @@ export function AgentFigure(p: Props) {
         )}
       </group>
 
-      {/* Ad etiketi: seçiliyken, üzerine gelince ya da Claude için her zaman. Görev/hata etiketi çalışırken. */}
-      {(p.selected || hovered || p.isClaude) && !tag && (
-        <Html position={[0, 1.55, 0]} center zIndexRange={[20, 0]}>
-          <div className="agent-label">{p.name}</div>
-        </Html>
-      )}
-      {tag && (
-        <Html position={[0, 2.0, 0]} center zIndexRange={[20, 0]}>
-          <div className={`agent-bubble ${p.pose === "error" ? "error" : ""}`}>
-            <b>{p.name}</b> · {tag}
-          </div>
-        </Html>
-      )}
-      {p.pose === "sleeping" && (
-        <Html position={[0.3, 1.45, 0]} center zIndexRange={[20, 0]}>
-          <span className="zzz">z</span>
-        </Html>
-      )}
+      {/* Etiket katmanının takip ettiği baş üstü noktası */}
+      <group ref={anchor} position={[0, 1.5, 0]} />
     </group>
   );
 }

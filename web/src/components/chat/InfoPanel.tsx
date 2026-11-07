@@ -140,9 +140,14 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
           </Button>
         </div>
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="flex items-center gap-2 text-xs text-muted hover:text-foreground">
-          <FolderPlus size={14} /> Klasör ekle
-        </button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => actions.openFolderPicker("dir", chat.chatId)} className="flex items-center gap-2 text-xs text-muted hover:text-foreground">
+            <FolderPlus size={14} /> Klasör ekle
+          </button>
+          <button type="button" onClick={() => setAdding(true)} className="text-[11px] text-muted hover:text-foreground">
+            yol yaz
+          </button>
+        </div>
       )}
     </Section>
   );

@@ -63,6 +63,8 @@ export function Composer(props: {
   disabledReason?: string;
   /** Verilirse "+" menüsü, ek dosyalar ve slash komut önerileri açılır (Claude sohbeti) */
   claudeChatId?: string;
+  /** Yazma kutusunun altındaki çubuk (verilmezse kısa ipucu yazısı gösterilir) */
+  footer?: React.ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
 }) {
@@ -264,6 +266,7 @@ export function Composer(props: {
           e.target.value = "";
         }}
       />
+      {props.footer ?? (
       <p className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-muted">
         Enter gönderir, Shift+Enter yeni satır
         {claude && (
@@ -273,6 +276,7 @@ export function Composer(props: {
           </>
         )}
       </p>
+      )}
     </div>
   );
 }

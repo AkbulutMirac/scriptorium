@@ -1,39 +1,29 @@
-import { Button, Chip, Spinner, Tooltip } from "@heroui/react";
-import { Brain, FileDiff, Folder, GitBranch, PanelRight, SquarePen, X } from "lucide-react";
+import { Button, Spinner, Tooltip } from "@heroui/react";
+import { Brain, FileDiff, GitBranch, PanelRight, SquarePen, X } from "lucide-react";
+import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { actions, useApp } from "../../store";
-import type { PermissionMode } from "../../protocol";
 import { AgentSelect } from "./AgentSelect";
-import { MiniSelect, StreamingDots, useAutoScroll, type Option } from "./common";
+import { ClaudeFooter } from "./ClaudeFooter";
+import { StreamingDots, useAutoScroll } from "./common";
 import { Composer } from "./Composer";
 import { Collapsible, ItemView } from "./ItemView";
 import { Markdown } from "./Markdown";
 import { PermissionCard } from "./PermissionCard";
 
-const MODELS: Option[] = [
-  { value: "", label: "Varsayılan model" },
-  { value: "opus", label: "Opus" },
-  { value: "sonnet", label: "Sonnet" },
-  { value: "haiku", label: "Haiku" },
-];
-
-const MODES: Option[] = [
-  { value: "default", label: "Her adımda sor" },
-  { value: "acceptEdits", label: "Düzenlemeleri kabul et" },
-  { value: "plan", label: "Plan modu" },
-  { value: "auto", label: "Otomatik" },
-];
-
 export function ClaudeChatPanel({ chatId }: { chatId: string }) {
   const chat = useApp((s) => s.chats[chatId]);
-  const branch = useApp((s) => s.git[s.chats[chatId]?.cwd ?? ""]?.branch);
   const infoOpen = useApp((s) => s.ui.infoOpen);
   const permissions = useApp(useShallow((s) => s.permissions.filter((p) => p.chatId === chatId)));
   const { ref, onScroll } = useAutoScroll<HTMLDivElement>([chat?.items.length, chat?.streamText, chat?.streamThinking, permissions.length]);
 
+  // Panel açılınca model, efor, bağlam ve kullanım bilgisini iste (ilk mesajı beklemeden)
+  useEffect(() => {
+    actions.requestInfo(chatId);
+  }, [chatId]);
+
   if (!chat) return null;
   const isSide = chat.isSide;
-  const folder = chat.cwd.replaceAll("\\", "/").split("/").filter(Boolean).pop();
   const onReply = (quote: string) => actions.setQuote(chatId, quote);
   const onSideChat = isSide ? undefined : (quote: string) => actions.openSideChat(quote);
 
@@ -83,39 +73,6 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <MiniSelect
-            label="Model"
-            value={chat.wantModel ?? ""}
-            options={MODELS}
-            onChange={(v) => actions.setModel(chatId, v)}
-            className="w-36"
-          />
-          <MiniSelect
-            label="İzin modu"
-            value={chat.permissionMode ?? "default"}
-            options={MODES}
-            onChange={(v) => actions.setMode(chatId, v as PermissionMode)}
-            className="w-44"
-          />
-          <span className="flex-1" />
-          {branch && (
-            <Chip size="sm" variant="soft" className="max-w-28">
-              <GitBranch size={12} />
-              <span className="truncate">{branch}</span>
-            </Chip>
-          )}
-          <Tooltip delay={300}>
-            <Chip size="sm" variant="soft" className="max-w-32">
-              <Folder size={12} />
-              <span className="truncate">{folder}</span>
-            </Chip>
-            <Tooltip.Content>
-              <span className="font-code text-xs">{chat.cwd}</span>
-              {chat.model && <div className="text-xs text-muted">Model: {chat.model}</div>}
-            </Tooltip.Content>
-          </Tooltip>
-        </div>
       </div>
 
       {/* Mesajlar */}
@@ -152,6 +109,7 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
         placeholder={isSide ? "Yan sohbette sor…" : "Claude'a yaz… (işçilere iş vermesini de isteyebilirsin)"}
         busy={chat.busy}
         claudeChatId={chatId}
+        footer={<ClaudeFooter chatId={chatId} />}
         onSend={(text, attachments) => actions.sendClaude(chatId, text, attachments)}
         onStop={() => actions.interruptClaude(chatId)}
       />

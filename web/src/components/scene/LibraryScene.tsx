@@ -1,11 +1,14 @@
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
-import type * as THREE from "three";
+import * as THREE from "three";
+import { truncate } from "../../lib/format";
 import { ACCENTS, useTheme } from "../../lib/theme";
 import { actions, CLAUDE_ID, useApp } from "../../store";
-import { AgentFigure, type Pose } from "./AgentFigure";
-import { CLAUDE_STATION, LOUNGE_SEATS, ROOM_BACK_Z, ROOM_HALF_X, roomFrontZ, workstations, type Seat } from "./layout";
+import { AgentFigure } from "./AgentFigure";
+import { anchors, labelEls, useHovered } from "./labels";
+import { claudePose, computePlacements, type Pose } from "./placement";
+import { CLAUDE_STATION, ROOM_BACK_Z, ROOM_HALF_X, roomFrontZ, workstations } from "./layout";
 import { ComputerDesk, Lounge, OfficeChair, palette, Room } from "./Office";
 
 /** Ortografik kamerayı odanın tamamı görünecek şekilde yakınlaştırır */
@@ -39,25 +42,13 @@ export function LibraryScene() {
   const p = palette(isDark);
   const bg = isDark ? "#15121b" : "#f1e7d8";
 
-  // Kim nerede: çalışanlar masasında, boştakiler sırayla dinlenme köşesinde (yer kalmazsa masada uyukluyor)
-  const placements = useMemo(() => {
-    let lounge = 0;
-    return workers.map((w, i) => {
-      const status = activity[w.id]?.status ?? "idle";
-      let pose: Pose;
-      let seat: Seat;
-      if (status === "working") [pose, seat] = ["working", stations[i].seat];
-      else if (status === "error") [pose, seat] = ["error", stations[i].seat];
-      else if (lounge < LOUNGE_SEATS.length) [pose, seat] = ["reading", LOUNGE_SEATS[lounge++]];
-      else [pose, seat] = ["sleeping", stations[i].seat];
-      return { pose, seat };
-    });
-  }, [workers, activity, stations]);
+  const placements = useMemo(() => computePlacements(workers, activity, stations), [workers, activity, stations]);
 
   const claude = activity[CLAUDE_ID];
-  const claudePose: Pose = claude?.status === "working" ? "working" : claude?.status === "error" ? "error" : "reading";
+  const cPose = claudePose(claude);
 
   return (
+    <>
     <Canvas
       key={pixel ? "pixel" : "smooth"}
       orthographic
@@ -90,16 +81,15 @@ export function LibraryScene() {
       <Lounge p={p} isDark={isDark} />
 
       {/* Baş yazıcı */}
-      <ComputerDesk position={CLAUDE_STATION.desk} p={p} big screenOn={claudePose === "working"} accentHex={accentHex} isDark={isDark} />
+      <ComputerDesk position={CLAUDE_STATION.desk} p={p} big screenOn={cPose === "working"} accentHex={accentHex} isDark={isDark} />
       <OfficeChair position={[CLAUDE_STATION.seat.pos[0], 0, CLAUDE_STATION.seat.pos[2] - 0.15]} color="#7a3b2e" />
       <AgentFigure
         name="Claude"
         color="#D97757"
         isClaude
-        pose={claudePose}
+        id={CLAUDE_ID}
+        pose={cPose}
         seat={CLAUDE_STATION.seat}
-        task={claude?.task}
-        error={claude?.error}
         selected={selected === CLAUDE_ID}
         accentHex={accentHex}
         onSelect={() => actions.selectAgent(CLAUDE_ID)}
@@ -109,18 +99,16 @@ export function LibraryScene() {
       {workers.map((w, i) => {
         const st = stations[i];
         const { pose, seat } = placements[i];
-        const a = activity[w.id];
         return (
           <group key={w.id}>
             <ComputerDesk position={st.desk} p={p} screenOn={pose === "working"} accentHex={w.color} isDark={isDark} />
             <OfficeChair position={[st.seat.pos[0], 0, st.seat.pos[2] - 0.15]} color={isDark ? "#3a4258" : "#556080"} />
             <AgentFigure
+              id={w.id}
               name={w.name}
               color={w.color}
               pose={pose}
               seat={seat}
-              task={a?.task}
-              error={a?.error}
               selected={selected === w.id}
               accentHex={accentHex}
               onSelect={() => actions.selectAgent(w.id)}
@@ -140,6 +128,68 @@ export function LibraryScene() {
         minAzimuthAngle={Math.PI / 4 - 0.6}
         maxAzimuthAngle={Math.PI / 4 + 0.6}
       />
+      <LabelTracker />
     </Canvas>
+    <SceneLabels
+      items={[
+        { id: CLAUDE_ID, name: "Claude", pose: cPose, task: claude?.task, error: claude?.error, always: true },
+        ...workers.map((w, i) => ({ id: w.id, name: w.name, pose: placements[i].pose, task: activity[w.id]?.task, error: activity[w.id]?.error })),
+      ]}
+      selected={selected}
+    />
+    </>
+  );
+}
+
+/** Her karede karakterlerin baş üstü noktalarını ekran koordinatına çevirip etiketleri taşır */
+function LabelTracker() {
+  const v = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ camera, size }) => {
+    for (const [id, obj] of anchors) {
+      const el = labelEls.get(id);
+      if (!el) continue;
+      obj.getWorldPosition(v).project(camera);
+      const x = (v.x * 0.5 + 0.5) * size.width;
+      const y = (-v.y * 0.5 + 0.5) * size.height;
+      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+      el.style.visibility = Math.abs(v.z) <= 1 ? "visible" : "hidden";
+    }
+  });
+  return null;
+}
+
+type LabelItem = { id: string; name: string; pose: Pose; task?: string; error?: string; always?: boolean };
+
+/** Sahnenin üstündeki etiket katmanı: ad (seçili/üzerine gelinen/Claude), görev ya da hata baloncuğu, uyku "z"si */
+function SceneLabels({ items, selected }: { items: LabelItem[]; selected: string }) {
+  const hovered = useHovered((s) => s.id);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" aria-hidden>
+      {items.map((it) => {
+        const tag = it.pose === "working" ? truncate(it.task ?? "Çalışıyor", 46) : it.pose === "error" ? `⚠ ${truncate(it.error ?? "Hata", 46)}` : null;
+        const showName = !tag && (it.always || selected === it.id || hovered === it.id);
+        return (
+          <div
+            key={it.id}
+            ref={(el) => {
+              if (el) labelEls.set(it.id, el);
+              else labelEls.delete(it.id);
+            }}
+            className="absolute left-0 top-0"
+            style={{ visibility: "hidden" }}
+          >
+            <div className="agent-tags">
+              {tag && (
+                <div className={`agent-bubble ${it.pose === "error" ? "error" : ""}`}>
+                  <b>{it.name}</b> · {tag}
+                </div>
+              )}
+              <div className={`agent-label ${showName ? "" : "is-hidden"}`}>{it.name}</div>
+              {it.pose === "sleeping" && <span className="zzz">z</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -22,8 +22,9 @@ import { config, SERVER_ROOT } from "./config.js";
 import { bus, reportActivity } from "./events.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
+import { isIgnoredPath, listDir, listProjects } from "./projects.js";
 import { isAvailable } from "./llm.js";
-import type { AgentActivity, ClientMsg, ServerMsg, WorkerInfo } from "./protocol.js";
+import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
 
 const HOST = "127.0.0.1";
@@ -92,7 +93,10 @@ function denyPendingOf(chatId: string, message: string) {
   }
 }
 
-function openChat(chatId: string, opts: { resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[] }) {
+function openChat(
+  chatId: string,
+  opts: { resume?: string; fork?: boolean; cwd?: string; additionalDirectories?: string[]; model?: string; effort?: EffortLevel },
+) {
   const existing = chats.get(chatId);
   if (existing) {
     // Sayfa yenilendi: aynı oturuma yeniden bağlan
@@ -109,6 +113,8 @@ function openChat(chatId: string, opts: { resume?: string; fork?: boolean; cwd?:
     resume: opts.resume,
     fork: opts.fork,
     additionalDirectories: state.dirs,
+    model: opts.model,
+    effort: opts.effort,
     onMessage: (message) => {
       broadcast({ type: "claude.message", chatId, message });
       const sid = state.session.sessionId;
@@ -265,18 +271,33 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
     }
 
     case "claude.sessions": {
-      const list = await listSessions({ dir: msg.cwd || config.claudeCwd, limit: 100 });
-      return reply(ws, {
-        type: "claude.sessions",
-        sessions: list.map((s) => ({
-          id: s.sessionId,
-          title: s.customTitle || s.summary || s.firstPrompt || "Adsız sohbet",
-          updatedAt: s.lastModified,
-          cwd: s.cwd,
-          gitBranch: s.gitBranch,
-        })),
+      const toSummary = (s: Awaited<ReturnType<typeof listSessions>>[number]): SessionSummary => ({
+        id: s.sessionId,
+        title: s.customTitle || s.summary || s.firstPrompt || "Adsız sohbet",
+        updatedAt: s.lastModified,
+        cwd: s.cwd,
+        gitBranch: s.gitBranch,
       });
+      if (msg.all) {
+        const list = await listSessions({ limit: 400 });
+        const visible = list.filter((s) => s.cwd && !isIgnoredPath(s.cwd));
+        return reply(ws, { type: "claude.allSessions", sessions: visible.map(toSummary) });
+      }
+      const list = await listSessions({ dir: msg.cwd || config.claudeCwd, limit: 100 });
+      return reply(ws, { type: "claude.sessions", sessions: list.map(toSummary) });
     }
+
+    case "claude.setEffort":
+      return chatOrThrow(msg.chatId).session.setEffort(msg.effort);
+
+    case "claude.setFastMode":
+      return chatOrThrow(msg.chatId).session.setFastMode(msg.on);
+
+    case "projects.list":
+      return reply(ws, { type: "projects", projects: await listProjects() });
+
+    case "fs.list":
+      return reply(ws, { type: "fs.list", ...(await listDir(msg.path)) });
 
     case "claude.history": {
       const messages = await getSessionMessages(msg.sessionId);
