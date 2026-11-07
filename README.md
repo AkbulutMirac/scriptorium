@@ -22,7 +22,9 @@ Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyl
 - Geçmiş paneli projelere göre gruplanmıştır ve terminaldeki Claude Code oturumlarıyla ortaktır. `PROJECTS_DIR` altındaki klasörler otomatik gelir. Sağ tık menüsünden yeni sohbet açılabilir, proje listeden gizlenebilir, sohbetler yeniden adlandırılıp silinebilir.
 
 **İşçiler (DeepSeek, Ollama)**
-- Her işçiyle doğrudan sohbet edilebilir.
+- Her işçiyle doğrudan sohbet edilebilir. Görsel ve dosya eklenebilir (DeepSeek PDF de okur). Yapıştırma ve sürükle-bırak da çalışır.
+- Yazma kutusunun altındaki çubukta model seçimi, düşünme seviyesi (Kapalı–Maks), sıcaklık, en fazla token, JSON çıktı ve sistem talimatı var. Ayarlar işçi başına hatırlanır.
+- Cevaplarda modelin düşüncesi açılır bir blokta, token kullanımı (önbellek ve düşünme dahil) mesajın altında görünür.
 - Claude işçilere araçlarla iş devreder: `ask_worker` için cevap beklenir, `start_job` ve `job_status` arka planda çalışır.
 - Gizli veri (`sensitive`) sadece local işçilere gider.
 - İşçiler arayüzden eklenir, düzenlenir, silinir (`server/agents.json`).

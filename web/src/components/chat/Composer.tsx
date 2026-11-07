@@ -65,6 +65,8 @@ export function Composer(props: {
   claudeChatId?: string;
   /** Yazma kutusunun altındaki çubuk (verilmezse kısa ipucu yazısı gösterilir) */
   footer?: React.ReactNode;
+  /** Claude dışında da ek dosya ve "+" menüsü (işçiler): menüyü çizen fonksiyon */
+  workerPlus?: (pickFiles: () => void) => React.ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
 }) {
@@ -78,6 +80,8 @@ export function Composer(props: {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const claude = !!props.claudeChatId;
+  /** Ek dosya, yapıştırma ve sürükle-bırak: Claude'da ve işçilerde */
+  const canAttach = claude || !!props.workerPlus;
 
   // Yükseklik içeriğe göre büyüsün (en fazla ~10 satır)
   useEffect(() => {
@@ -128,9 +132,9 @@ export function Composer(props: {
   return (
     <div
       className="relative border-t border-separator p-3"
-      onDragOver={(e) => claude && e.preventDefault()}
+      onDragOver={(e) => canAttach && e.preventDefault()}
       onDrop={(e) => {
-        if (!claude || !e.dataTransfer.files.length) return;
+        if (!canAttach || !e.dataTransfer.files.length) return;
         e.preventDefault();
         addFiles(e.dataTransfer.files);
       }}
@@ -192,13 +196,14 @@ export function Composer(props: {
             onPickCommand={pickCommand}
           />
         )}
+        {!claude && props.workerPlus?.(() => fileInput.current?.click())}
         <textarea
           ref={ref}
           rows={1}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => {
-            if (!claude) return;
+            if (!canAttach) return;
             const files = [...e.clipboardData.files];
             if (files.length) {
               e.preventDefault();

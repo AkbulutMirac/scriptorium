@@ -48,7 +48,36 @@ export type HistoryMessage = {
   parent_tool_use_id: string | null;
 };
 
-export type WorkerChatMessage = { role: "user" | "assistant"; content: string; at: number; error?: boolean };
+/** İşçinin düşünme seviyesi. "none" düşünmeyi kapatır. */
+export type ReasoningLevel = "none" | "low" | "medium" | "high" | "max";
+
+/** İşçiyle doğrudan sohbetin ayarları (işçi başına hatırlanır) */
+export type WorkerSettings = {
+  /** Boşsa işçinin varsayılan modeli */
+  model?: string;
+  /** Boşsa modelin varsayılanı */
+  reasoning?: ReasoningLevel;
+  /** Sadece düşünme kapalıyken etkili */
+  temperature?: number;
+  json?: boolean;
+  maxTokens?: number;
+  system?: string;
+};
+
+export type TokenUsage = { prompt: number; completion: number; cacheHit?: number; reasoning?: number };
+
+export type WorkerChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  at: number;
+  error?: boolean;
+  /** Modelin düşünce metni (varsa) */
+  reasoning?: string;
+  /** Kullanıcının eklediği dosyalar (görseller dahil, base64) */
+  attachments?: Attachment[];
+  usage?: TokenUsage;
+  model?: string;
+};
 
 export type WorkerChatSummary = { id: string; workerId: string; title: string; updatedAt: number };
 
@@ -175,7 +204,8 @@ export type ClientMsg =
   | { type: "claude.history"; sessionId: string }
   | { type: "claude.rename"; sessionId: string; title: string }
   | { type: "claude.delete"; sessionId: string }
-  | { type: "worker.send"; workerId: string; chatId?: string; text: string }
+  | { type: "worker.send"; workerId: string; chatId?: string; text: string; attachments?: Attachment[]; settings?: WorkerSettings }
+  | { type: "worker.models"; workerId: string }
   | { type: "worker.stop"; chatId: string }
   | { type: "worker.chats"; workerId: string }
   | { type: "worker.chat"; chatId: string }
@@ -215,6 +245,8 @@ export type ServerMsg =
   | { type: "worker.chats"; workerId: string; chats: WorkerChatSummary[] }
   | { type: "worker.chat"; chat: WorkerChat }
   | { type: "worker.token"; chatId: string; text: string }
+  | { type: "worker.reasoning"; chatId: string; text: string }
+  | { type: "worker.models"; workerId: string; models: string[] }
   | { type: "worker.done"; chatId: string; message: WorkerChatMessage }
   | { type: "workers"; workers: WorkerInfo[] }
   | { type: "activity"; activity: AgentActivity }

@@ -44,7 +44,7 @@ export async function runWorkerTask(args: {
   try {
     const fileText = files?.length ? await readProjectFiles(cwd, files) : "";
     const userContent = fileText ? `${task}\n\n## Dosyalar\n\n${fileText}` : task;
-    const answer = await chat(
+    const { content: answer } = await chat(
       worker,
       [
         { role: "system", content: WORKER_SYSTEM_PROMPT },

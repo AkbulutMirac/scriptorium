@@ -24,7 +24,7 @@ import { bus, reportActivity } from "./events.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { isIgnoredPath, listDir, listProjects } from "./projects.js";
-import { deepseekBalance, isAvailable } from "./llm.js";
+import { deepseekBalance, isAvailable, listModels } from "./llm.js";
 import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
 
@@ -378,9 +378,12 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
           workerId: msg.workerId,
           chatId,
           text: msg.text,
+          attachments: msg.attachments,
+          settings: msg.settings,
           signal: abort.signal,
           onStart: (chat) => broadcast({ type: "worker.chat", chat }),
           onToken: (id, text) => broadcast({ type: "worker.token", chatId: id, text }),
+          onReasoning: (id, text) => broadcast({ type: "worker.reasoning", chatId: id, text }),
         });
         broadcast({ type: "worker.done", chatId, message });
         broadcast({ type: "worker.chats", workerId: msg.workerId, chats: await listChats(msg.workerId) });
@@ -388,6 +391,11 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
         workerAborts.delete(chatId);
       }
       return;
+    }
+
+    case "worker.models": {
+      const worker = (await loadWorkers()).find((w) => w.id === msg.workerId);
+      return reply(ws, { type: "worker.models", workerId: msg.workerId, models: worker ? await listModels(worker) : [] });
     }
 
     case "worker.stop":

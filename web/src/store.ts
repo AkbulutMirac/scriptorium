@@ -19,6 +19,7 @@ import type {
   WorkerChat,
   WorkerChatSummary,
   WorkerInfo,
+  WorkerSettings,
 } from "./protocol";
 
 export const CLAUDE_ID = "claude";
@@ -66,7 +67,7 @@ export type ClaudeChat = {
 };
 
 export type PermissionReq = Extract<ServerMsg, { type: "claude.permissionRequest" }>;
-export type LiveWorkerChat = WorkerChat & { stream: string; busy: boolean };
+export type LiveWorkerChat = WorkerChat & { stream: string; streamReasoning: string; busy: boolean };
 export type Overlay = { title: string; body: string; mono?: boolean; diff?: boolean; image?: string };
 export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: number; infoOpen: boolean };
 
@@ -89,6 +90,9 @@ type State = {
   workerChatLists: Record<string, WorkerChatSummary[]>;
   workerChats: Record<string, LiveWorkerChat>;
   activeWorkerChat: Record<string, string | undefined>;
+  /** İşçi başına sohbet ayarları (model, düşünme, sıcaklık, JSON, sistem talimatı) */
+  workerSettings: Record<string, WorkerSettings>;
+  workerModels: Record<string, string[]>;
 
   /** Sohbet paneline göre alıntı: Claude için chatId, işçi için "w:<id>" */
   quotes: Record<string, string | undefined>;
@@ -129,6 +133,8 @@ export const useApp = create<State>(() => ({
   workerChatLists: {},
   workerChats: {},
   activeWorkerChat: {},
+  workerSettings: load<Record<string, WorkerSettings>>("workerSettings", {}),
+  workerModels: {},
   quotes: {},
   overlay: null,
   workerModal: { open: false },
@@ -373,7 +379,12 @@ function onServer(msg: ServerMsg) {
 
     case "worker.chat": {
       const prev = s.workerChats[msg.chat.id];
-      set({ workerChats: { ...s.workerChats, [msg.chat.id]: { ...msg.chat, stream: prev?.stream ?? "", busy: prev?.busy ?? false } } });
+      set({
+        workerChats: {
+          ...s.workerChats,
+          [msg.chat.id]: { ...msg.chat, stream: prev?.stream ?? "", streamReasoning: prev?.streamReasoning ?? "", busy: prev?.busy ?? false },
+        },
+      });
       return;
     }
 
@@ -381,8 +392,16 @@ function onServer(msg: ServerMsg) {
       updateWorkerChat(msg.chatId, (c) => ({ ...c, stream: c.stream + msg.text }));
       return;
 
+    case "worker.reasoning":
+      updateWorkerChat(msg.chatId, (c) => ({ ...c, streamReasoning: c.streamReasoning + msg.text }));
+      return;
+
+    case "worker.models":
+      set({ workerModels: { ...s.workerModels, [msg.workerId]: msg.models } });
+      return;
+
     case "worker.done":
-      updateWorkerChat(msg.chatId, (c) => ({ ...c, messages: [...c.messages, msg.message], stream: "", busy: false, updatedAt: msg.message.at }));
+      updateWorkerChat(msg.chatId, (c) => ({ ...c, messages: [...c.messages, msg.message], stream: "", streamReasoning: "", busy: false, updatedAt: msg.message.at }));
       return;
 
     case "workers": {
@@ -661,18 +680,44 @@ export const actions = {
     socket.send({ type: "worker.chat", chatId });
   },
 
-  sendWorker(workerId: string, text: string) {
+  sendWorker(workerId: string, text: string, attachments: Attachment[] = []) {
     const chatId = get().activeWorkerChat[workerId] ?? uuid();
-    const user = { role: "user" as const, content: text, at: Date.now() };
+    const user = { role: "user" as const, content: text, at: Date.now(), attachments: attachments.length ? attachments : undefined };
     const prev = get().workerChats[chatId];
     const chat: LiveWorkerChat = prev
-      ? { ...prev, messages: [...prev.messages, user], busy: true, stream: "" }
-      : { id: chatId, workerId, title: text.slice(0, 60), updatedAt: Date.now(), messages: [user], busy: true, stream: "" };
+      ? { ...prev, messages: [...prev.messages, user], busy: true, stream: "", streamReasoning: "" }
+      : {
+          id: chatId,
+          workerId,
+          title: (text || attachments[0]?.name || "Sohbet").slice(0, 60),
+          updatedAt: Date.now(),
+          messages: [user],
+          busy: true,
+          stream: "",
+          streamReasoning: "",
+        };
     set({
       workerChats: { ...get().workerChats, [chatId]: chat },
       activeWorkerChat: { ...get().activeWorkerChat, [workerId]: chatId },
     });
-    socket.send({ type: "worker.send", workerId, chatId, text });
+    socket.send({
+      type: "worker.send",
+      workerId,
+      chatId,
+      text,
+      attachments: attachments.length ? attachments : undefined,
+      settings: get().workerSettings[workerId],
+    });
+  },
+
+  setWorkerSettings(workerId: string, patch: Partial<WorkerSettings>) {
+    const next = { ...get().workerSettings, [workerId]: { ...get().workerSettings[workerId], ...patch } };
+    set({ workerSettings: next });
+    save("workerSettings", next);
+  },
+
+  loadWorkerModels(workerId: string) {
+    socket.send({ type: "worker.models", workerId });
   },
 
   stopWorker(chatId: string) {
