@@ -98,6 +98,8 @@ type State = {
   projects: ProjectInfo[];
   /** Tüm projelerin Claude oturumları (geçmiş panelinde projelere göre gruplanır) */
   allSessions: SessionSummary[];
+  /** Bilgi panelinde açılıp görünür kılınacak bölüm ("Tümünü gör" gibi) */
+  infoFocus: { section: string; n: number } | null;
   /** Klasör gezgini */
   folderPicker: { open: boolean; purpose: "cwd" | "dir"; chatId?: string; listing?: DirListing };
 };
@@ -130,6 +132,7 @@ export const useApp = create<State>(() => ({
   projects: [],
   allSessions: [],
   folderPicker: { open: false, purpose: "cwd" },
+  infoFocus: null,
 }));
 
 const get = useApp.getState;
@@ -660,6 +663,12 @@ export const actions = {
 
   setQuote(key: string, quote: string | undefined) {
     set({ quotes: { ...get().quotes, [key]: quote } });
+  },
+
+  /** Bilgi panelini açıp bir bölümüne odaklan */
+  focusInfo(section: string) {
+    actions.setUi({ infoOpen: true });
+    set({ infoFocus: { section, n: Date.now() }, selected: CLAUDE_ID });
   },
 
   showOverlay(overlay: Overlay | null) {

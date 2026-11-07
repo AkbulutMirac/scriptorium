@@ -1,9 +1,13 @@
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type MenuItem = { label: string; icon?: LucideIcon; danger?: boolean; onSelect: () => void } | "separator";
 
-/** Sağ tık menüsü: imlecin olduğu yerde açılır, dışarı tıklayınca, Esc'ye basınca ya da kaydırınca kapanır. */
+/**
+ * Sağ tık menüsü: imlecin olduğu yerde açılır, dışarı tıklayınca, Esc'ye basınca ya da kaydırınca kapanır.
+ * body'ye portal ile çizilir: kaydırma alanlarının kenar soldurma maskesi (mask-image) menüyü kırpmasın.
+ */
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
@@ -31,7 +35,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
     };
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       role="menu"
@@ -58,6 +62,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
           </button>
         ),
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

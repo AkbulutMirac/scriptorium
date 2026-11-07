@@ -14,7 +14,9 @@ import {
   RotateCw,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { load, save } from "../../lib/storage";
+import { UsageCard } from "./UsageCard";
 import { actions, agentMeta, useApp, type ClaudeChat } from "../../store";
 
 const fmt = (n: number) => n.toLocaleString("tr-TR");
@@ -48,6 +50,9 @@ export function InfoPanel({ chatId }: { chatId: string }) {
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2 text-sm">
         <Environment chat={chat} branch={git?.branch} />
         <ContextSection chat={chat} />
+        <Section id="usage" title="Kullanım">
+          <UsageCard usage={chat.info?.usage} />
+        </Section>
         <Connectors chat={chat} />
         <Outputs chat={chat} isRepo={!!git?.isRepo} />
         <Changes chat={chat} />
@@ -57,12 +62,39 @@ export function InfoPanel({ chatId }: { chatId: string }) {
   );
 }
 
-function Section({ title, right, children, defaultOpen = true }: { title: string; right?: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+/** Bölümlerin varsayılan açık/kapalı durumu; kullanıcının seçimi hatırlanır */
+const SECTION_DEFAULTS: Record<string, boolean> = {
+  env: true,
+  context: true,
+  usage: true,
+  connectors: false,
+  outputs: false,
+  changes: false,
+  tasks: false,
+};
+
+function Section({ id, title, right, children }: { id: string; title: string; right?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(() => load<Record<string, boolean>>("infoSections", {})[id] ?? SECTION_DEFAULTS[id] ?? true);
+  const focus = useApp((s) => s.infoFocus);
+  const ref = useRef<HTMLElement>(null);
+
+  // "Tümünü gör" gibi bir yerden bu bölüme odaklanıldıysa aç ve görünür kıl
+  useEffect(() => {
+    if (focus?.section !== id) return;
+    setOpen(true);
+    setTimeout(() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }, [focus, id]);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    save("infoSections", { ...load<Record<string, boolean>>("infoSections", {}), [id]: next });
+  };
+
   return (
-    <section className="border-b border-separator py-2.5 last:border-b-0">
+    <section ref={ref} className="border-b border-separator py-2.5 last:border-b-0">
       <div className="flex items-center gap-1">
-        <button type="button" onClick={() => setOpen(!open)} className="flex flex-1 items-center gap-1 text-left text-xs font-semibold text-muted hover:text-foreground">
+        <button type="button" onClick={toggle} className="flex flex-1 items-center gap-1 text-left text-xs font-semibold text-muted hover:text-foreground">
           <ChevronRight size={13} className={`transition-transform ${open ? "rotate-90" : ""}`} />
           {title}
         </button>
@@ -93,7 +125,7 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
     setAdding(false);
   };
   return (
-    <Section title="Ortam">
+    <Section id="env" title="Ortam">
       <Row icon={<Monitor size={14} />}>Bu bilgisayar</Row>
       <Row icon={<Folder size={14} />} title={chat.cwd}>
         <span className="font-medium">{folder}</span> <span className="font-code text-xs text-muted">{chat.cwd}</span>
@@ -156,7 +188,7 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
 function ContextSection({ chat }: { chat: ClaudeChat }) {
   const ctx = chat.info?.context;
   return (
-    <Section title="Bağlam" right={ctx && <span className="text-xs tabular-nums text-muted">%{Math.round(ctx.percentage)}</span>}>
+    <Section id="context" title="Bağlam" right={ctx && <span className="text-xs tabular-nums text-muted">%{Math.round(ctx.percentage)}</span>}>
       {ctx ? (
         <>
           <div className="h-1.5 overflow-hidden rounded-full bg-default-soft">
@@ -235,7 +267,7 @@ export function ConnectorList({ chat }: { chat: ClaudeChat }) {
 function Connectors({ chat }: { chat: ClaudeChat }) {
   const count = (chat.info?.mcp ?? chat.init?.mcpServers ?? []).length;
   return (
-    <Section title="Bağlayıcılar" right={count > 0 && <span className="text-xs text-muted">{count}</span>}>
+    <Section id="connectors" title="Bağlayıcılar" right={count > 0 && <span className="text-xs text-muted">{count}</span>}>
       <ConnectorList chat={chat} />
     </Section>
   );
@@ -262,7 +294,7 @@ function Outputs({ chat, isRepo }: { chat: ClaudeChat; isRepo: boolean }) {
   };
 
   return (
-    <Section title="Çıktılar" right={files.length > 0 && <span className="text-xs text-muted">{files.length}</span>}>
+    <Section id="outputs" title="Çıktılar" right={files.length > 0 && <span className="text-xs text-muted">{files.length}</span>}>
       {files.length === 0 ? (
         <p className="text-xs text-muted">Bu oturumda henüz dosya yazılmadı.</p>
       ) : (
@@ -290,6 +322,7 @@ function Changes({ chat }: { chat: ClaudeChat }) {
   const git = useApp((s) => s.git[chat.cwd]);
   return (
     <Section
+      id="changes"
       title="Değişiklikler"
       right={
         git?.isRepo ? (
@@ -361,7 +394,7 @@ function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
   const running = tasks.filter((t) => t.status === "running" || t.status === "pending").length + jobs.filter((j) => j.status === "running" || j.status === "queued").length;
 
   return (
-    <Section title="Arka plan görevleri" right={running > 0 && <span className="text-xs text-accent">{running} aktif</span>}>
+    <Section id="tasks" title="Arka plan görevleri" right={running > 0 && <span className="text-xs text-accent">{running} aktif</span>}>
       {tasks.length === 0 && jobs.length === 0 && <p className="text-xs text-muted">Arka planda çalışan görev yok.</p>}
       {tasks.map((t) => (
         <div key={t.id} className="flex items-center gap-2">

@@ -1,8 +1,9 @@
 import { Button, Popover, Switch, Tooltip } from "@heroui/react";
 import { Check, ChevronDown, Folder, FolderOpen, GitBranch, Laptop, Search, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { relativeTime } from "../../lib/format";
-import type { EffortLevel, LimitWindow, ModelOption, PermissionMode } from "../../protocol";
+import type { EffortLevel, ModelOption, PermissionMode } from "../../protocol";
+import { pct, UsageCard } from "./UsageCard";
 import { actions, useApp, type ClaudeChat } from "../../store";
 
 export const EFFORT_LABEL: Record<EffortLevel, string> = { low: "Düşük", medium: "Orta", high: "Yüksek", xhigh: "Ekstra", max: "Maks" };
@@ -14,18 +15,6 @@ const MODES: { value: PermissionMode; label: string; hint: string }[] = [
   { value: "plan", label: "Plan modu", hint: "Önce plan yapar, bir şey değiştirmez" },
   { value: "auto", label: "Otomatik", hint: "Güvenli adımları kendisi onaylar" },
 ];
-
-/** Limit kullanımını yüzdeye çevirir (API 0-1 ya da 0-100 döndürebilir) */
-export function pct(w?: LimitWindow): number | null {
-  if (!w || w.utilization == null) return null;
-  return Math.round(w.utilization <= 1 ? w.utilization * 100 : w.utilization);
-}
-
-export function resetText(w?: LimitWindow): string {
-  if (!w?.resetsAt) return "";
-  const d = new Date(w.resetsAt);
-  return Number.isNaN(d.getTime()) ? "" : `sıfırlanma ${d.toLocaleString("tr-TR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}`;
-}
 
 /** Şu an seçili model (kullanıcının seçimi ya da oturumun bildirdiği model) */
 function currentModel(chat: ClaudeChat, models: ModelOption[]): ModelOption | undefined {
@@ -291,7 +280,7 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
   );
 }
 
-/** Kullanım halkası: 5 saatlik limit (yoksa bağlam doluluğu). Üzerine gelince ayrıntı. */
+/** Kullanım halkası: 5 saatlik limit (yoksa bağlam doluluğu). Üzerine gelince kart, tıklayınca ayrıntı. */
 function UsageRing({ chat }: { chat: ClaudeChat }) {
   const usage = chat.info?.usage;
   const ctx = chat.info?.context;
@@ -301,27 +290,19 @@ function UsageRing({ chat }: { chat: ClaudeChat }) {
   const circ = 2 * Math.PI * r;
   const color = value == null ? "var(--muted)" : value > 85 ? "var(--danger)" : value > 65 ? "var(--warning)" : "var(--accent)";
 
-  const lines = useMemo(() => {
-    const l: string[] = [];
-    if (usage?.available) {
-      const add = (name: string, w?: LimitWindow) => {
-        const p = pct(w);
-        if (p != null) l.push(`${name}: %${p}${resetText(w) ? ` · ${resetText(w)}` : ""}`);
-      };
-      add("5 saatlik limit", usage.fiveHour);
-      add("7 günlük limit", usage.sevenDay);
-      add("7 günlük Opus", usage.sevenDayOpus);
-      add("7 günlük Sonnet", usage.sevenDaySonnet);
-    } else if (usage) {
-      l.push("Plan limitleri bu giriş türünde görünmüyor.");
-    }
-    if (ctx) l.push(`Bağlam: %${Math.round(ctx.percentage)} (${ctx.totalTokens.toLocaleString("tr-TR")} token)`);
-    return l;
-  }, [usage, ctx]);
-
   return (
-    <Tooltip delay={200}>
-      <Button isIconOnly size="sm" variant="ghost" className="h-7 w-7 min-w-7" aria-label="Kullanım" onPress={() => actions.requestInfo(chat.chatId)}>
+    <Tooltip delay={150}>
+      <Button
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        className="h-7 w-7 min-w-7"
+        aria-label="Kullanım"
+        onPress={() => {
+          actions.requestInfo(chat.chatId);
+          actions.focusInfo("usage");
+        }}
+      >
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
           <circle cx="9" cy="9" r={r} fill="none" stroke="var(--border)" strokeWidth="2.5" />
           {value != null && (
@@ -339,11 +320,9 @@ function UsageRing({ chat }: { chat: ClaudeChat }) {
           )}
         </svg>
       </Button>
-      <Tooltip.Content>
-        <div className="flex flex-col gap-0.5 text-xs">
-          <span className="font-medium">Kullanım</span>
-          {lines.length ? lines.map((l) => <span key={l}>{l}</span>) : <span className="text-muted">Tıkla, yüklensin.</span>}
-        </div>
+      <Tooltip.Content className="p-2">
+        <UsageCard usage={usage} context={ctx} />
+        <p className="mt-2 px-1 text-[10px] text-muted">Ayrıntılar için tıkla</p>
       </Tooltip.Content>
     </Tooltip>
   );

@@ -2,7 +2,7 @@ import { Button, Chip, Input, Label, Popover, Switch, TextField, Tooltip } from 
 import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Settings, Sun } from "lucide-react";
 import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
-import { pct, resetText } from "./chat/ClaudeFooter";
+import { pct, UsageCard } from "./chat/UsageCard";
 import { actions, useApp } from "../store";
 
 export function TopBar() {
@@ -135,29 +135,29 @@ function SettingsPopover() {
   );
 }
 
-/** Claude aboneliğinin kullanım limitleri (ana sohbetin bilgisinden) */
+/** Claude aboneliğinin kullanım limitleri (ana sohbetin bilgisinden). Üzerine gelince kart, tıklayınca ayrıntı. */
 function UsageChip() {
   const usage = useApp((s) => s.chats[s.mainChatId ?? ""]?.info?.usage);
   if (!usage?.available) return null;
   const five = pct(usage.fiveHour);
   const week = pct(usage.sevenDay);
   if (five == null && week == null) return null;
-  const tone = Math.max(five ?? 0, week ?? 0) > 85 ? "text-danger" : Math.max(five ?? 0, week ?? 0) > 65 ? "text-warning" : "text-muted";
+  const worst = Math.max(five ?? 0, week ?? 0);
+  const tone = worst > 85 ? "text-danger" : worst > 65 ? "text-warning" : "text-muted";
   return (
-    <Tooltip delay={200}>
-      <button type="button" className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-default-soft ${tone}`} aria-label="Kullanım limitleri">
+    <Tooltip delay={150}>
+      <button
+        type="button"
+        onClick={() => actions.focusInfo("usage")}
+        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-default-soft ${tone}`}
+        aria-label="Kullanım limitleri"
+      >
         <Gauge size={14} />
         {five != null && <span>5s %{five}</span>}
-        {week != null && <span>· 7g %{week}</span>}
+        {week != null && <span>· Haftalık %{week}</span>}
       </button>
-      <Tooltip.Content>
-        <div className="flex flex-col gap-0.5 text-xs">
-          <span className="font-medium">Claude kullanım limitleri{usage.subscription ? ` (${usage.subscription})` : ""}</span>
-          {five != null && <span>5 saatlik: %{five} {resetText(usage.fiveHour) && `· ${resetText(usage.fiveHour)}`}</span>}
-          {week != null && <span>7 günlük: %{week} {resetText(usage.sevenDay) && `· ${resetText(usage.sevenDay)}`}</span>}
-          {pct(usage.sevenDayOpus) != null && <span>7 günlük Opus: %{pct(usage.sevenDayOpus)}</span>}
-          {pct(usage.sevenDaySonnet) != null && <span>7 günlük Sonnet: %{pct(usage.sevenDaySonnet)}</span>}
-        </div>
+      <Tooltip.Content placement="bottom end" className="p-2">
+        <UsageCard usage={usage} />
       </Tooltip.Content>
     </Tooltip>
   );
