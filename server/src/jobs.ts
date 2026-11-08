@@ -7,7 +7,8 @@ import { runWorkerTask } from "./workerTasks.js";
 /**
  * Background jobs. For long tasks (e.g. hundreds of files with a local model) Claude does not wait:
  * it starts the job, gets a job id, and asks for the result later via job_status.
- * Jobs of the same worker run sequentially (a local model handles only one job at a time).
+ * Jobs of the same local worker run sequentially (a local model handles only one job at a time);
+ * API workers run them in parallel, limited by their slot count in requests.ts.
  */
 const jobs = new Map<string, JobInfo>();
 const queues = new Map<string, Promise<unknown>>();
@@ -40,7 +41,7 @@ export function startJob(args: {
   jobs.set(job.id, job);
   changed();
 
-  const previous = queues.get(args.worker.id) ?? Promise.resolve();
+  const previous = (args.worker.local && queues.get(args.worker.id)) || Promise.resolve();
   const run = previous.then(async () => {
     job.status = "running";
     changed();
@@ -54,7 +55,7 @@ export function startJob(args: {
     job.finishedAt = Date.now();
     changed();
   });
-  queues.set(args.worker.id, run);
+  if (args.worker.local) queues.set(args.worker.id, run);
   return job;
 }
 

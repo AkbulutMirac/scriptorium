@@ -60,6 +60,12 @@ function withProjectDir(ctx: ToolCtx, projectDir?: string): ToolCtx {
   return { cwd: projectDir, caller: { ...ctx.caller, label: path.basename(projectDir) || ctx.caller.label } };
 }
 
+/**
+ * readOnlyHint: the tools don't change the user's files, so Claude Code may run them concurrently.
+ * Without it, ask_worker calls sent in parallel run one after another (and only one worker shows up in the office).
+ */
+export const WORKER_TOOL_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true };
+
 /** The four worker tools. The same in both Scriptorium sessions (in-SDK) and other Claude Code sessions (HTTP). */
 export const WORKER_TOOLS = [
   {
@@ -251,7 +257,7 @@ export function createWorkerServer(ctx: ToolCtx) {
     instructions: WORKER_INSTRUCTIONS,
     tools: WORKER_TOOLS.map((t) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tool(t.name, t.description, t.schema, (args: any) => t.handler(args, ctx), { alwaysLoad: true }),
+      tool(t.name, t.description, t.schema, (args: any) => t.handler(args, ctx), { alwaysLoad: true, annotations: WORKER_TOOL_ANNOTATIONS }),
     ),
   });
 }

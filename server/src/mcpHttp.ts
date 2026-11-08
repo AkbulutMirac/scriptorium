@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { WORKER_INSTRUCTIONS, WORKER_SERVER_NAME, WORKER_TOOLS, type ToolCtx } from "./workerTools.js";
+import { WORKER_INSTRUCTIONS, WORKER_SERVER_NAME, WORKER_TOOL_ANNOTATIONS, WORKER_TOOLS, type ToolCtx } from "./workerTools.js";
 
 /**
  * Exposes the worker tools as an MCP server at http://127.0.0.1:<port>/mcp. This way, Claude Code sessions in the terminal
@@ -78,7 +78,7 @@ function newSession(): StreamableHTTPServerTransport {
 
   for (const t of WORKER_TOOLS) {
     // anthropic/alwaysLoad: Claude Code does not hide tools behind ToolSearch; they are ready from the first message
-    server.registerTool(t.name, { description: t.description, inputSchema: t.schema, _meta: { "anthropic/alwaysLoad": true } }, (async (args: unknown, extra: Parameters<typeof resolveCtx>[1]) =>
+    server.registerTool(t.name, { description: t.description, inputSchema: t.schema, annotations: WORKER_TOOL_ANNOTATIONS, _meta: { "anthropic/alwaysLoad": true } }, (async (args: unknown, extra: Parameters<typeof resolveCtx>[1]) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (t.handler as any)(args, await resolveCtx(session, extra))) as never);
   }
