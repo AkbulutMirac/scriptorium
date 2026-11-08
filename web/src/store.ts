@@ -467,7 +467,11 @@ function onServer(msg: ServerMsg) {
         const c = get().chats[msg.chatId];
         if (c) rememberPrefs(msg.chatId, { mode: c.permissionMode ?? c.wantMode, model: c.wantModel, effort: c.effort ?? c.wantEffort }, true);
       }
-      if (msg.chatId === s.mainChatId) persistMain();
+      if (msg.chatId === s.mainChatId) {
+        persistMain();
+        // A new chat got its session: put it in the history list right away
+        refreshSessions();
+      }
       return;
 
     case "claude.busy":

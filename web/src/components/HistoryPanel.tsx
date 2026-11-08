@@ -1,6 +1,6 @@
 import { Button, Modal, ScrollShadow, Tooltip } from "@heroui/react";
 import { Check, ChevronRight, Copy, Eye, EyeOff, Folder, FolderOpen, FolderPlus, MessageSquare, PanelLeftOpen, Pencil, Plus, RefreshCw, SquarePen, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { load, save } from "../lib/storage";
 import { COMPACT_QUERY, isCompactNow, MOBILE_QUERY, useMedia } from "../lib/useMedia";
 import { Drawer } from "./Drawer";
@@ -94,6 +94,10 @@ function ClaudeHistory() {
   const projects = useApp((s) => s.projects);
   const activeSession = useApp((s) => s.chats[s.mainChatId ?? ""]?.sessionId);
   const seenAt = useApp((s) => s.seenAt);
+  const activeTitle = useApp((s) => {
+    const first = s.chats[s.mainChatId ?? ""]?.items.find((it) => it.kind === "user");
+    return first?.kind === "user" ? first.text : "";
+  });
   const activeCwd = useApp((s) => s.chats[s.mainChatId ?? ""]?.cwd ?? "");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -140,7 +144,9 @@ function ClaudeHistory() {
   }, [all, projects]);
 
   if (!groups.length) return <Empty text="No projects or chats yet." />;
-  const activeKey = keyOf(activeCwd);
+  // The group holding the open chat (by session; a new chat without one yet goes by its folder)
+  const activeGroup = groups.find((g) => g.sessions.some((s) => s.id === activeSession));
+  const activeKey = activeGroup ? keyOf(activeGroup.path) : keyOf(activeCwd);
   const visible = groups.filter((g) => showHidden || !hidden.includes(keyOf(g.path)) || keyOf(g.path) === activeKey);
   const hiddenCount = groups.filter((g) => hidden.includes(keyOf(g.path))).length;
 
@@ -231,7 +237,10 @@ function ClaudeHistory() {
       {visible.map((g) => {
         const k = keyOf(g.path);
         const isOpen = open[k] ?? k === activeKey;
-        const list = expanded[k] ? g.sessions : g.sessions.slice(0, 6);
+        const first = g.sessions.slice(0, 6);
+        // The open chat stays visible even when it's beyond the first six
+        const extra = !expanded[k] && g.sessions.slice(6).find((s) => s.id === activeSession);
+        const list = expanded[k] ? g.sessions : extra ? [...first, extra] : first;
         return (
           <div key={k}>
             <div
@@ -260,7 +269,17 @@ function ClaudeHistory() {
             </div>
             {isOpen && (
               <ul className="ml-3 flex flex-col gap-0.5 border-l border-separator pl-1.5">
-                {g.sessions.length === 0 && <li className="px-2 py-1 text-[11px] text-muted">No chats. Start one with +.</li>}
+                {/* The open chat isn't in the list yet (no message sent, or the list hasn't refreshed): show it on top */}
+                {!activeGroup && k === activeKey && (
+                  <li aria-current="true" className="relative flex items-center rounded-lg bg-accent-soft px-2 py-1.5 ring-1 ring-accent/50">
+                    <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-accent-soft-foreground">{activeTitle || "New chat"}</div>
+                      <div className="text-[11px] text-muted">{activeSession ? "just now" : "Not started yet"}</div>
+                    </div>
+                  </li>
+                )}
+                {g.sessions.length === 0 && (activeGroup || k !== activeKey) && <li className="px-2 py-1 text-[11px] text-muted">No chats. Start one with +.</li>}
                 {list.map((s) => (
                   <HistoryRow
                     key={s.id}
@@ -346,6 +365,12 @@ function HistoryRow(props: {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const rowRef = useRef<HTMLLIElement>(null);
+
+  // Keep the open chat in view when it changes
+  useEffect(() => {
+    if (props.active) rowRef.current?.scrollIntoView({ block: "nearest" });
+  }, [props.active]);
 
   useEffect(() => {
     if (props.editRequest && props.onRename) {
@@ -382,8 +407,10 @@ function HistoryRow(props: {
 
   return (
     <li
-      className={`group flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
-        props.active ? "bg-accent-soft" : "hover:bg-default-soft"
+      ref={rowRef}
+      aria-current={props.active ? "true" : undefined}
+      className={`group relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+        props.active ? "bg-accent-soft ring-1 ring-accent/50" : "hover:bg-default-soft"
       }`}
       onClick={() => {
         props.onOpen();
@@ -392,6 +419,7 @@ function HistoryRow(props: {
       onContextMenu={props.onContextMenu}
       onMouseLeave={() => setConfirmDelete(false)}
     >
+      {props.active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent" aria-hidden />}
       <div className="min-w-0 flex-1">
         <div className={`truncate text-sm ${props.active ? "font-medium text-accent-soft-foreground" : ""}`}>{props.title}</div>
         <div className="text-[11px] text-muted">{props.subtitle}</div>
