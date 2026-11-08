@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Worker } from "./agents.js";
-import { chat, type ChatPart } from "./llm.js";
+import { chat, supportsVision, type ChatPart } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { withWorkerSlot } from "./requests.js";
 import { saveDelegatedTask } from "./workerChats.js";
@@ -65,6 +65,10 @@ export async function runWorkerTask(args: {
   const { worker, task, files, cwd, signal } = args;
   return withWorkerSlot(worker, { task, caller: args.caller, signal }, async () => {
     const { text: fileText, images } = files?.length ? await readTaskFiles(cwd, files) : { text: "", images: [] };
+    // A model without vision would silently ignore the images and review nothing
+    if (images.length && !(await supportsVision(worker))) {
+      throw new Error(`${worker.model} can't read images. Send screenshots to a worker with vision (list_workers shows "vision": true), e.g. deepseek or qa.`);
+    }
     const text = fileText ? `${task}\n\n## Files\n\n${fileText}` : task;
     const userContent: string | ChatPart[] = images.length ? [{ type: "text", text }, ...images] : text;
     // A worker can have its own role on top of the shared instructions (for example a QA reviewer)

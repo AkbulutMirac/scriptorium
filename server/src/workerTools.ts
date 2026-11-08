@@ -3,7 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { findWorker, loadWorkers, type Worker } from "./agents.js";
 import { getJob, listJobs, startJob } from "./jobs.js";
-import { isAvailable } from "./llm.js";
+import { isAvailable, supportsVision } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { listRequests } from "./requests.js";
 import { runWorkerTask } from "./workerTasks.js";
@@ -73,6 +73,7 @@ export const WORKER_TOOLS = [
           local: w.local,
           description: w.description,
           available: await isAvailable(w),
+          vision: await supportsVision(w),
           running: requests.filter((r) => r.workerId === w.id && r.status === "running").length,
           queued: requests.filter((r) => r.workerId === w.id && r.status === "queued").length,
         })),

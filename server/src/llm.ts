@@ -116,9 +116,29 @@ async function contextWindow(worker: Worker, model: string): Promise<number | un
   }
 }
 
+/**
+ * Can the model read images? DeepSeek: only Flash (api-docs.deepseek.com, Models & Pricing, "Vision"); Pro
+ * silently ignores images. Ollama: the model's reported capabilities.
+ */
+const visionCache = new Map<string, boolean>();
+export async function supportsVision(worker: Worker, model = worker.model): Promise<boolean> {
+  if (worker.provider === "deepseek") return model === "deepseek-flash" || model.startsWith("deepseek-v4-flash");
+  const key = model.replace(/:latest$/, "");
+  if (visionCache.has(key)) return visionCache.get(key)!;
+  try {
+    const res = await fetch(`${ollamaRoot()}/api/show`, { method: "POST", body: JSON.stringify({ model }), signal: AbortSignal.timeout(3000) });
+    const j = (await res.json()) as { capabilities?: string[] };
+    const ok = !!j.capabilities?.includes("vision");
+    visionCache.set(key, ok);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Models the worker can use: a fixed list for DeepSeek, installed models for Ollama */
 export async function listModels(worker: Worker): Promise<WorkerModel[]> {
-  if (worker.provider === "deepseek") return [{ id: "deepseek-flash" }, { id: "deepseek-v4-pro" }];
+  if (worker.provider === "deepseek") return [{ id: "deepseek-flash", vision: true }, { id: "deepseek-v4-pro", vision: false }];
   // Ollama's own API: also returns size and vision capability info
   const root = ollamaRoot();
   try {

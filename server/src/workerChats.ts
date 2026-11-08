@@ -6,7 +6,7 @@ import { findWorker } from "./agents.js";
 import { SERVER_ROOT } from "./config.js";
 import { bus } from "./events.js";
 import { withWorkerSlot } from "./requests.js";
-import { chat, type ChatMessage, type ChatPart } from "./llm.js";
+import { chat, supportsVision, type ChatMessage, type ChatPart } from "./llm.js";
 import type { Attachment, WorkerChat, WorkerChatMessage, WorkerChatSummary, WorkerSettings } from "./protocol.js";
 import type { Worker } from "./agents.js";
 
@@ -137,6 +137,10 @@ export async function sendToWorker(args: {
   const model = settings.model || worker.model;
   try {
     const task = args.text || "Checking attachment";
+    // Don't let a model without vision silently skip the images the user attached
+    if (args.attachments?.some((a) => a.mediaType.startsWith("image/")) && !(await supportsVision(worker, model))) {
+      throw new Error(`${model} can't read images. Pick a model with vision from the model menu (DeepSeek: deepseek-flash).`);
+    }
     const result = await withWorkerSlot(worker, { task, caller: { kind: "user", label: "You" }, signal: args.signal }, () => chat(worker, history, {
       signal: args.signal,
       model,

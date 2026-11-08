@@ -20,7 +20,7 @@
       "id": "qa",
       "name": "QA",
       "provider": "deepseek",
-      "model": "deepseek-v4-pro",
+      "model": "deepseek-flash",
       "color": "#E8A23A",
       "description": "Reviewer: checks UI screenshots (layout, overflow, cut-off text, contrast, consistency, empty and error states) and code changes, and writes test files and Playwright scripts. It can't run anything itself: Claude runs the tests and takes the screenshots.",
       "local": false,

@@ -29,7 +29,7 @@ If the `mcp__scriptorium__*` tools are available (they are in every Claude Code 
 - Use the project's own test command and library. If there is no test setup, ask the user before adding one.
 
 **UI and design review (QA):**
-- When you change the UI, take screenshots (desktop and phone width; light and dark theme if there is one) and send them to the `qa` worker. Pass the images in `files` with their full paths. Say what you changed and what to look at. If there is no `qa` worker, give it to `deepseek-pro` the same way.
+- When you change the UI, take screenshots (desktop and phone width; light and dark theme if there is one) and send them to the `qa` worker. Pass the images in `files` with their full paths. Say what you changed and what to look at. If there is no `qa` worker, use a worker that can read images (`deepseek`, i.e. Flash). `deepseek-pro` can't read images.
 - Check QA's findings against the screenshot yourself and fix the real ones. After fixing, take new screenshots and have them checked again.
 - You can also have QA write Playwright test scenarios (clicks, forms, overflow checks). Running them is your job.
 

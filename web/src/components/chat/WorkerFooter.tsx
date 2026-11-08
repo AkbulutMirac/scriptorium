@@ -52,7 +52,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
               <MenuButton
                 icon={<Paperclip size={15} />}
                 label="Add file or photo"
-                hint={worker.provider === "deepseek" ? "Image, PDF, text" : "Image, text"}
+                hint={worker.provider === "ollama" ? "Image, text" : (settings.model || worker.model) === "deepseek-flash" ? "Image, PDF, text" : "PDF, text (no images)"}
                 onPress={() => {
                   setOpen(false);
                   onPickFiles();
