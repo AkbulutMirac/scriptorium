@@ -501,6 +501,11 @@ export function startConnection() {
       // Reconnected: reattach to open chats (session is resumed if the server restarted)
       for (const c of Object.values(chats)) {
         if (c.opened) reattach(c.chatId);
+        // Messages sent while the socket was down never arrived: reload the chat from its transcript
+        if (c.sessionId) {
+          updateChat(c.chatId, (x) => ({ ...x, loadingHistory: true }));
+          socket.send({ type: "claude.history", sessionId: c.sessionId });
+        }
       }
     }
     if (selected !== CLAUDE_ID) loadWorker(selected);
