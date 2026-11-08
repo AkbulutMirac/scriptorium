@@ -1,5 +1,5 @@
 import { Button, Chip, Input, Label, Popover, Switch, TextField, Tooltip } from "@heroui/react";
-import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Power, Settings, Sun, X } from "lucide-react";
+import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Power, RotateCw, Settings, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
 import { pct, UsageCard } from "./chat/UsageCard";
@@ -73,6 +73,7 @@ function SettingsPopover() {
   const { mode, accent, pixel, setMode, setAccent, setPixel } = useTheme();
   const cwd = useApp((s) => s.cwd);
   const serverCwd = useApp((s) => s.serverCwd);
+  const appControl = useApp((s) => s.appControl);
   const [draft, setDraft] = useState(cwd);
 
   return (
@@ -81,73 +82,103 @@ function SettingsPopover() {
         <Settings size={18} />
       </Button>
       <Popover.Content placement="bottom end" className="w-80 max-w-[calc(100vw-1rem)]">
-        <Popover.Dialog className="flex flex-col gap-4 p-1">
+        <Popover.Dialog className="flex max-h-[calc(100dvh-5rem)] flex-col gap-5 overflow-y-auto p-4">
           <div className="flex items-center justify-between">
-            <Popover.Heading className="text-sm font-semibold">Appearance</Popover.Heading>
+            <Popover.Heading className="text-sm font-semibold">Settings</Popover.Heading>
             <Button slot="close" isIconOnly size="sm" variant="ghost" aria-label="Close settings">
               <X size={16} />
             </Button>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <span className="text-xs text-muted">Mode</span>
-            <div className="grid grid-cols-3 gap-1">
-              {MODES.map((m) => (
-                <Button key={m.id} size="sm" variant={mode === m.id ? "primary" : "secondary"} onPress={() => setMode(m.id)}>
-                  {m.icon}
-                  {m.label}
-                </Button>
-              ))}
+          <section className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Appearance</h3>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs text-muted">Mode</span>
+              <div className="grid grid-cols-3 gap-1">
+                {MODES.map((m) => (
+                  <Button key={m.id} size="sm" className="w-full" variant={mode === m.id ? "primary" : "secondary"} onPress={() => setMode(m.id)}>
+                    {m.icon}
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <span className="text-xs text-muted">Accent color</span>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(ACCENTS) as AccentName[]).map((a) => (
-                <Tooltip key={a} delay={300}>
-                  <button
-                    type="button"
-                    aria-label={ACCENTS[a].label}
-                    onClick={() => setAccent(a)}
-                    className={`size-7 rounded-full transition ${accent === a ? "ring-2 ring-offset-2 ring-offset-surface" : "hover:scale-110"}`}
-                    style={{ background: ACCENTS[a].hex, ["--tw-ring-color" as string]: ACCENTS[a].hex }}
-                  />
-                  <Tooltip.Content>{ACCENTS[a].label}</Tooltip.Content>
-                </Tooltip>
-              ))}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs text-muted">Accent color</span>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(ACCENTS) as AccentName[]).map((a) => (
+                  <Tooltip key={a} delay={300}>
+                    <button
+                      type="button"
+                      aria-label={ACCENTS[a].label}
+                      onClick={() => setAccent(a)}
+                      className={`size-7 rounded-full transition ${accent === a ? "ring-2 ring-offset-2 ring-offset-surface" : "hover:scale-110"}`}
+                      style={{ background: ACCENTS[a].hex, ["--tw-ring-color" as string]: ACCENTS[a].hex }}
+                    />
+                    <Tooltip.Content>{ACCENTS[a].label}</Tooltip.Content>
+                  </Tooltip>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <Switch isSelected={pixel} onChange={setPixel}>
-            <Switch.Content>
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              <span className="text-sm">Pixel view (3D scene)</span>
-            </Switch.Content>
-          </Switch>
+            <Switch isSelected={pixel} onChange={setPixel}>
+              <Switch.Content>
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+                <span className="text-sm">Pixel view (3D scene)</span>
+              </Switch.Content>
+            </Switch>
+          </section>
 
-          <div className="flex flex-col gap-2 border-t border-separator pt-3">
-            <TextField value={draft} onChange={setDraft} fullWidth>
-              <Label>Claude's working folder</Label>
-              <Input variant="secondary" placeholder={serverCwd} className="font-code text-xs" />
-            </TextField>
+          <section className="flex flex-col gap-3 border-t border-separator pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Working folder</h3>
+            <div className="flex items-center gap-2">
+              <TextField value={draft} onChange={setDraft} fullWidth className="min-w-0 flex-1">
+                <Label className="sr-only">Claude's working folder</Label>
+                <Input variant="secondary" placeholder={serverCwd} title={draft || serverCwd} className="font-code text-xs" />
+              </TextField>
+              <Button size="sm" variant="secondary" className="shrink-0" isDisabled={draft === cwd} onPress={() => actions.setCwd(draft.trim())}>
+                Save
+              </Button>
+            </div>
             <p className="text-xs text-muted">New chats open in this folder. If left empty, the default from .env is used.</p>
-            <Button size="sm" variant="secondary" isDisabled={draft === cwd} onPress={() => actions.setCwd(draft.trim())}>
-              Save
-            </Button>
-          </div>
+          </section>
 
-          <div className="flex flex-col gap-2 border-t border-separator pt-3">
-            <Button size="sm" variant="secondary" onPress={() => actions.openSetup()}>
+          <section className="flex flex-col gap-3 border-t border-separator pt-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">App</h3>
+            {appControl?.supported && (
+              <>
+                <Switch isSelected={appControl.autostart} onChange={(on) => actions.setAutostart(on)}>
+                  <Switch.Content>
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                    <span className="text-sm">Start at login</span>
+                  </Switch.Content>
+                </Switch>
+                <p className="text-xs text-muted">Starts Scriptorium in the background when you sign in to Windows.</p>
+              </>
+            )}
+            <Button size="sm" variant="secondary" className="w-full" onPress={() => actions.openSetup()}>
               Setup (Claude, DeepSeek, local models)
             </Button>
-            <Button size="sm" variant="danger-soft" onPress={() => actions.shutdownServer()}>
-              <Power size={14} /> Shut down Scriptorium
-            </Button>
-            <p className="text-xs text-muted">Shuts down the background server. Open Claude sessions will close too. Use the desktop shortcut to reopen.</p>
-          </div>
+            <div className="grid grid-cols-2 gap-2">
+              {appControl?.supported && (
+                <Button size="sm" variant="secondary" className="w-full" onPress={() => actions.restartServer()}>
+                  <RotateCw size={14} /> Restart
+                </Button>
+              )}
+              <Button size="sm" variant="danger-soft" className={appControl?.supported ? "w-full" : "col-span-2 w-full"} onPress={() => actions.shutdownServer()}>
+                <Power size={14} /> Shut down
+              </Button>
+            </div>
+            <p className="text-xs text-muted">
+              Restart reloads the background server and rebuilds the UI. Both close open Claude sessions. Use the desktop shortcut to reopen after shutting down.
+            </p>
+          </section>
         </Popover.Dialog>
       </Popover.Content>
     </Popover>

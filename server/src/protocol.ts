@@ -225,6 +225,9 @@ export type GitInfo = {
   files: { path: string; added: number; removed: number; untracked?: boolean }[];
 };
 
+/** Restart and start-at-login (Windows only) */
+export type AppControl = { supported: boolean; autostart: boolean };
+
 export type ClientMsg =
   | {
       type: "claude.open";
@@ -277,6 +280,8 @@ export type ClientMsg =
   | { type: "worker.chat"; chatId: string }
   | { type: "worker.deleteChat"; chatId: string }
   | { type: "app.shutdown" }
+  | { type: "app.restart" }
+  | { type: "app.setAutostart"; on: boolean }
   | { type: "setup.status" }
   | { type: "setup.claudeLogin" }
   | { type: "setup.deepseekKey"; key: string }
@@ -288,7 +293,8 @@ export type ClientMsg =
   | { type: "jobs.list" };
 
 export type ServerMsg =
-  | { type: "welcome"; cwd: string; claudeCodeVersion?: string }
+  | { type: "welcome"; cwd: string; claudeCodeVersion?: string; appControl: AppControl }
+  | { type: "app.autostart"; on: boolean }
   | ({ type: "claude.info" } & ClaudeInfo)
   | { type: "projects"; projects: ProjectInfo[] }
   | { type: "deepseek.balance"; balance: DeepSeekBalance }

@@ -87,6 +87,8 @@ export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: numb
 type State = {
   connection: ConnectionStatus;
   serverCwd: string;
+  /** Restart / start at login (undefined until the server says hello) */
+  appControl?: { supported: boolean; autostart: boolean };
   /** Folder where new Claude chats will run (server default if empty) */
   cwd: string;
   workers: WorkerInfo[];
@@ -284,7 +286,7 @@ function onServer(msg: ServerMsg) {
       socket.send({ type: "claude.globalInfo" });
       // The chat may have opened before the server's default folder arrived: fill in empty folders
       const chats = Object.fromEntries(Object.entries(s.chats).map(([id, c]) => [id, c.cwd ? c : { ...c, cwd: msg.cwd }]));
-      set({ serverCwd: msg.cwd, chats });
+      set({ serverCwd: msg.cwd, chats, appControl: msg.appControl });
       refreshSessions();
       return;
     }
@@ -379,6 +381,10 @@ function onServer(msg: ServerMsg) {
       set({ git: { ...s.git, [msg.cwd]: info } });
       return;
     }
+
+    case "app.autostart":
+      if (s.appControl) set({ appControl: { ...s.appControl, autostart: msg.on } });
+      return;
 
     case "git.diff":
       set({
@@ -610,6 +616,15 @@ export const actions = {
   /** Shuts down the server running in the background (the shortcut runs it without opening a window) */
   shutdownServer() {
     socket.send({ type: "app.shutdown" });
+  },
+
+  /** Shuts the server down and relaunches it in the background; the page reconnects by itself */
+  restartServer() {
+    socket.send({ type: "app.restart" });
+  },
+
+  setAutostart(on: boolean) {
+    socket.send({ type: "app.setAutostart", on });
   },
 
   refreshDeepseekBalance() {

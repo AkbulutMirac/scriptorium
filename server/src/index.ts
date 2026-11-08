@@ -26,6 +26,7 @@ import { listRequests } from "./requests.js";
 import { claudeLogin, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
+import { appControlSupported, getAutostart, restartApp, setAutostart } from "./app.js";
 import { isIgnoredPath, listDir, listProjects, makeDir } from "./projects.js";
 import { deepseekBalance, isAvailable, listModels } from "./llm.js";
 import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
@@ -509,6 +510,14 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
     case "app.shutdown":
       console.log("Shut down from the UI.");
       return shutdown();
+
+    case "app.restart":
+      console.log("Restart from the UI.");
+      restartApp();
+      return shutdown();
+
+    case "app.setAutostart":
+      return broadcast({ type: "app.autostart", on: await setAutostart(msg.on) });
   }
 }
 
@@ -586,7 +595,7 @@ wss.on("connection", async (ws) => {
     }
   });
 
-  reply(ws, { type: "welcome", cwd: config.claudeCwd });
+  reply(ws, { type: "welcome", cwd: config.claudeCwd, appControl: { supported: appControlSupported, autostart: getAutostart() } });
   reply(ws, { type: "workers", workers: await workersWithAvailability() });
   reply(ws, { type: "jobs", jobs: listJobs() });
   reply(ws, { type: "worker.requests", requests: listRequests() });
