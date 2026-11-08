@@ -175,7 +175,7 @@ function UsageChip() {
         {five != null && <span>5h {five}%</span>}
         {week != null && <span className="hidden sm:inline">· Weekly {week}%</span>}
       </button>
-      <Tooltip.Content placement="bottom end" className="p-2">
+      <Tooltip.Content placement="bottom end" className="max-w-[calc(100vw-1rem)] p-2">
         <UsageCard usage={usage} />
       </Tooltip.Content>
     </Tooltip>

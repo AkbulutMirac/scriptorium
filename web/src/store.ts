@@ -533,6 +533,12 @@ export function startConnection() {
     if (!load("setupDone", false)) actions.openSetup();
   });
   socket.connect();
+  setInterval(() => {
+    if (document.hidden) return;
+    const main = get().chats[get().mainChatId ?? ""];
+    if (main?.opened) socket.send({ type: "claude.info", chatId: main.chatId });
+    socket.send({ type: "claude.globalInfo" });
+  }, 60_000);
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────

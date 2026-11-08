@@ -322,7 +322,7 @@ function UsageRing({ chat }: { chat: ClaudeChat }) {
           )}
         </svg>
       </Button>
-      <Tooltip.Content className="p-2">
+      <Tooltip.Content className="max-w-[calc(100vw-1rem)] p-2">
         <UsageCard usage={usage} context={ctx} />
         <p className="mt-2 px-1 text-[10px] text-muted">Click for details</p>
       </Tooltip.Content>

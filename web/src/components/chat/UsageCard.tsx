@@ -42,7 +42,7 @@ const PLAN_NAMES: Record<string, string> = { pro: "Pro", max: "Max", team: "Team
 export function UsageCard({ usage, context, onSeeAll, fluid = false }: { usage?: UsageInfo; context?: ContextInfo; onSeeAll?: () => void; /** Fill the containing area (info panel) */ fluid?: boolean }) {
   const plan = usage?.subscription ? PLAN_NAMES[usage.subscription.toLowerCase()] ?? usage.subscription : null;
   return (
-    <div className={`flex min-w-0 flex-col gap-3 ${fluid ? "w-full" : "w-80 p-1"}`}>
+    <div className={`flex min-w-0 flex-col gap-3 ${fluid ? "w-full" : "w-80 max-w-full p-1"}`}>
       <div className="flex items-center gap-2 text-xs">
         <span className="text-muted">
           Plan usage limits{plan && <> · <span className="text-foreground">{plan}</span></>}

@@ -59,7 +59,7 @@ export const ItemView = memo(function ItemView({ item, ...handlers }: Handlers &
           {item.receipt && (
             <span className={`inline-flex items-center gap-1 text-[11px] ${item.receipt === "read" ? "text-accent" : "text-muted"}`}>
               {item.receipt === "read" ? <CheckCheck size={12} /> : <Check size={12} />}
-              {item.receipt === "read" ? "Read" : "Sent"}
+              {item.receipt === "read" ? "Seen" : "Sent"}
             </span>
           )}
           <MessageActions text={item.text} elRef={ref} onReply={handlers.onReply} />
