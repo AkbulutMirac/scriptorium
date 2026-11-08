@@ -95,7 +95,7 @@ function Section({ id, title, right, children }: { id: string; title: string; ri
   return (
     <section ref={ref} className="border-b border-separator py-2.5 last:border-b-0">
       <div className="flex items-center gap-1">
-        <button type="button" onClick={toggle} className="flex flex-1 items-center gap-1 text-left text-xs font-semibold text-muted hover:text-foreground">
+        <button type="button" onClick={toggle} className="flex flex-1 items-center gap-1 text-left text-xs font-semibold text-muted hover:text-foreground [@media(pointer:coarse)]:min-h-9">
           <ChevronRight size={13} className={`transition-transform ${open ? "rotate-90" : ""}`} />
           {title}
         </button>

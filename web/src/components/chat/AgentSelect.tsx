@@ -15,7 +15,7 @@ export function AgentSelect() {
     <Select value={selected} onChange={(k) => k != null && actions.selectAgent(String(k))} className="min-w-0 flex-1">
       <Label className="sr-only">Agent</Label>
       <Select.Trigger>
-        <Select.Value />
+        <Select.Value className="flex min-w-0 items-center gap-1.5 truncate" />
         <Select.Indicator />
       </Select.Trigger>
       <Select.Popover>
@@ -23,8 +23,8 @@ export function AgentSelect() {
           {options.map((o) => (
             <ListBox.Item key={o.id} id={o.id} textValue={o.name}>
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: o.color }} />
-              <span className="font-medium">{o.name}</span>
-              <span className="truncate text-xs text-muted">{o.hint}</span>
+              <span className="min-w-0 truncate font-medium">{o.name}</span>
+              <span className="shrink-0 text-xs text-muted">{o.hint}</span>
               {o.id !== CLAUDE_ID && <span className={`ml-auto size-1.5 shrink-0 rounded-full ${o.ok ? "bg-success" : "bg-danger"}`} />}
               <ListBox.ItemIndicator />
             </ListBox.Item>

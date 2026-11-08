@@ -212,6 +212,8 @@ function emptyChat(chatId: string, cwd: string, extra: Partial<ClaudeChat> = {})
     loadingHistory: false,
     tasks: {},
     ...extra,
+    // New chats start in Automatic permission mode unless told otherwise
+    wantMode: extra.wantMode ?? "auto",
   };
 }
 

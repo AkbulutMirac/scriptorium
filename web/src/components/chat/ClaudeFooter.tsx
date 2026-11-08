@@ -79,7 +79,7 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
         }
       }}
     >
-      <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs" aria-label="Working folder">
+      <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs [@media(pointer:coarse)]:h-9" aria-label="Working folder">
         <Folder size={13} />
         <span className="max-w-36 truncate">{folder}</span>
         {branch && (
@@ -161,7 +161,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
         if (o) actions.requestInfo(chat.chatId);
       }}
     >
-      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Model and effort">
+      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs [@media(pointer:coarse)]:h-9" aria-label="Model and effort">
         {chat.fastMode && <Zap size={12} className="text-warning" />}
         <span className="max-w-32 truncate font-medium">{label}</span>
         {effort && <span className="text-muted">{EFFORT_LABEL[effort]}</span>}
@@ -249,7 +249,7 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
   const label = MODES.find((m) => m.value === mode)?.label ?? mode;
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Permission mode">
+      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs [@media(pointer:coarse)]:h-9" aria-label="Permission mode">
         <span className="max-w-32 truncate">{label}</span>
         <ChevronDown size={12} className="text-muted" />
       </Button>

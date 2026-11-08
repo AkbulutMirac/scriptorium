@@ -227,7 +227,7 @@ function ClaudeHistory() {
               onContextMenu={(e) => projectMenu(e, g)}
               className={`group flex items-center gap-1 rounded-lg px-1.5 py-1 ${k === activeKey ? "text-foreground" : "text-muted"} ${hidden.includes(k) ? "opacity-60" : ""} hover:bg-default-soft`}
             >
-              <button type="button" onClick={() => setOpen({ ...open, [k]: !isOpen })} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" title={g.path}>
+              <button type="button" onClick={() => setOpen({ ...open, [k]: !isOpen })} className="flex min-w-0 flex-1 items-center gap-1.5 text-left [@media(pointer:coarse)]:min-h-9" title={g.path}>
                 <ChevronRight size={13} className={`shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                 {isOpen ? <FolderOpen size={14} className="shrink-0" /> : <Folder size={14} className="shrink-0" />}
                 <span className="truncate text-[13px] font-medium">{g.name}</span>
@@ -238,7 +238,7 @@ function ClaudeHistory() {
                   isIconOnly
                   size="sm"
                   variant="ghost"
-                  className="h-6 w-6 min-w-6 opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
+                  className="h-6 w-6 min-w-6 opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:h-9 [@media(pointer:coarse)]:w-9 [@media(pointer:coarse)]:opacity-100"
                   aria-label={`New chat in ${g.name}`}
                   onPress={() => actions.newClaudeChat(g.path)}
                 >

@@ -1,5 +1,5 @@
 import { Button, Chip, Input, Label, Popover, Switch, TextField, Tooltip } from "@heroui/react";
-import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Power, Settings, Sun } from "lucide-react";
+import { BookOpen, Gauge, Monitor, Moon, PanelLeft, Power, Settings, Sun, X } from "lucide-react";
 import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
 import { pct, UsageCard } from "./chat/UsageCard";
@@ -82,7 +82,12 @@ function SettingsPopover() {
       </Button>
       <Popover.Content placement="bottom end" className="w-80 max-w-[calc(100vw-1rem)]">
         <Popover.Dialog className="flex flex-col gap-4 p-1">
-          <Popover.Heading className="text-sm font-semibold">Appearance</Popover.Heading>
+          <div className="flex items-center justify-between">
+            <Popover.Heading className="text-sm font-semibold">Appearance</Popover.Heading>
+            <Button slot="close" isIconOnly size="sm" variant="ghost" aria-label="Close settings">
+              <X size={16} />
+            </Button>
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className="text-xs text-muted">Mode</span>
