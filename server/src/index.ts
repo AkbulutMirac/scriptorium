@@ -39,7 +39,26 @@ const ALLOWED_ORIGINS = new Set([
   `http://127.0.0.1:${config.port}`,
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  ...config.remoteOrigins,
 ]);
+
+const LOCAL_HOSTS = new Set([`localhost:${config.port}`, `127.0.0.1:${config.port}`, "localhost:5173", "127.0.0.1:5173"]);
+const REMOTE_HOSTS = new Set(config.remoteOrigins.map((o) => new URL(o).host));
+
+/**
+ * Who may use the server. Local requests (Host is localhost) are always allowed. A request for a remote
+ * address only passes when remote access is configured, the address is one of REMOTE_ORIGINS and Tailscale
+ * says which tailnet user sent it (`tailscale serve` adds that header and drops a forged one). Anything else,
+ * including DNS-rebinding tricks with a foreign Host header, gets 403.
+ */
+function allowRequest(req: IncomingMessage): boolean {
+  const host = req.headers.host ?? "";
+  if (LOCAL_HOSTS.has(host)) return true;
+  if (!REMOTE_HOSTS.has(host)) return false;
+  const login = String(req.headers["tailscale-user-login"] ?? "").toLowerCase();
+  if (!login) return false;
+  return config.remoteUsers.length === 0 || config.remoteUsers.includes(login);
+}
 
 // ─── Broadcast ──────────────────────────────────────────────────────────────────
 
@@ -524,6 +543,10 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse) {
 const handleMcp = createMcpHandler(ALLOWED_ORIGINS);
 
 const server = createServer((req, res) => {
+  if (!allowRequest(req)) {
+    res.writeHead(403, { "content-type": "text/plain; charset=utf-8" }).end("Forbidden");
+    return;
+  }
   if (req.url === "/mcp" || req.url?.startsWith("/mcp?")) {
     handleMcp(req, res);
     return;
@@ -540,7 +563,7 @@ const wss = new WebSocketServer({
   server,
   path: "/ws",
   maxPayload: 60 * 1024 * 1024, // for attachments
-  verifyClient: ({ origin }: { origin?: string }) => !!origin && ALLOWED_ORIGINS.has(origin),
+  verifyClient: ({ origin, req }: { origin?: string; req: IncomingMessage }) => !!origin && ALLOWED_ORIGINS.has(origin) && allowRequest(req),
 });
 
 wss.on("connection", async (ws) => {

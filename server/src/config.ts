@@ -23,4 +23,18 @@ export const config = {
     .filter(Boolean),
   workerMaxTokens: Number(process.env.WORKER_MAX_TOKENS) || 4000,
   port: Number(process.env.PORT) || 7777,
+  /**
+   * Optional remote access through `tailscale serve` (off unless set). Addresses the UI is opened from,
+   * comma-separated, e.g. "http://mypc.tailnet.ts.net:7777". Requests to these must carry Tailscale's
+   * identity header, which only `tailscale serve` adds.
+   */
+  remoteOrigins: (process.env.REMOTE_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean),
+  /** Tailscale logins allowed to use remote access (comma-separated). Empty: any user of your tailnet. */
+  remoteUsers: (process.env.REMOTE_USERS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
 };

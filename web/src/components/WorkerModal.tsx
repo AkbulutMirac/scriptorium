@@ -52,7 +52,7 @@ export function WorkerModal() {
   const save = () => {
     if (!valid) return;
     const { available: _a, ...rest } = form;
-    actions.saveWorker({ ...rest, id, name: form.name.trim(), model: form.model.trim(), description: form.description.trim() });
+    actions.saveWorker({ ...rest, id, name: form.name.trim(), model: form.model.trim(), description: form.description.trim(), system: form.system?.trim() || undefined });
     actions.closeWorkerModal();
   };
 
@@ -106,6 +106,17 @@ export function WorkerModal() {
                 onChange={(e) => update({ description: e.target.value })}
                 rows={3}
                 placeholder="e.g. Fast and cheap. For well-defined coding tasks."
+                className="resize-none rounded-xl border border-field-border bg-field px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Role instructions (optional, sent to the worker with every task)</span>
+              <textarea
+                value={form.system ?? ""}
+                onChange={(e) => update({ system: e.target.value || undefined })}
+                rows={3}
+                placeholder="e.g. You are the QA reviewer: list concrete UI problems in the screenshots, most severe first."
                 className="resize-none rounded-xl border border-field-border bg-field px-3 py-2 text-sm outline-none focus:border-accent"
               />
             </label>

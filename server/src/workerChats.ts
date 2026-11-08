@@ -124,6 +124,7 @@ export async function sendToWorker(args: {
   args.onStart(c);
 
   const history: ChatMessage[] = [
+    ...(worker.system?.trim() ? [{ role: "system" as const, content: worker.system.trim() }] : []),
     ...(settings.system?.trim() ? [{ role: "system" as const, content: settings.system.trim() }] : []),
     ...c.messages
       .filter((m) => !m.error)

@@ -24,4 +24,13 @@ If the `mcp__scriptorium__*` tools are available (they are in every Claude Code 
 4. Don't use an answer unchecked: write the code to the file yourself and run or test it. If it's wrong, fix it or send it back to the worker with the error.
 5. Tell the user in one line which task went to which worker.
 
+**Tests:**
+- For coding tasks, have the worker write the test file too (in the same task or as a separate, parallel one). Workers can't run tests: you run them. If they fail, send the error output back to the worker with the code and have it fixed; test the fix yourself again.
+- Use the project's own test command and library. If there is no test setup, ask the user before adding one.
+
+**UI and design review (QA):**
+- When you change the UI, take screenshots (desktop and phone width; light and dark theme if there is one) and send them to the `qa` worker. Pass the images in `files` with their full paths. Say what you changed and what to look at. If there is no `qa` worker, give it to `deepseek-pro` the same way.
+- Check QA's findings against the screenshot yourself and fix the real ones. After fixing, take new screenshots and have them checked again.
+- You can also have QA write Playwright test scenarios (clicks, forms, overflow checks). Running them is your job.
+
 If the user names a worker, use that one. If they say "don't use workers", don't delegate in that session.

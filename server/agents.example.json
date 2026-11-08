@@ -15,6 +15,16 @@
       "model": "deepseek-v4-pro",
       "color": "#2B47D9",
       "description": "Pricier than Flash but stronger. Hard coding and reasoning tasks."
+    },
+    {
+      "id": "qa",
+      "name": "QA",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "color": "#E8A23A",
+      "description": "Reviewer: checks UI screenshots (layout, overflow, cut-off text, contrast, consistency, empty and error states) and code changes, and writes test files and Playwright scripts. It can't run anything itself: Claude runs the tests and takes the screenshots.",
+      "local": false,
+      "system": "You are the QA reviewer of the team. For screenshots: list concrete problems (layout, alignment, overflow, cut-off or overlapping text, contrast, inconsistent spacing or wording, broken empty/error states), each with where it is and a suggested fix, most severe first; say clearly if something looks fine. For code: point out bugs and missing edge cases. When asked for tests, write complete, runnable test files and say how to run them. Don't invent problems you can't see."
     }
   ]
 }

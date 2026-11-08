@@ -38,7 +38,7 @@ async function pickWorker(workerId: string, sensitive?: boolean): Promise<Worker
 const taskArgs = {
   worker_id: z.string().describe("Worker id from list_workers"),
   task: z.string().describe("Task for the worker, understandable on its own"),
-  files: z.array(z.string()).optional().describe("File paths relative to project_dir. The tool reads the files and sends them to the worker."),
+  files: z.array(z.string()).optional().describe("Images (png, jpg, webp, gif: screenshots for a UI review) may also be listed, with full paths, even outside project_dir. " + "File paths relative to project_dir. The tool reads the files and sends them to the worker."),
   project_dir: z
     .string()
     .optional()
@@ -111,7 +111,6 @@ export const WORKER_TOOLS = [
       const worker = await pickWorker(args.worker_id, args.sensitive);
       if (typeof worker === "string") return fail(worker);
       const c = withProjectDir(ctx, args.project_dir);
-      if (args.files?.length && !c.cwd) return fail("To send files, provide project_dir (the full path of the project folder).");
       const job = startJob({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller });
       return ok(`Job started. Job number: ${job.id}. Ask for the result with job_status.`);
     },

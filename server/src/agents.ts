@@ -13,6 +13,8 @@ const WorkerSchema = z.object({
   description: z.string().default(""),
   /** if true, data never leaves the computer */
   local: z.boolean().default(false),
+  /** Extra instructions for this worker's role (e.g. a QA reviewer); added to its system prompt */
+  system: z.string().optional(),
 });
 
 const AgentsFileSchema = z.object({ workers: z.array(WorkerSchema) });

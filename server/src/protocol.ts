@@ -17,6 +17,8 @@ export type WorkerInfo = {
   description: string;
   /** if true, data never leaves the computer */
   local: boolean;
+  /** Extra instructions for this worker's role (e.g. a QA reviewer); added to its system prompt */
+  system?: string;
   available?: { ok: boolean; reason?: string };
 };
 
