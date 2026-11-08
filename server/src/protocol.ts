@@ -161,6 +161,27 @@ export type UsageInfo = {
 };
 
 /** DeepSeek hesap bakiyesi (GET /user/balance) */
+/** İlk kurulum penceresinin gösterdiği durum */
+export type SetupStatus = {
+  claude: {
+    /** Claude Code programı bulundu mu (kurulu ya da Scriptorium'un dahili sürümü) */
+    found: boolean;
+    cliSource?: "kurulu" | "dahili";
+    loggedIn: boolean;
+    email?: string;
+    authMethod?: string;
+    error?: string;
+  };
+  deepseek: { configured: boolean };
+  ollama: { running: boolean; models: WorkerModel[] };
+  /** İşçi araçları bütün Claude Code oturumlarına eklendi mi */
+  mcp: boolean;
+  /** ~/.claude/CLAUDE.md içinde devretme kuralları var mı */
+  rules: boolean;
+};
+
+export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules";
+
 export type DeepSeekBalance = {
   ok: boolean;
   error?: string;
@@ -246,6 +267,11 @@ export type ClientMsg =
   | { type: "worker.chat"; chatId: string }
   | { type: "worker.deleteChat"; chatId: string }
   | { type: "app.shutdown" }
+  | { type: "setup.status" }
+  | { type: "setup.claudeLogin" }
+  | { type: "setup.deepseekKey"; key: string }
+  | { type: "setup.mcp" }
+  | { type: "setup.rules" }
   | { type: "workers.list" }
   | { type: "workers.save"; worker: WorkerInfo }
   | { type: "workers.delete"; workerId: string }
@@ -288,6 +314,8 @@ export type ServerMsg =
   | { type: "activity"; activity: AgentActivity }
   | { type: "jobs"; jobs: JobInfo[] }
   | { type: "worker.requests"; requests: WorkerRequest[] }
+  | { type: "setup.status"; status: SetupStatus }
+  | { type: "setup.result"; action: SetupAction; ok: boolean; message?: string }
   | { type: "error"; message: string };
 
 /** Sunucu tarafında saklanan izin önerileri (arayüze gönderilmez). */

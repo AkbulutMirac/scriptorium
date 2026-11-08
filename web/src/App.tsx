@@ -8,6 +8,7 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import { LibraryScene } from "./components/scene/LibraryScene";
 import { SceneOverlay } from "./components/SceneOverlay";
 import { TopBar } from "./components/TopBar";
+import { SetupModal } from "./components/SetupModal";
 import { WorkerModal } from "./components/WorkerModal";
 import { actions, CLAUDE_ID, useApp } from "./store";
 
@@ -55,6 +56,7 @@ export default function App() {
         )}
       </div>
       <WorkerModal />
+      <SetupModal />
       <FolderPicker />
     </div>
   );

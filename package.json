@@ -4,6 +4,20 @@
   "private": true,
   "description": "Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı: çok ajanlı sohbet arayüzü ve 3D kütüphane",
   "license": "MIT",
+  "author": "Miraç Akbulut",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AkbulutMirac/scriptorium.git"
+  },
+  "keywords": [
+    "claude",
+    "claude-agent-sdk",
+    "multi-agent",
+    "deepseek",
+    "ollama",
+    "mcp",
+    "react-three-fiber"
+  ],
   "workspaces": [
     "server",
     "web"
@@ -17,7 +31,7 @@
     "app": "npm run build:ui -w web && npm run start -w server"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

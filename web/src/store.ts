@@ -20,6 +20,8 @@ import type {
   WorkerChat,
   WorkerChatSummary,
   WorkerInfo,
+  SetupAction,
+  SetupStatus,
   WorkerModel,
   WorkerRequest,
   WorkerSettings,
@@ -105,6 +107,8 @@ type State = {
   quotes: Record<string, string | undefined>;
   overlay: Overlay | null;
   workerModal: { open: boolean; worker?: WorkerInfo };
+  /** İlk kurulum penceresi */
+  setup: { open: boolean; status?: SetupStatus; busy?: SetupAction };
   ui: UiPrefs;
   git: Record<string, GitInfo>;
   /** Bilinen proje klasörleri (oturumu olanlar + projeler klasörü) */
@@ -147,6 +151,7 @@ export const useApp = create<State>(() => ({
   quotes: {},
   overlay: null,
   workerModal: { open: false },
+  setup: { open: false },
   ui: { historyOpen: true, chatWidth: 520, sideWidth: 440, infoOpen: false, ...load<Partial<UiPrefs>>("ui", {}) },
   git: {},
   projects: [],
@@ -448,6 +453,16 @@ function onServer(msg: ServerMsg) {
       set({ jobs: msg.jobs });
       return;
 
+    case "setup.status":
+      set({ setup: { ...s.setup, status: msg.status } });
+      return;
+
+    case "setup.result":
+      set({ setup: { ...s.setup, busy: undefined } });
+      if (!msg.ok) toast.danger(msg.message ?? "Olmadı.");
+      else if (msg.message) toast.success(msg.message);
+      return;
+
     case "error":
       toast.danger(msg.message);
       return;
@@ -476,6 +491,8 @@ export function startConnection() {
       }
     }
     if (selected !== CLAUDE_ID) loadWorker(selected);
+    // İlk açılışta kurulum penceresi (Kurulum'a Ayarlar menüsünden her zaman dönülebilir)
+    if (!load("setupDone", false)) actions.openSetup();
   });
   socket.connect();
 }
@@ -788,6 +805,29 @@ export const actions = {
 
   showOverlay(overlay: Overlay | null) {
     set({ overlay });
+  },
+
+  openSetup() {
+    set({ setup: { ...get().setup, open: true } });
+    socket.send({ type: "setup.status" });
+  },
+
+  /** Pencereyi açmadan kurulum durumunu tazeler (işçi penceresindeki Ollama model önerileri için) */
+  loadSetupStatus() {
+    socket.send({ type: "setup.status" });
+  },
+
+  closeSetup() {
+    set({ setup: { ...get().setup, open: false } });
+    save("setupDone", true);
+  },
+
+  setupAction(action: SetupAction, key?: string) {
+    set({ setup: { ...get().setup, busy: action } });
+    if (action === "claudeLogin") socket.send({ type: "setup.claudeLogin" });
+    else if (action === "deepseekKey") socket.send({ type: "setup.deepseekKey", key: key ?? "" });
+    else if (action === "mcp") socket.send({ type: "setup.mcp" });
+    else socket.send({ type: "setup.rules" });
   },
 
   openWorkerModal(worker?: WorkerInfo) {

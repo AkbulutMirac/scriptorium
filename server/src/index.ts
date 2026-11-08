@@ -23,6 +23,7 @@ import { config, SERVER_ROOT } from "./config.js";
 import { bus, reportActivity } from "./events.js";
 import { createMcpHandler } from "./mcpHttp.js";
 import { listRequests } from "./requests.js";
+import { claudeLogin, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { isIgnoredPath, listDir, listProjects } from "./projects.js";
@@ -451,6 +452,36 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "deepseek.balance":
       return refreshBalance();
+
+    case "setup.status":
+      return reply(ws, { type: "setup.status", status: await setupStatus() });
+
+    case "setup.claudeLogin":
+      claudeLogin();
+      return reply(ws, { type: "setup.result", action: "claudeLogin", ok: true, message: "Tarayıcıda giriş sayfası açıldı." });
+
+    case "setup.deepseekKey":
+      try {
+        await saveDeepseekKey(msg.key);
+      } catch (err) {
+        return reply(ws, { type: "setup.result", action: "deepseekKey", ok: false, message: err instanceof Error ? err.message : String(err) });
+      }
+      reply(ws, { type: "setup.result", action: "deepseekKey", ok: true, message: "Anahtar kaydedildi." });
+      broadcast({ type: "workers", workers: await workersWithAvailability() });
+      await refreshBalance();
+      return reply(ws, { type: "setup.status", status: await setupStatus() });
+
+    case "setup.mcp":
+    case "setup.rules": {
+      const action = msg.type === "setup.mcp" ? "mcp" : "rules";
+      try {
+        await (action === "mcp" ? registerMcp() : installRules());
+      } catch (err) {
+        return reply(ws, { type: "setup.result", action, ok: false, message: err instanceof Error ? err.message : String(err) });
+      }
+      reply(ws, { type: "setup.result", action, ok: true });
+      return reply(ws, { type: "setup.status", status: await setupStatus() });
+    }
 
     case "app.shutdown":
       console.log("Arayüzden kapatıldı.");

@@ -133,6 +133,9 @@ function SettingsPopover() {
           </div>
 
           <div className="flex flex-col gap-2 border-t border-separator pt-3">
+            <Button size="sm" variant="secondary" onPress={() => actions.openSetup()}>
+              Kurulum (Claude, DeepSeek, local modeller)
+            </Button>
             <Button size="sm" variant="danger-soft" onPress={() => actions.shutdownServer()}>
               <Power size={14} /> Scriptorium'u kapat
             </Button>

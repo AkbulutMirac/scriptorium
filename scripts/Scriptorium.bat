@@ -11,6 +11,15 @@ if %errorlevel%==0 (
   exit /b 0
 )
 
+rem Ilk acilista paketleri kur
+if not exist node_modules (
+  call npm install > server\data\install.log 2>&1
+  if errorlevel 1 (
+    start "" notepad server\data\install.log
+    exit /b 1
+  )
+)
+
 call npm run build:ui -w web > server\data\build.log 2>&1
 if errorlevel 1 (
   rem Pencere gizli oldugu icin hatayi Not Defteri'nde goster

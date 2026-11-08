@@ -1,8 +1,7 @@
 # Scriptorium — Plan
 
-**Durum:** Tüm aşamalar tamam ve DeepSeek bağlı (2026-11-07). Kalan: Ollama kurulumu (local işçi). Başlatma: masaüstündeki Scriptorium kısayolu (scripts\Scriptorium.bat).
+**Durum:** Bütün aşamalar tamam: Claude, DeepSeek ve local (Ollama) işçiler çalışıyor. Kurulum ve çalıştırma için README'ye bak.
 **Ad:** Scriptorium. Ortaçağ manastırlarında yazıcıların masalarında el yazması kopyaladığı oda. Claude baş yazıcı, işçiler yazıcılar. (Eski çalışma adı: isci-mcp)
-**Geri dönünce:** Claude'a "Scriptorium planına devam" de.
 **Arayüz kararı:** Kendi arayüzümüz, HeroUI ile (aşağıda, "Arayüz tasarımı" bölümünde).
 
 ## Hedef
@@ -48,7 +47,7 @@ Claude işi kime vereceğine kendisi karar verir.
   - Arayüzdeki ajan seçiciden herhangi biriyle doğrudan sohbet edilir. Her ajanın kendi sohbet geçmişi olur.
   - Claude da onlara işçi araçları üzerinden iş verir.
 - **DeepSeek bağlantısı:** Doğrudan DeepSeek API'si (OpenAI uyumlu). Ollama da aynı formatı kullandığı için ikisi tek bir istemciyle konuşur. Modeller: `deepseek-flash` (V4.1-Flash, ucuz) ve `deepseek-v4-pro` (güçlü).
-- **Kod akışı:**
+- **Kod akışı (plan, henüz yapılmadı):**
   1. Claude görevi ve testleri yazar.
   2. İşçi aracı ilgili dosyaları okuyup DeepSeek'e gönderir, gelen kodu ayrı bir git worktree'ye yazar.
   3. Testler otomatik çalışır.
@@ -57,16 +56,16 @@ Claude işi kime vereceğine kendisi karar verir.
   - `qwen3.8-27b-metin`: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB) modelinin görsel modülü çıkarılmış kopyası. Bağlam 16K. Ölçülen (RTX 4060 Laptop, %41 CPU / %59 GPU): çıktı ~3,7 token/sn, girdi ~250 token/sn, ilk yükleme ~15 sn. Düşünme kapalı çalışır (açıkken dakikalar sürer).
   - Küçük bir embedding modeli: arama ve RAG için
 - **Local işçilerin rolü:**
-  - TÜBİTAK YOLO projesi için görsel ön eleme (gece çalışan toplu iş)
+  - Gece çalışan toplu işler (örneğin görsel ön eleme)
   - Gizli veri
-  - Deadlock wiki için arama indeksi (embedding)
-  - Acelesi olmayan toplu işler (bot loglarını özetlemek vb.)
+  - Arama indeksi (embedding)
+  - Acelesi olmayan toplu işler (log özetlemek vb.)
   - Kod yazımı local'e değil DeepSeek'e gider.
 - **Kural: Uzun işler arka planda çalışır.** Claude işi başlatır, bir iş numarası alır, sonucu sonra kontrol eder. Böylece kilitlenip beklemez.
 - **Kural: Gizlilik.** "hassas" diye işaretlenen dosya ve işler sadece local işçiye gider. DeepSeek'e giden veri Çin'deki sunuculara gidiyor.
 - **İşçi listesi:** `agents.json`. Claude'un araçları: `list_workers`, `ask_worker(isim, görev, dosyalar)`, `start_job` ve `job_status` (arka plan işleri için).
 - **Dosyalar:** Dosyaları Claude değil araç kendisi okur, böylece Claude token harcamaz.
-- **Para güvenliği:** DeepSeek ön ödemeli, bakiye bitince `402` hatası verip durur. Ödeme limitli sanal kartla yapılır. Araçta çağrı başına `max_tokens` limiti olur.
+- **Para güvenliği:** DeepSeek ön ödemeli, bakiye bitince `402` hatası verip durur. Ödemeyi limitli bir kartla yapmak önerilir. Araçta çağrı başına `max_tokens` limiti olur.
 
 ## Arayüz tasarımı (karar: 2026-11-07)
 
@@ -138,16 +137,20 @@ scriptorium/
 - [x] Geçmiş paneli projelere göre gruplu (PROJECTS_DIR otomatik). Sağ tık menüsü: yeni sohbet, yolu kopyala, gizle/göster, tüm sohbetleri sil (onaylı, dosyalara dokunmaz), sohbet aç/yeniden adlandır/sil.
 - [x] 3D etiketleri drei <Html> yerine sahne üstü katmanda: React 19'da kaybolma sorunu çözüldü
 - [x] Karanlık modda meşaleler ve mangal (titreyen sıcak ışık)
+- [x] İlk kurulum penceresi: Claude girişi, DeepSeek anahtarı, local modeller, bütün Claude Code oturumlarına bağlama
+- [x] İşçi araçları HTTP MCP sunucusu olarak da açık: terminal ve masaüstü Claude Code oturumları da kullanıyor
+- [x] Aynı işçiye aynı anda gelen her iş için 3D'de ayrı kopya; üzerine gelince iş kartı
+- [x] İşçi panelinde ek dosya, model ve düşünme menüsü, ayarlar, token kullanımı ve bağlam halkası
 - [ ] Terminal sekmesi (opsiyonel, sonraya bırakıldı): gerçek Claude Code ekranı. node-pty yerel derleme gerektiriyor.
 
-## Senin yapacakların (en son, ~15 dk)
+## İlk kurulum
 
-1. Bankadan sanal kart aç. Limiti 2-5 $, internet ve yurtdışı işlemleri açık olsun.
-2. platform.deepseek.com üzerinde hesap aç, bakiye yükle, bir API anahtarı oluştur.
-3. Anahtarı proje kökündeki `.env` dosyasına ekle (anahtarı sohbete yapıştırma): `DEEPSEEK_API_KEY=sk-...`
-4. Ollama'yı kur ve modeli indir:
-   `winget install Ollama.Ollama`, ardından `ollama pull hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` ve README'deki "Local model" adımları
-5. Sunucuyu yeniden başlat (`npm run dev`). İşçilerin yanındaki kırmızı nokta yeşile dönmeli.
+Uygulama ilk açılışta Kurulum penceresini gösterir (sonra Ayarlar menüsünden açılır):
+
+1. Claude hesabıyla giriş (tarayıcıda Anthropic giriş sayfası açılır)
+2. DeepSeek API anahtarı (isteğe bağlı, sadece yerel `.env` dosyasına yazılır)
+3. Ollama'da kurulu modellerden local işçi ekleme (isteğe bağlı)
+4. İşçi araçlarını bütün Claude Code oturumlarına ekleme ve devretme kuralları (isteğe bağlı)
 
 ## Aşamalar
 
@@ -181,4 +184,4 @@ scriptorium/
   - büyük girdi alıp küçük çıktı veren işler
   - gizli veri
 - Karmaşık debug ve mimari kararlar Claude'da kalmalı.
-- Bilgisayar: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. Local model 16K bağlamla çalışıyor (4K: %15 daha hızlı, 32K: %25 daha yavaş ve 11 GB bellek).
+- Test bilgisayarı: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. Local model 16K bağlamla çalışıyor (4K: %15 daha hızlı, 32K: %25 daha yavaş ve 11 GB bellek).

@@ -5,11 +5,7 @@ import { actions, useApp } from "../store";
 
 const COLORS = ["#4D6BFE", "#7F77DD", "#22A06B", "#E8A23A", "#E5487A", "#14B8A6", "#64748B", "#A855F7"];
 
-const MODEL_HINTS: Record<Provider, string[]> = {
-  deepseek: ["deepseek-flash", "deepseek-v4-pro"],
-  // İlki görsel modülü çıkarılmış hızlı kopya (README: "Local model"), ikincisi Hugging Face'teki asıl model
-  ollama: ["qwen3.8-27b-metin", "hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S"],
-};
+const DEEPSEEK_MODELS = ["deepseek-flash", "deepseek-v4-pro"];
 
 /** Türkçe karakterleri sadeleştirip id üretir: "Kod Ustası" → "kod-ustasi" */
 function slugify(text: string) {
@@ -28,6 +24,11 @@ const empty = (): WorkerInfo => ({ id: "", name: "", provider: "deepseek", model
 export function WorkerModal() {
   const { open, worker } = useApp((s) => s.workerModal);
   const workers = useApp((s) => s.workers);
+  // Ollama önerileri: bu bilgisayarda kurulu modeller (kurulum durumundan)
+  // Seçici sabit referans döndürmeli (her seferinde yeni dizi sonsuz yeniden çizime yol açar)
+  const ollamaList = useApp((s) => s.setup.status?.ollama.models);
+  const ollamaModels = (ollamaList ?? []).map((m) => m.id);
+  const hints: Record<Provider, string[]> = { deepseek: DEEPSEEK_MODELS, ollama: ollamaModels };
   const editing = !!worker;
   const [form, setForm] = useState<WorkerInfo>(empty);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -36,6 +37,7 @@ export function WorkerModal() {
     if (open) {
       setForm(worker ? { ...worker } : empty());
       setConfirmDelete(false);
+      actions.loadSetupStatus();
     }
   }, [open, worker]);
 
@@ -45,7 +47,7 @@ export function WorkerModal() {
   const update = (patch: Partial<WorkerInfo>) => setForm((f) => ({ ...f, ...patch }));
 
   const setProvider = (provider: Provider) =>
-    update({ provider, local: provider === "ollama", model: MODEL_HINTS[provider].includes(form.model) || !form.model ? MODEL_HINTS[provider][0] : form.model });
+    update({ provider, local: provider === "ollama", model: hints[form.provider].includes(form.model) || !form.model ? (hints[provider][0] ?? "") : form.model });
 
   const save = () => {
     if (!valid) return;
@@ -86,7 +88,10 @@ export function WorkerModal() {
                 <Input variant="secondary" className="font-code text-xs" />
               </TextField>
               <div className="flex flex-wrap gap-1">
-                {MODEL_HINTS[form.provider].map((m) => (
+                {form.provider === "ollama" && ollamaModels.length === 0 && (
+                  <span className="text-[11px] text-muted">Ollama'da kurulu model bulunamadı. Önce ollama pull ile bir model indir.</span>
+                )}
+                {hints[form.provider].map((m) => (
                   <button key={m} type="button" onClick={() => update({ model: m })} className="font-code rounded-md bg-default-soft px-2 py-0.5 text-[11px] hover:bg-default-soft-hover">
                     {m}
                   </button>
