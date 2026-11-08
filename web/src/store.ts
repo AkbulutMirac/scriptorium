@@ -134,6 +134,8 @@ type State = {
   folderPicker: { open: boolean; purpose: "cwd" | "dir"; chatId?: string; listing?: DirListing };
   /** Plan file shown in the side panel (main chat) */
   planPath: string | null;
+  /** When each session was last looked at (for the unread dot in history) */
+  seenAt: Record<string, number>;
 };
 
 /** crypto.randomUUID only exists on secure pages (https or localhost); over plain http build a v4 UUID by hand */
@@ -179,10 +181,32 @@ export const useApp = create<State>(() => ({
   folderPicker: { open: false, purpose: "cwd" },
   infoFocus: null,
   planPath: null,
+  seenAt: load<Record<string, number>>("sessionSeen", {}),
 }));
+
+/** Sessions last changed before the unread dot existed count as read */
+export const SEEN_SINCE = load<number>("seenSince", 0) || Date.now();
+save("seenSince", SEEN_SINCE);
+
+function markSeen(sessionId: string | undefined, at = Date.now()) {
+  if (!sessionId || (get().seenAt[sessionId] ?? 0) >= at) return;
+  const seenAt = { ...get().seenAt, [sessionId]: at };
+  set({ seenAt });
+  save("sessionSeen", seenAt);
+}
 
 const get = useApp.getState;
 const set = useApp.setState;
+
+// The chat you're on (and the one you leave) is read
+useApp.subscribe((s, prev) => {
+  const now = s.chats[s.mainChatId ?? ""]?.sessionId;
+  const before = prev.chats[prev.mainChatId ?? ""]?.sessionId;
+  if (now !== before) {
+    markSeen(before);
+    markSeen(now);
+  }
+});
 
 // The last open chat is remembered per worker: on app launch you return to the chat you left
 useApp.subscribe((s, prev) => {
@@ -391,9 +415,14 @@ function onServer(msg: ServerMsg) {
       return;
     }
 
-    case "claude.allSessions":
+    case "claude.allSessions": {
       set({ allSessions: msg.sessions });
+      // New messages in the open chat are read as they arrive
+      const active = get().chats[get().mainChatId ?? ""]?.sessionId;
+      const cur = msg.sessions.find((x) => x.id === active);
+      if (cur) markSeen(cur.id, Math.max(cur.updatedAt, Date.now()));
       return;
+    }
 
     case "projects":
       set({ projects: msg.projects });

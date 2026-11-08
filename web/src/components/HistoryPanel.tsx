@@ -7,7 +7,7 @@ import { Drawer } from "./Drawer";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import type { SessionSummary } from "../protocol";
 import { relativeTime } from "../lib/format";
-import { actions, agentMeta, CLAUDE_ID, useApp } from "../store";
+import { actions, agentMeta, CLAUDE_ID, SEEN_SINCE, useApp } from "../store";
 import { copyText } from "../lib/clipboard";
 
 export function HistoryPanel() {
@@ -93,6 +93,7 @@ function ClaudeHistory() {
   const all = useApp((s) => s.allSessions);
   const projects = useApp((s) => s.projects);
   const activeSession = useApp((s) => s.chats[s.mainChatId ?? ""]?.sessionId);
+  const seenAt = useApp((s) => s.seenAt);
   const activeCwd = useApp((s) => s.chats[s.mainChatId ?? ""]?.cwd ?? "");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -266,6 +267,7 @@ function ClaudeHistory() {
                     title={s.title}
                     subtitle={relativeTime(s.updatedAt)}
                     active={s.id === activeSession}
+                    unread={s.id !== activeSession && s.updatedAt > Math.max(seenAt[s.id] ?? 0, SEEN_SINCE)}
                     onOpen={() => actions.openClaudeSession(s.id)}
                     onRename={(t) => actions.renameSession(s.id, t)}
                     onDelete={() => actions.deleteSession(s.id)}
@@ -332,6 +334,8 @@ function HistoryRow(props: {
   title: string;
   subtitle: string;
   active: boolean;
+  /** New messages since the chat was last opened: blue dot */
+  unread?: boolean;
   onOpen: () => void;
   onRename?: (title: string) => void;
   onDelete: () => void;
@@ -392,6 +396,7 @@ function HistoryRow(props: {
         <div className={`truncate text-sm ${props.active ? "font-medium text-accent-soft-foreground" : ""}`}>{props.title}</div>
         <div className="text-[11px] text-muted">{props.subtitle}</div>
       </div>
+      {props.unread && <span className="size-2 shrink-0 rounded-full bg-[#3b82f6] group-hover:hidden" aria-label="Unread" />}
       <div className="hidden shrink-0 items-center group-hover:flex [@media(pointer:coarse)]:flex" onClick={(e) => e.stopPropagation()}>
         {confirmDelete ? (
           <>
