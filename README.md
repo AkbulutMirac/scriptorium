@@ -56,6 +56,7 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 - The tools also work in every Claude Code session in your terminal and the desktop app.
 - Several sessions can use the same worker at once. In the 3D office a copy of the worker walks in for each task, sits at a spare desk and leaves when it's done. Local workers do one task at a time; the rest wait in line.
 - Hover over a worker to see which task it is doing, for which project, and for how long.
+- **QA tools** drive a real headless Edge/Chrome on your computer: `qa_sweep` clicks every visible control in desktop, tablet and phone sizes and measures overflow, cut-off text, overlaps, small tap targets and console errors; `qa_explore` is an agent that looks at the screen and decides what to try next. The QA worker reviews the screenshots; reports go to `server/data/qa/`. They only test local addresses and never press buttons that send, delete, rename, sign in/out or quit.
 - Every task Claude delegates (from any session) lands in that worker's history under "From Claude", with the answer and token usage. You can continue it as a chat.
 - Sensitive data (`sensitive`) only goes to local workers.
 - Add, edit and delete workers from the UI (`server/agents.json`). DeepSeek Flash and Pro come by default.

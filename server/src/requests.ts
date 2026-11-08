@@ -50,11 +50,17 @@ function release(w: Worker) {
   waiting.get(w.id)?.shift()?.();
 }
 
+/** Updates what a running request shows in the 3D office (progress of a long job) */
+export function setRequestTask(req: WorkerRequest, task: string) {
+  req.task = task.slice(0, 300);
+  changed();
+}
+
 /** Queues the job in the worker's line and runs it when its turn comes. Errors are shown in the 3D office for a while. */
 export async function withWorkerSlot<T>(
   worker: Worker,
   info: { task: string; caller: WorkerCaller; signal?: AbortSignal },
-  fn: () => Promise<T>,
+  fn: (req: WorkerRequest) => Promise<T>,
 ): Promise<T> {
   const req: WorkerRequest = {
     id: randomUUID().slice(0, 8),
@@ -77,7 +83,7 @@ export async function withWorkerSlot<T>(
   req.startedAt = Date.now();
   changed();
   try {
-    const out = await fn();
+    const out = await fn(req);
     requests.delete(req.id);
     return out;
   } catch (err) {

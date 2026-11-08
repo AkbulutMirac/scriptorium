@@ -21,7 +21,15 @@ function changed() {
   bus.emit("jobs");
 }
 
-export function startJob(args: { worker: Worker; task: string; files?: string[]; cwd?: string; caller: WorkerCaller }): JobInfo {
+export function startJob(args: {
+  worker: Worker;
+  task: string;
+  files?: string[];
+  cwd?: string;
+  caller: WorkerCaller;
+  /** Custom work instead of a worker task (e.g. a QA run); returns the result text */
+  run?: () => Promise<string>;
+}): JobInfo {
   const job: JobInfo = {
     id: randomUUID().slice(0, 8),
     workerId: args.worker.id,
@@ -37,7 +45,7 @@ export function startJob(args: { worker: Worker; task: string; files?: string[];
     job.status = "running";
     changed();
     try {
-      job.result = await runWorkerTask(args);
+      job.result = await (args.run ? args.run() : runWorkerTask(args));
       job.status = "done";
     } catch (err) {
       job.error = err instanceof Error ? err.message : String(err);

@@ -7,6 +7,7 @@ import { isAvailable, supportsVision } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { listRequests } from "./requests.js";
 import { runWorkerTask } from "./workerTasks.js";
+import { checkQaUrl, pickQaWorker, runQaExplore, runQaSweep } from "./qa/run.js";
 
 /** The Claude session calling the tool: the folder file paths are relative to, and the name shown in the 3D office */
 export type ToolCtx = { cwd?: string; caller: WorkerCaller };
@@ -25,6 +26,7 @@ export const WORKER_INSTRUCTIONS = [
   "ask_worker waits for the answer; for jobs longer than a few minutes use start_job, then job_status. Send independent parts in parallel.",
   "Workers can't read files, write files or run commands: pass the files with files and set project_dir to the full path of the working folder.",
   "For confidential data use sensitive: true (only local workers accept it).",
+  "UI testing: qa_sweep clicks every visible control in a real browser and measures layout problems; qa_explore is an agent that explores flows on its own. Run one after UI changes.",
 ].join(" ");
 
 /** Finds the worker and enforces the confidentiality rule. Returns an error text if there is a problem. */
@@ -131,6 +133,109 @@ export const WORKER_TOOLS = [
         .slice(0, 20)
         .map(({ id, workerId, status, task }) => ({ id, workerId, status, task: task.slice(0, 100) }));
       return ok(JSON.stringify(summary, null, 2));
+    },
+  },
+  {
+    name: "qa_sweep",
+    description: [
+      "Systematic UI test. Opens the app in a real headless browser on this computer and clicks every visible control on the start screen, in each viewport (desktop, tablet, phone) and theme.",
+      "Measures layout problems itself (sideways overflow, cut-off text, overlapping controls, tap targets under 32px, console errors) and sends every screen that changed to the QA worker for a visual review.",
+      "Thorough and predictable: use it after UI changes. Runs in the background (a few minutes): returns a job id, then poll job_status for the report.",
+      "Only local or private URLs. It never clicks controls named like send, delete, rename, sign in/out, quit, stop. Screenshots are sent to DeepSeek for review, so don't run it on pages that show secrets.",
+    ].join(" "),
+    schema: {
+      url: z.string().describe("Address of the running app, e.g. http://localhost:5173"),
+      viewports: z.array(z.enum(["desktop", "tablet", "phone"])).optional().describe("Default: all three"),
+      themes: z.array(z.enum(["dark", "light"])).optional().describe('Color scheme the browser asks for. Default: ["dark"]'),
+      max_clicks_per_view: z.number().int().min(1).max(80).optional().describe("Default 25"),
+      focus: z.string().optional().describe("What the reviewer should pay special attention to"),
+      local_storage: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('localStorage entries set before the page loads, e.g. to skip a first-run dialog. For Scriptorium itself use {"scriptorium.setupDone":"true"}'),
+    },
+    handler: async (
+      args: {
+        url: string;
+        viewports?: ("desktop" | "tablet" | "phone")[];
+        themes?: ("dark" | "light")[];
+        max_clicks_per_view?: number;
+        focus?: string;
+        local_storage?: Record<string, string>;
+      },
+      ctx: ToolCtx,
+    ): Promise<ToolResult> => {
+      const bad = checkQaUrl(args.url);
+      if (bad) return fail(bad);
+      const worker = await pickQaWorker().catch((e: Error) => e);
+      if (worker instanceof Error) return fail(worker.message);
+      const job = startJob({
+        worker,
+        task: `QA sweep: ${args.url}`,
+        caller: ctx.caller,
+        run: () =>
+          runQaSweep({
+            url: args.url,
+            viewports: args.viewports?.length ? args.viewports : ["desktop", "tablet", "phone"],
+            themes: args.themes?.length ? args.themes : ["dark"],
+            maxClicksPerView: args.max_clicks_per_view ?? 25,
+            focus: args.focus ?? "",
+            storage: args.local_storage,
+            caller: ctx.caller,
+          }),
+      });
+      return ok(`QA sweep started (job ${job.id}). It takes a few minutes; ask job_status with job_id "${job.id}" for the report.`);
+    },
+  },
+  {
+    name: "qa_explore",
+    description: [
+      "Exploratory UI test. A vision model drives a real headless browser like a human tester: it looks at the screen, decides what to click, type or hover next, works through controls it hasn't tried yet, and reports the problems it sees with steps to reproduce.",
+      "Goes deeper than qa_sweep (menus, dialogs, multi-step flows, hover cards) but may skip things: use it for flows and hard-to-reach states, or after qa_sweep.",
+      "Runs in the background: returns a job id, then poll job_status. Same safety rules as qa_sweep (local URLs only; never sends messages, deletes, renames, signs in/out or quits; never presses Enter in a text box).",
+    ].join(" "),
+    schema: {
+      url: z.string().describe("Address of the running app"),
+      goal: z.string().describe("What to explore and check, e.g. 'every menu and dialog of the chat panel on a phone'"),
+      viewport: z.enum(["desktop", "tablet", "phone"]).optional().describe("Default desktop"),
+      theme: z.enum(["dark", "light"]).optional().describe("Default dark"),
+      max_steps: z.number().int().min(5).max(100).optional().describe("Default 40"),
+      local_storage: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('localStorage entries set before the page loads, e.g. to skip a first-run dialog. For Scriptorium itself use {"scriptorium.setupDone":"true"}'),
+    },
+    handler: async (
+      args: {
+        url: string;
+        goal: string;
+        viewport?: "desktop" | "tablet" | "phone";
+        theme?: "dark" | "light";
+        max_steps?: number;
+        local_storage?: Record<string, string>;
+      },
+      ctx: ToolCtx,
+    ): Promise<ToolResult> => {
+      const bad = checkQaUrl(args.url);
+      if (bad) return fail(bad);
+      const worker = await pickQaWorker().catch((e: Error) => e);
+      if (worker instanceof Error) return fail(worker.message);
+      const job = startJob({
+        worker,
+        task: `QA explore: ${args.goal}`,
+        caller: ctx.caller,
+        run: () =>
+          runQaExplore({
+            url: args.url,
+            goal: args.goal,
+            viewport: args.viewport ?? "desktop",
+            theme: args.theme ?? "dark",
+            maxSteps: args.max_steps ?? 40,
+            storage: args.local_storage,
+            caller: ctx.caller,
+          }),
+      });
+      return ok(`QA explore started (job ${job.id}). Ask job_status with job_id "${job.id}" for the report.`);
     },
   },
 ] as const;

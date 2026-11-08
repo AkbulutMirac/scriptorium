@@ -25,7 +25,7 @@ export type ChatOptions = {
 export type ChatResult = { content: string; reasoning: string; usage?: TokenUsage };
 
 /** Both DeepSeek and Ollama use OpenAI-compatible APIs, so a single client suffices for both. */
-function clientFor(worker: Worker): OpenAI {
+export function clientFor(worker: Worker): OpenAI {
   if (worker.provider === "deepseek") {
     if (!config.deepseekApiKey) {
       throw new Error("DEEPSEEK_API_KEY is not set. Add it to the .env file.");
