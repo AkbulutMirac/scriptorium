@@ -225,9 +225,12 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
       <SettingsMenu worker={worker} thinkingOff={thinkingOff} />
 
       <span className="flex-1" />
+      <ContextRing usage={lastUsage} />
       {lastUsage && (
         <Tooltip delay={200}>
-          <span className="truncate text-[11px] tabular-nums text-muted">{usageText(lastUsage)}</span>
+          <button type="button" className="cursor-default truncate rounded px-1 text-[11px] tabular-nums text-muted hover:bg-default-soft">
+            {usageText(lastUsage)}
+          </button>
           <Tooltip.Content>
             <div className="flex flex-col text-xs">
               <span className="font-medium">Son cevabın token kullanımı</span>
@@ -238,6 +241,46 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
         </Tooltip>
       )}
     </div>
+  );
+}
+
+/** Bağlam doluluğu halkası: son cevaptaki girdi + çıktı, modelin bağlam sınırına göre */
+function ContextRing({ usage }: { usage?: TokenUsage }) {
+  if (!usage?.contextWindow) return null;
+  const used = usage.prompt + usage.completion;
+  const pct = Math.min(100, (used / usage.contextWindow) * 100);
+  const r = 6;
+  const circ = 2 * Math.PI * r;
+  const color = pct > 85 ? "var(--danger)" : pct > 65 ? "var(--warning)" : "var(--accent)";
+  return (
+    <Tooltip delay={150}>
+      <button type="button" className="flex cursor-default items-center gap-1 rounded px-1 text-[11px] tabular-nums text-muted hover:bg-default-soft" aria-label="Bağlam doluluğu">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+          <circle cx="8" cy="8" r={r} fill="none" stroke="var(--border)" strokeWidth="2.5" />
+          <circle
+            cx="8"
+            cy="8"
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={`${(circ * Math.max(pct, 1)) / 100} ${circ}`}
+            transform="rotate(-90 8 8)"
+          />
+        </svg>
+        %{pct < 1 ? "<1" : Math.round(pct)}
+      </button>
+      <Tooltip.Content>
+        <div className="flex flex-col text-xs">
+          <span className="font-medium">Bağlam</span>
+          <span>
+            {used.toLocaleString("tr-TR")} / {usage.contextWindow.toLocaleString("tr-TR")} token
+          </span>
+          <span className="text-muted">Sohbet uzadıkça dolar; dolunca model eski mesajları unutur.</span>
+        </div>
+      </Tooltip.Content>
+    </Tooltip>
   );
 }
 

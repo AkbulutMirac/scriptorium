@@ -93,14 +93,34 @@ export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOp
       };
     }
   }
+  if (usage) usage.contextWindow = await contextWindow(worker, body.model);
   return { content, reasoning, usage };
+}
+
+/** DeepSeek'in iki modeli de 1M token bağlam alır (api-docs.deepseek.com, Models & Pricing) */
+const DEEPSEEK_CONTEXT = 1_000_000;
+
+/** Ollama'nın kendi API adresi (OpenAI uyumlu /v1 değil) */
+const ollamaRoot = () => config.ollamaBaseUrl.replace(/\/v1\/?$/, "");
+
+/** Modelin şu anki bağlam sınırı. Ollama'da yüklü modelin gerçek ayarı (/api/ps), DeepSeek'te sabit. */
+async function contextWindow(worker: Worker, model: string): Promise<number | undefined> {
+  if (worker.provider === "deepseek") return DEEPSEEK_CONTEXT;
+  try {
+    const res = await fetch(`${ollamaRoot()}/api/ps`, { signal: AbortSignal.timeout(2000) });
+    const j = (await res.json()) as { models?: { name: string; context_length?: number }[] };
+    const norm = (m: string) => m.replace(/:latest$/, "");
+    return j.models?.find((m) => norm(m.name) === norm(model))?.context_length;
+  } catch {
+    return undefined;
+  }
 }
 
 /** İşçinin kullanabileceği modeller: DeepSeek için sabit liste, Ollama için kurulu modeller */
 export async function listModels(worker: Worker): Promise<WorkerModel[]> {
   if (worker.provider === "deepseek") return [{ id: "deepseek-flash" }, { id: "deepseek-v4-pro" }];
-  // Ollama'nın kendi API'si (OpenAI uyumlu /v1 değil): boyut ve görsel okuma bilgisi de gelir
-  const root = config.ollamaBaseUrl.replace(/\/v1\/?$/, "");
+  // Ollama'nın kendi API'si: boyut ve görsel okuma bilgisi de gelir
+  const root = ollamaRoot();
   try {
     const res = await fetch(`${root}/api/tags`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return [];

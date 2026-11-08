@@ -92,7 +92,14 @@ export type WorkerSettings = {
   system?: string;
 };
 
-export type TokenUsage = { prompt: number; completion: number; cacheHit?: number; reasoning?: number };
+export type TokenUsage = {
+  prompt: number;
+  completion: number;
+  cacheHit?: number;
+  reasoning?: number;
+  /** Modelin o anki bağlam sınırı (token). Bağlam doluluğu = prompt + completion */
+  contextWindow?: number;
+};
 
 export type WorkerChatMessage = {
   role: "user" | "assistant";

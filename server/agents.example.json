@@ -22,7 +22,7 @@
       "provider": "ollama",
       "model": "qwen3.8-27b-metin",
       "color": "#7F77DD",
-      "description": "Qwen3.8-27B, 2-bit sıkıştırılmış (GSQ-RCO IQ2_S), sadece metin. Bedava, veri bilgisayardan çıkmaz. Yavaş: çıktı ~4 token/sn, girdi okuma ~200 token/sn, ilk yükleme ~15 sn. Bağlam 4K token. Sadece kısa, tek adımlı işler: sınıflandırma, kısa özet, basit dönüştürme, gizli veri içeren küçük işler.",
+      "description": "Qwen3.8-27B, 2-bit sıkıştırılmış (GSQ-RCO IQ2_S), sadece metin. Bedava, veri bilgisayardan çıkmaz. Yavaş: çıktı ~3,7 token/sn, girdi okuma ~250 token/sn, ilk yükleme ~15 sn. Bağlam 16K token. Sadece kısa, tek adımlı işler: sınıflandırma, kısa özet, basit dönüştürme, gizli veri içeren küçük işler.",
       "local": true
     }
   ]

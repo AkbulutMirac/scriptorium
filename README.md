@@ -108,13 +108,13 @@ ollama pull hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S
 ollama show --modelfile hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S > qwen.Modelfile
 ```
 
-`qwen.Modelfile` içindeki ikinci `FROM` satırını (görsel modülü) sil, sonra:
+`qwen.Modelfile` içindeki ikinci `FROM` satırını (görsel modülü) sil, en sona `PARAMETER num_ctx 16384` ekle (bağlam 4K yerine 16K), sonra:
 
 ```bash
 ollama create qwen3.8-27b-metin -f qwen.Modelfile
 ```
 
-RTX 4060 Laptop'ta ölçülen: çıktı ~4 token/sn, girdi ~200 token/sn. Local işçilerde düşünme varsayılan olarak kapalıdır.
+RTX 4060 Laptop'ta ölçülen (16K bağlam): çıktı ~3,7 token/sn, girdi ~250 token/sn. 4K bağlamda %15 daha hızlı, 32K'da %25 daha yavaş. Local işçilerde düşünme varsayılan olarak kapalıdır.
 
 **Windows kısayolu:** `scripts\Scriptorium.vbs` pencere açmadan arayüzü derler, sunucuyu arka planda başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Masaüstü kısayolu için hedefi `wscript.exe "<repo>\scripts\Scriptorium.vbs"`, simgesi `scripts\scriptorium.ico` olan bir kısayol oluştur. Sunucuyu kapatmak için arayüzde Ayarlar → "Scriptorium'u kapat". Çıktılar `server\data\server.log` ve `build.log` dosyalarına yazılır.
 

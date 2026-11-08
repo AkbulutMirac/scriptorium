@@ -54,7 +54,7 @@ Claude işi kime vereceğine kendisi karar verir.
   3. Testler otomatik çalışır.
   4. Claude yalnızca diff'e ve sonuca bakar.
 - **Local işçiler (Ollama, ücretsiz):**
-  - `qwen3.8-27b-metin`: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB) modelinin görsel modülü çıkarılmış kopyası. Ölçülen (RTX 4060 Laptop, %36 CPU / %64 GPU): çıktı ~4 token/sn, girdi ~200 token/sn, ilk yükleme ~15 sn. Düşünme kapalı çalışır (açıkken dakikalar sürer).
+  - `qwen3.8-27b-metin`: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB) modelinin görsel modülü çıkarılmış kopyası. Bağlam 16K. Ölçülen (RTX 4060 Laptop, %41 CPU / %59 GPU): çıktı ~3,7 token/sn, girdi ~250 token/sn, ilk yükleme ~15 sn. Düşünme kapalı çalışır (açıkken dakikalar sürer).
   - Küçük bir embedding modeli: arama ve RAG için
 - **Local işçilerin rolü:**
   - TÜBİTAK YOLO projesi için görsel ön eleme (gece çalışan toplu iş)
@@ -181,4 +181,4 @@ scriptorium/
   - büyük girdi alıp küçük çıktı veren işler
   - gizli veri
 - Karmaşık debug ve mimari kararlar Claude'da kalmalı.
-- Bilgisayar: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. Local model 4K bağlamla çalışıyor (daha büyüğü daha yavaş).
+- Bilgisayar: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. Local model 16K bağlamla çalışıyor (4K: %15 daha hızlı, 32K: %25 daha yavaş ve 11 GB bellek).
