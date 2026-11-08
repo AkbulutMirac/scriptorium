@@ -1,5 +1,6 @@
 import { ClaudeChatPanel } from "./components/chat/ClaudeChatPanel";
 import { InfoPanel } from "./components/chat/InfoPanel";
+import { PlanPanel } from "./components/chat/PlanPanel";
 import { WorkerChatPanel } from "./components/chat/WorkerChatPanel";
 import { ExpandOverlay } from "./components/ExpandOverlay";
 import { FolderPicker } from "./components/FolderPicker";
@@ -25,6 +26,10 @@ export default function App() {
   const compact = useMedia(COMPACT_QUERY);
   const mobile = useMedia(MOBILE_QUERY);
   const showInfo = selected === CLAUDE_ID && ui.infoOpen && !!mainChatId;
+  const planPath = useApp((s) => s.planPath);
+  const mainItems = useApp((s) => s.chats[s.mainChatId ?? ""]?.items);
+  const showPlan = selected === CLAUDE_ID && !!planPath && !!mainItems;
+  const planPanel = showPlan && <PlanPanel path={planPath!} items={mainItems!} onClose={() => actions.openPlan(null)} />;
 
   // Phones and tablets start with the history drawer closed so it does not cover the content.
   useEffect(() => {
@@ -71,6 +76,20 @@ export default function App() {
               <ResizeHandle width={ui.sideWidth} min={320} max={800} onChange={(sideWidth) => actions.setUi({ sideWidth })} />
               <aside style={{ flexBasis: ui.sideWidth }} className="flex min-w-[300px] shrink flex-col overflow-hidden border-l border-separator bg-surface">
                 <ClaudeChatPanel key={sideChatId} chatId={sideChatId!} />
+              </aside>
+            </>
+          ))}
+
+        {showPlan &&
+          (compact ? (
+            <Drawer side="right" width="min(560px, 100%)" onClose={() => actions.openPlan(null)}>
+              {planPanel}
+            </Drawer>
+          ) : (
+            <>
+              <ResizeHandle width={ui.sideWidth} min={320} max={800} onChange={(sideWidth) => actions.setUi({ sideWidth })} />
+              <aside style={{ flexBasis: ui.sideWidth }} className="flex min-w-[300px] shrink flex-col overflow-hidden border-l border-separator bg-surface">
+                {planPanel}
               </aside>
             </>
           ))}

@@ -24,23 +24,19 @@ function autostartLnkPath(): string {
 /** Starts a detached process that waits for this server to exit, then relaunches it (the caller exits right after) */
 export function restartApp(): void {
   if (!appControlSupported) return;
+  // A detached Node process, not PowerShell: powershell.exe started detached (no console) exits without running its command
   const script = `
-for ($i = 0; $i -lt 40; $i++) {
-  try {
-    Invoke-WebRequest -UseBasicParsing http://127.0.0.1:${config.port}/api/health -TimeoutSec 1 | Out-Null
-    Start-Sleep -Milliseconds 500
-  } catch {
-    break
+const { spawn } = require("node:child_process");
+const url = ${JSON.stringify(`http://127.0.0.1:${config.port}/api/health`)};
+(async () => {
+  for (let i = 0; i < 40; i++) {
+    try { await fetch(url, { signal: AbortSignal.timeout(1000) }); } catch { break; }
+    await new Promise((r) => setTimeout(r, 500));
   }
-}
-Start-Process -FilePath ${psQuote(wscriptPath)} -ArgumentList @(${psQuote(`"${vbsPath}" --no-browser`)})
+  spawn(${JSON.stringify(wscriptPath)}, [${JSON.stringify(vbsPath)}, "--no-browser"], { detached: true, stdio: "ignore" }).unref();
+})();
 `;
-  const child = spawn("powershell", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", script], {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true,
-  });
-  child.unref();
+  spawn(process.execPath, ["-e", script], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 }
 
 /** Whether a Scriptorium shortcut is in the Windows Startup folder */

@@ -59,6 +59,8 @@ export type SessionSummary = {
   updatedAt: number;
   cwd?: string;
   gitBranch?: string;
+  /** Folder-less chat of the Claude app (runs in a scratch folder): shown under "This computer" */
+  scratch?: boolean;
 };
 
 /** Message read from Claude session history (rendered the same way as live SDK messages). */
@@ -268,8 +270,10 @@ export type ClientMsg =
       always?: boolean;
       /** Allow by modifying the tool's input (e.g. AskUserQuestion answers: { answers: { question: answer } }) */
       updatedInput?: Record<string, unknown>;
+      /** Deny reason Claude reads (e.g. what to change in a rejected plan) */
+      message?: string;
     }
-  | { type: "claude.sessions"; cwd?: string; all?: boolean }
+  | { type: "claude.sessions";cwd?: string; all?: boolean }
   | { type: "claude.history"; sessionId: string }
   | { type: "claude.rename"; sessionId: string; title: string }
   | { type: "claude.delete"; sessionId: string }

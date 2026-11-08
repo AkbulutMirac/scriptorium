@@ -27,7 +27,7 @@ import { claudeLogin, installRules, registerMcp, saveDeepseekKey, setupStatus } 
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { appControlSupported, getAutostart, restartApp, setAutostart } from "./app.js";
-import { isIgnoredPath, listDir, listProjects, makeDir } from "./projects.js";
+import { isIgnoredPath, isScratchPath, listDir, listProjects, makeDir } from "./projects.js";
 import { deepseekBalance, isAvailable, listModels } from "./llm.js";
 import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
@@ -350,7 +350,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       p.resolve(
         msg.allow
           ? { behavior: "allow", updatedInput: msg.updatedInput ?? p.input, updatedPermissions: msg.always ? p.suggestions : undefined }
-          : { behavior: "deny", message: "Permission denied by user." },
+          : { behavior: "deny", message: msg.message || "Permission denied by user." },
       );
       broadcast({ type: "claude.permissionResolved", requestId: msg.requestId });
       return;
@@ -363,10 +363,11 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
         updatedAt: s.lastModified,
         cwd: s.cwd,
         gitBranch: s.gitBranch,
+        scratch: s.cwd ? isScratchPath(s.cwd) || undefined : undefined,
       });
       if (msg.all) {
         const list = await listSessions({ limit: 400 });
-        const visible = list.filter((s) => s.cwd && !isIgnoredPath(s.cwd));
+        const visible = list.filter((s) => s.cwd && (!isIgnoredPath(s.cwd) || isScratchPath(s.cwd)));
         return reply(ws, { type: "claude.allSessions", sessions: visible.map(toSummary) });
       }
       const list = await listSessions({ dir: msg.cwd || config.claudeCwd, limit: 100 });

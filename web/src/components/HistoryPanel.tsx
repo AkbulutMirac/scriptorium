@@ -112,8 +112,10 @@ function ClaudeHistory() {
     for (const p of projects) map.set(keyOf(p.path), { path: p.path, name: p.name, sessions: [], last: p.lastUsed });
     for (const s of all) {
       if (!s.cwd) continue;
-      const k = keyOf(s.cwd);
-      const g = map.get(k) ?? { path: s.cwd, name: s.cwd.replaceAll("\\", "/").split("/").filter(Boolean).pop() ?? s.cwd, sessions: [], last: 0 };
+      // The Claude app's folder-less chats each have their own scratch folder: one "This computer" group, like the app
+      const root = s.scratch ? s.cwd.slice(0, s.cwd.search(/scratch-workspaces/i) + "scratch-workspaces".length) : s.cwd;
+      const k = keyOf(root);
+      const g = map.get(k) ?? { path: root, name: s.scratch ? "This computer" : (root.replaceAll("\\", "/").split("/").filter(Boolean).pop() ?? root), sessions: [], last: 0 };
       g.sessions.push(s);
       g.last = Math.max(g.last, s.updatedAt);
       map.set(k, g);

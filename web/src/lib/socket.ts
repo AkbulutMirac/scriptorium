@@ -10,15 +10,37 @@ class Socket {
   private statusListeners = new Set<(s: ConnectionStatus) => void>();
   private openListeners = new Set<() => void>();
   status: ConnectionStatus = "closed";
+  private retry: ReturnType<typeof setTimeout> | undefined;
+
+  constructor() {
+    // Background tabs throttle timers: when the tab comes back (or the network does), retry right away
+    const now = () => this.status === "closed" && this.connect();
+    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && now());
+    window.addEventListener("focus", now);
+    window.addEventListener("online", now);
+  }
 
   connect() {
     if (this.ws) return;
+    clearTimeout(this.retry);
     this.setStatus("connecting");
     const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
     const ws = new WebSocket(url);
     this.ws = ws;
+    // A connection attempt made while the server restarts can hang in "connecting" forever: give up and retry
+    const timeout = setTimeout(() => ws.readyState === WebSocket.CONNECTING && drop(), 5000);
+    const drop = () => {
+      clearTimeout(timeout);
+      if (this.ws !== ws) return;
+      ws.onopen = ws.onmessage = ws.onclose = null;
+      ws.close();
+      this.ws = null;
+      this.setStatus("closed");
+      this.retry = setTimeout(() => this.connect(), 1500);
+    };
 
     ws.onopen = () => {
+      clearTimeout(timeout);
       this.setStatus("open");
       for (const fn of this.openListeners) fn();
       const pending = this.queue;
@@ -29,11 +51,7 @@ class Socket {
       const msg = JSON.parse(e.data) as ServerMsg;
       for (const fn of this.listeners) fn(msg);
     };
-    ws.onclose = () => {
-      this.ws = null;
-      this.setStatus("closed");
-      setTimeout(() => this.connect(), 1500);
-    };
+    ws.onclose = drop;
   }
 
   send(msg: ClientMsg) {

@@ -1,7 +1,7 @@
 import { toast } from "@heroui/react";
 import { isMobileNow } from "./lib/useMedia";
 import { create } from "zustand";
-import { applyMessage, historyToItems, streamDelta, type ChatItem } from "./lib/claudeItems";
+import { applyMessage, historyToItems, isPlanPath, streamDelta, type ChatItem } from "./lib/claudeItems";
 import { socket, type ConnectionStatus } from "./lib/socket";
 import { load, save } from "./lib/storage";
 import { assignCopies, LEAVE_MS, type CopyState } from "./lib/workerCopies";
@@ -132,6 +132,8 @@ type State = {
   infoFocus: { section: string; n: number } | null;
   /** Folder browser */
   folderPicker: { open: boolean; purpose: "cwd" | "dir"; chatId?: string; listing?: DirListing };
+  /** Plan file shown in the side panel (main chat) */
+  planPath: string | null;
 };
 
 /** crypto.randomUUID only exists on secure pages (https or localhost); over plain http build a v4 UUID by hand */
@@ -176,6 +178,7 @@ export const useApp = create<State>(() => ({
   allSessions: [],
   folderPicker: { open: false, purpose: "cwd" },
   infoFocus: null,
+  planPath: null,
 }));
 
 const get = useApp.getState;
@@ -276,6 +279,24 @@ function closeChat(chatId: string | null) {
   set({ chats, permissions: get().permissions.filter((p) => p.chatId !== chatId) });
 }
 
+/** Leaving a chat: a running (or queued) one keeps going in the background, an idle one is closed */
+function detachChat(chatId: string | null) {
+  const c = chatId ? get().chats[chatId] : undefined;
+  if (c && (c.busy || c.queue.length)) return;
+  closeChat(chatId);
+}
+
+/** Permission mode, model and effort remembered per session */
+type SessionPrefs = { mode?: PermissionMode; model?: string; effort?: EffortLevel };
+const prefsOf = (sessionId?: string): SessionPrefs => (sessionId ? (load<Record<string, SessionPrefs>>("sessionPrefs", {})[sessionId] ?? {}) : {});
+function rememberPrefs(chatId: string, patch: SessionPrefs, onlyIfNew = false) {
+  const sid = get().chats[chatId]?.sessionId;
+  if (!sid) return;
+  const all = load<Record<string, SessionPrefs>>("sessionPrefs", {});
+  if (onlyIfNew && all[sid]) return;
+  save("sessionPrefs", { ...all, [sid]: { ...all[sid], ...patch } });
+}
+
 // ─── Server messages ──────────────────────────────────────────────────────────
 
 function onServer(msg: ServerMsg) {
@@ -331,6 +352,13 @@ function onServer(msg: ServerMsg) {
         }
         return next;
       });
+      // Claude is writing a plan: show it beside the chat, like the Claude app
+      if (m.type === "assistant" && msg.chatId === s.mainChatId) {
+        for (const b of (m.message?.content ?? []) as { type: string; input?: Record<string, unknown> }[]) {
+          const fp = b.type === "tool_use" ? (b.input?.file_path ?? b.input?.planFilePath) : undefined;
+          if (typeof fp === "string" && isPlanPath(fp)) set({ planPath: fp });
+        }
+      }
       if (m.type === "result") {
         // Turn over: queued messages go out together as the next message
         const done = get().chats[msg.chatId];
@@ -341,6 +369,13 @@ function onServer(msg: ServerMsg) {
           actions.sendClaude(msg.chatId, texts.join("\n\n"), attachments);
         }
         if (msg.chatId === s.mainChatId) refreshSessions();
+        // A chat that kept running in the background finished its turn: release it
+        const bg = get().chats[msg.chatId];
+        if (bg && !done?.queue.length && msg.chatId !== get().mainChatId && msg.chatId !== get().sideChatId) {
+          closeChat(msg.chatId);
+          refreshSessions();
+          return;
+        }
         socket.send({ type: "claude.info", chatId: msg.chatId });
         socket.send({ type: "claude.globalInfo" });
         const cwd = get().chats[msg.chatId]?.cwd;
@@ -399,6 +434,10 @@ function onServer(msg: ServerMsg) {
 
     case "claude.session":
       updateChat(msg.chatId, (c) => ({ ...c, sessionId: msg.sessionId }));
+      {
+        const c = get().chats[msg.chatId];
+        if (c) rememberPrefs(msg.chatId, { mode: c.permissionMode ?? c.wantMode, model: c.wantModel, effort: c.effort ?? c.wantEffort }, true);
+      }
       if (msg.chatId === s.mainChatId) persistMain();
       return;
 
@@ -417,6 +456,11 @@ function onServer(msg: ServerMsg) {
 
     case "claude.permissionRequest":
       if (!s.permissions.some((p) => p.requestId === msg.requestId)) set({ permissions: [...s.permissions, msg] });
+      // Plan ready for approval: show it beside the chat
+      if (msg.toolName === "ExitPlanMode" && msg.chatId === s.mainChatId) {
+        const fp = msg.input.planFilePath;
+        if (typeof fp === "string") set({ planPath: fp });
+      }
       return;
 
     case "claude.permissionResolved":
@@ -575,11 +619,11 @@ export const actions = {
   newClaudeChat(cwd?: string, keepSelection = false) {
     const prev = get().chats[get().mainChatId ?? ""];
     closeChat(get().sideChatId);
-    closeChat(get().mainChatId);
+    detachChat(get().mainChatId);
     if (cwd) actions.setCwd(cwd);
     const chatId = uuid();
-    const chat = emptyChat(chatId, cwd || effectiveCwd(), { wantModel: prev?.wantModel, wantEffort: prev?.wantEffort ?? prev?.effort });
-    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, ...(keepSelection ? {} : { selected: CLAUDE_ID }) });
+    const chat = emptyChat(chatId, cwd || effectiveCwd(), { wantModel: prev?.wantModel, wantEffort: load<EffortLevel | undefined>("lastEffort", undefined) ?? prev?.wantEffort ?? prev?.effort });
+    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, planPath: null, ...(keepSelection ? {} : { selected: CLAUDE_ID }) });
     if (!keepSelection) save("selected", CLAUDE_ID);
     persistMain();
   },
@@ -604,6 +648,9 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setEffort", chatId, effort });
     updateChat(chatId, (x) => ({ ...x, effort, wantEffort: effort }));
+    rememberPrefs(chatId, { effort });
+    // New chats start with the effort chosen last
+    save("lastEffort", effort);
   },
 
   setFastMode(chatId: string, on: boolean) {
@@ -656,11 +703,27 @@ export const actions = {
   /** Opens a session from history. reattach=true: the page was refreshed, it may still be open on the server. */
   openClaudeSession(sessionId: string, chatId = uuid(), reattachToServer = false) {
     if (get().chats[get().mainChatId ?? ""]?.sessionId === sessionId && !reattachToServer) return;
+    // Still running in the background: switch back to it as it is
+    const running = Object.values(get().chats).find((c) => c.sessionId === sessionId && !c.isSide);
+    if (running && !reattachToServer) {
+      closeChat(get().sideChatId);
+      detachChat(get().mainChatId);
+      set({ mainChatId: running.chatId, sideChatId: null, planPath: null });
+      persistMain();
+      return;
+    }
     closeChat(get().sideChatId);
-    closeChat(get().mainChatId);
+    detachChat(get().mainChatId);
     const session = get().sessions.find((x) => x.id === sessionId) ?? get().allSessions.find((x) => x.id === sessionId);
-    const chat = emptyChat(chatId, session?.cwd || effectiveCwd(), { sessionId, loadingHistory: true });
-    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null });
+    const p = prefsOf(sessionId);
+    const chat = emptyChat(chatId, session?.cwd || effectiveCwd(), {
+      sessionId,
+      loadingHistory: true,
+      ...(p.mode ? { wantMode: p.mode, permissionMode: p.mode } : {}),
+      ...(p.model ? { wantModel: p.model } : {}),
+      ...(p.effort ? { wantEffort: p.effort, effort: p.effort } : {}),
+    });
+    set({ chats: { ...get().chats, [chatId]: chat }, mainChatId: chatId, sideChatId: null, planPath: null });
     persistMain();
     socket.send({ type: "claude.history", sessionId });
     if (reattachToServer) reattach(chatId);
@@ -741,6 +804,7 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setMode", chatId, mode });
     updateChat(chatId, (x) => ({ ...x, permissionMode: mode, wantMode: mode }));
+    rememberPrefs(chatId, { mode });
   },
 
   setModel(chatId: string, model: string) {
@@ -748,6 +812,7 @@ export const actions = {
     if (!c) return;
     if (c.opened) socket.send({ type: "claude.setModel", chatId, model: model || undefined });
     updateChat(chatId, (x) => ({ ...x, wantModel: model }));
+    rememberPrefs(chatId, { model });
     socket.send({ type: "claude.info", chatId });
   },
 
@@ -779,6 +844,18 @@ export const actions = {
       ],
     });
     set({ chats: { ...get().chats, [chatId]: side }, sideChatId: chatId, quotes: { ...get().quotes, [chatId]: quote } });
+  },
+
+  /** Answers Claude's plan: mode = accept and continue in that mode; null = reject (with optional feedback to revise) */
+  respondPlan(req: PermissionReq, mode: PermissionMode | null, feedback?: string) {
+    if (mode) actions.setMode(req.chatId, mode);
+    const message = feedback ? `The user wants changes to the plan before approving it:\n\n${feedback}` : "The user rejected the plan.";
+    socket.send({ type: "claude.permission", requestId: req.requestId, allow: !!mode, message: mode ? undefined : message });
+    set({ permissions: get().permissions.filter((p) => p.requestId !== req.requestId) });
+  },
+
+  openPlan(path: string | null) {
+    set({ planPath: path });
   },
 
   closeSideChat() {

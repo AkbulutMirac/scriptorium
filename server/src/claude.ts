@@ -96,6 +96,8 @@ export class ClaudeSession {
         model: opts.model || undefined,
         effort: opts.effort,
         includePartialMessages: true,
+        // Lets the user pick "Bypass permissions" from the mode menu; sessions don't start in it
+        allowDangerouslySkipPermissions: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
         // If the user added the server to their global settings (claude mcp add), that one is used; both go to the same address.
         mcpServers: {

@@ -10,10 +10,11 @@ export const EFFORT_LABEL: Record<EffortLevel, string> = { low: "Low", medium: "
 const ALL_EFFORTS: EffortLevel[] = ["low", "medium", "high", "xhigh", "max"];
 
 const MODES: { value: PermissionMode; label: string; hint: string }[] = [
-  { value: "default", label: "Ask every step", hint: "Asks permission before commands and edits" },
-  { value: "acceptEdits", label: "Accept edits", hint: "Makes file edits without asking" },
-  { value: "plan", label: "Plan mode", hint: "Plans first, changes nothing" },
-  { value: "auto", label: "Automatic", hint: "Approves safe steps on its own" },
+  { value: "auto", label: "Auto", hint: "Claude handles permission decisions" },
+  { value: "default", label: "Manual", hint: "Always ask before making changes" },
+  { value: "acceptEdits", label: "Accept edits", hint: "Automatically accept all file edits" },
+  { value: "plan", label: "Plan", hint: "Create a plan before making changes" },
+  { value: "bypassPermissions", label: "Bypass permissions", hint: "Accepts all permissions" },
 ];
 
 /** Currently selected model (the user's choice or the model reported by the session) */
@@ -255,8 +256,18 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
       </Button>
       <Popover.Content placement="top end" className="w-72">
         <Popover.Dialog className="p-1">
-          <ul className="flex flex-col">
-            {MODES.map((m) => (
+          <div
+            onKeyDown={(e) => {
+              // 1-5 picks a mode, like the Claude app
+              const m = MODES[Number(e.key) - 1];
+              if (!m) return;
+              actions.setMode(chat.chatId, m.value);
+              setOpen(false);
+            }}
+          >
+            <div className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted">Mode</div>
+            <ul className="flex flex-col">
+            {MODES.map((m, i) => (
               <li key={m.value}>
                 <button
                   type="button"
@@ -267,14 +278,19 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
                   className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${mode === m.value ? "bg-accent-soft" : "hover:bg-default-soft"}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm">{m.label}</div>
+                    <div className="flex items-center gap-1.5 text-sm">
+                      {m.label}
+                      {m.value === "auto" && <span className="rounded-full border border-separator px-1.5 text-[10px] text-muted">Recommended</span>}
+                    </div>
                     <div className="text-[11px] text-muted">{m.hint}</div>
                   </div>
                   {mode === m.value && <Check size={15} className="text-accent" />}
+                  <span className="w-3 text-right text-xs text-muted">{i + 1}</span>
                 </button>
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
         </Popover.Dialog>
       </Popover.Content>
     </Popover>

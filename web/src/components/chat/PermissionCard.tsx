@@ -2,10 +2,12 @@ import { Button } from "@heroui/react";
 import { MessageCircleQuestion, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { actions, type PermissionReq } from "../../store";
+import { PlanCard } from "./PlanCard";
 
 /** Shown below the chat when Claude requests permission to use a tool. */
 export function PermissionCard({ req }: { req: PermissionReq }) {
   if (req.toolName === "AskUserQuestion") return <QuestionCard req={req} />;
+  if (req.toolName === "ExitPlanMode") return <PlanCard req={req} />;
 
   const preview = previewOf(req.toolName, req.input);
   return (

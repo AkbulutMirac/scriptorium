@@ -22,7 +22,10 @@ const IGNORED_ROOTS = [
 ]
   .filter((p): p is string => !!p)
   .map(norm);
-export const isIgnoredPath = (p: string) => IGNORED_ROOTS.some((root) => norm(p) === root || norm(p).startsWith(root + path.sep));
+/** Folder-less chats of the Claude app ("This computer"): each runs in its own scratch folder here */
+const SCRATCH_ROOT = process.env.APPDATA ? norm(path.join(process.env.APPDATA, "Claude", "scratch-workspaces")) : "";
+export const isScratchPath = (p: string) => !!SCRATCH_ROOT && norm(p).startsWith(SCRATCH_ROOT + path.sep);
+export const isIgnoredPath =(p: string) => IGNORED_ROOTS.some((root) => norm(p) === root || norm(p).startsWith(root + path.sep));
 
 /**
  * Known project folders: every folder with a Claude Code session + folders under PROJECTS_DIR.

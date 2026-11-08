@@ -18,6 +18,9 @@ export type ChatItem =
   | { kind: "result"; id: string; durationMs?: number; costUsd?: number }
   | { kind: "unknown"; id: string; label: string; data: unknown };
 
+/** Plan files Claude writes in plan mode (~/.claude/plans/*.md) */
+export const isPlanPath = (p: string) => /[\\/]\.claude[\\/]plans[\\/][^\\/]+\.md$/i.test(p);
+
 type Block = { type: string; [k: string]: unknown };
 type AnyMsg = { type: string; subtype?: string; uuid?: string; message?: unknown; parent_tool_use_id?: string | null; [k: string]: unknown };
 

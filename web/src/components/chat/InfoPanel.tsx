@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isPlanPath } from "../../lib/claudeItems";
 import { load, save } from "../../lib/storage";
 import { UsageCard } from "./UsageCard";
 import { actions, agentMeta, useApp, type ClaudeChat } from "../../store";
@@ -310,7 +311,7 @@ function Outputs({ chat, isRepo }: { chat: ClaudeChat; isRepo: boolean }) {
               <button
                 type="button"
                 title={f}
-                onClick={() => (isRepo ? actions.showGitDiff(chat.cwd, rel(f)) : actions.showOverlay({ title: f, body: "This folder is not a git repository, cannot show diff.", mono: true }))}
+                onClick={() => (isPlanPath(f) ? actions.openPlan(f) : isRepo ?actions.showGitDiff(chat.cwd, rel(f)) : actions.showOverlay({ title: f, body: "This folder is not a git repository, cannot show diff.", mono: true }))}
                 className="flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-default-soft"
               >
                 <FileCode2 size={14} className="shrink-0 text-muted" />
