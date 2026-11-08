@@ -75,6 +75,9 @@ export async function gitInfo(cwd: string): Promise<GitInfo> {
 
 /** Diff of a file (or the entire working tree) relative to HEAD */
 export async function gitDiff(cwd: string, file?: string): Promise<string> {
+  // Outside a repo git falls back to --no-index mode and dumps its usage text
+  const isRepo = await git(cwd, ["rev-parse", "--is-inside-work-tree"]).then(() => true, () => false);
+  if (!isRepo) return "This folder is not a git repository, no changes to show.";
   const base = (await hasHead(cwd)) ? ["diff", "HEAD"] : ["diff", "--cached"];
   if (file) {
     const out = await git(cwd, [...base, "--", file]);
