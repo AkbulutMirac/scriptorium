@@ -1,4 +1,4 @@
-/** localStorage sarmalayıcı. Gizli pencerede ya da engellendiğinde sessizce varsayılana döner. */
+/** localStorage wrapper. Silently falls back to the default in private windows or when blocked. */
 export function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(`scriptorium.${key}`);
@@ -12,6 +12,6 @@ export function save(key: string, value: unknown) {
   try {
     localStorage.setItem(`scriptorium.${key}`, JSON.stringify(value));
   } catch {
-    /* depolama yoksa önemli değil: sadece tercih hatırlanmaz */
+    /* no storage is fine: the preference just won't be remembered */
   }
 }

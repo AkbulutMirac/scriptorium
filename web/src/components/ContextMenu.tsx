@@ -5,14 +5,14 @@ import { createPortal } from "react-dom";
 export type MenuItem = { label: string; icon?: LucideIcon; danger?: boolean; onSelect: () => void } | "separator";
 
 /**
- * Sağ tık menüsü: imlecin olduğu yerde açılır, dışarı tıklayınca, Esc'ye basınca ya da kaydırınca kapanır.
- * body'ye portal ile çizilir: kaydırma alanlarının kenar soldurma maskesi (mask-image) menüyü kırpmasın.
+ * Context menu: opens at the cursor position, closes on outside click, Esc press, or scroll.
+ * Rendered into body via portal: so the scroll areas' edge fade mask (mask-image) doesn't clip the menu.
  */
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
 
-  // Ekranın dışına taşmasın
+  // Don't overflow off-screen
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;

@@ -3,20 +3,20 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-/** server/ klasörü */
+/** server/ folder */
 export const SERVER_ROOT = path.resolve(here, "..");
 
 export const config = {
   deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? "",
   deepseekBaseUrl: "https://api.deepseek.com",
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
-  /** Boşsa SDK'nın kendi paketindeki Claude Code kullanılır. */
+  /** If empty, the Claude Code bundled with the SDK is used. */
   claudeCodePath: process.env.CLAUDE_CODE_PATH || undefined,
-  /** Claude'un varsayılan çalışma klasörü. Boşsa bu repo. Arayüzden sohbet başına değiştirilebilir. */
+  /** Claude's default working folder. If empty, this repo. Can be changed per chat from the UI. */
   claudeCwd: path.resolve(process.env.CLAUDE_CWD || path.join(SERVER_ROOT, "..")),
-  /** Proje klasörlerinin durduğu yer (klasör seçicide otomatik listelenir). Boşsa bu reponun bir üst klasörü. */
+  /** Where project folders live (auto-listed in the folder picker). If empty, the parent folder of this repo. */
   projectsDir: path.resolve(process.env.PROJECTS_DIR || path.join(SERVER_ROOT, "..", "..")),
-  /** Listelerde hiç görünmeyecek klasörler: PROJECTS_DIR altındaki adlar ya da tam yollar, virgülle. Klasörlere dokunulmaz. */
+  /** Folders that never appear in lists: names under PROJECTS_DIR or full paths, comma-separated. Folders are not touched. */
   projectsExclude: (process.env.PROJECTS_EXCLUDE ?? "")
     .split(",")
     .map((s) => s.trim())

@@ -9,11 +9,11 @@ import { ToolCard } from "./ToolCard";
 
 type Handlers = {
   onReply: (quote: string) => void;
-  /** Sadece ana Claude sohbetinde: bu mesaj hakkında yan sohbet aç */
+  /** Main Claude chat only: open a side chat about this message */
   onSideChat?: (quote: string) => void;
 };
 
-/** Seçili metin bu öğenin içindeyse onu, değilse öğenin tamamını alıntılar. */
+/** Quotes the selected text if it is inside this item, otherwise the whole item. */
 export function quoteFrom(el: HTMLElement | null, fallback: string): string {
   const sel = window.getSelection();
   const text = sel?.toString().trim();
@@ -26,17 +26,17 @@ export function MessageActions({ text, elRef, onReply, onSideChat }: Handlers & 
     <div className="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
       <CopyButton text={text} />
       <Tooltip delay={300}>
-        <Button isIconOnly size="sm" variant="ghost" aria-label="Alıntıla" onPress={() => onReply(quoteFrom(elRef.current, text))}>
+        <Button isIconOnly size="sm" variant="ghost" aria-label="Quote" onPress={() => onReply(quoteFrom(elRef.current, text))}>
           <Quote size={13} />
         </Button>
-        <Tooltip.Content>Alıntılayarak yanıtla (önce metin seçebilirsin)</Tooltip.Content>
+        <Tooltip.Content>Reply with quote (you can select text first)</Tooltip.Content>
       </Tooltip>
       {onSideChat && (
         <Tooltip delay={300}>
-          <Button isIconOnly size="sm" variant="ghost" aria-label="Yan sohbette sor" onPress={() => onSideChat(quoteFrom(elRef.current, text))}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="Ask in side chat" onPress={() => onSideChat(quoteFrom(elRef.current, text))}>
             <GitBranch size={13} />
           </Button>
-          <Tooltip.Content>Yan sohbette sor (ana sohbet bozulmaz)</Tooltip.Content>
+          <Tooltip.Content>Ask in side chat (main chat stays intact)</Tooltip.Content>
         </Tooltip>
       )}
     </div>
@@ -75,7 +75,7 @@ export const ItemView = memo(function ItemView({ item, ...handlers }: Handlers &
     case "thinking":
       return (
         <Nested parent={item.parent}>
-          <Collapsible icon={<Brain size={13} />} label="Düşünce">
+          <Collapsible icon={<Brain size={13} />} label="Thinking">
             <div className="whitespace-pre-wrap text-xs leading-relaxed text-muted">{item.text}</div>
           </Collapsible>
         </Nested>
@@ -107,7 +107,7 @@ export const ItemView = memo(function ItemView({ item, ...handlers }: Handlers &
   }
 });
 
-/** Alt ajanın (Task) adımlarını girintili gösterir */
+/** Shows the sub-agent's (Task) steps indented */
 function Nested({ parent, children }: { parent: string | null; children: ReactNode }) {
   if (!parent) return <>{children}</>;
   return <div className="ml-3 border-l-2 border-separator pl-3 opacity-90">{children}</div>;

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { actions, useApp } from "../store";
 
 /**
- * Sunucu tarafında çalışan klasör gezgini. Tarayıcılar güvenlik nedeniyle tam klasör yolu vermediği için
- * klasörleri arka uç listeler. "cwd": sohbetin çalışma klasörü, "dir": ek klasör.
+ * Server-side folder browser. Since browsers do not provide the full folder path for security reasons,
+ * the backend lists the folders. "cwd": the chat's working folder, "dir": extra folder.
  */
 export function FolderPicker() {
   const picker = useApp((s) => s.folderPicker);
@@ -30,23 +30,23 @@ export function FolderPicker() {
       <Modal.Container size="md">
         <Modal.Dialog>
           <Modal.Header>
-            <Modal.Heading>{picker.purpose === "dir" ? "Ek klasör seç" : "Çalışma klasörü seç"}</Modal.Heading>
+            <Modal.Heading>{picker.purpose === "dir" ? "Select extra folder" : "Select working folder"}</Modal.Heading>
           </Modal.Header>
           <Modal.Body className="flex flex-col gap-2">
             <div className="flex items-center gap-1">
-              <Button isIconOnly size="sm" variant="ghost" aria-label="Kısayollar" onPress={() => actions.browse()}>
+              <Button isIconOnly size="sm" variant="ghost" aria-label="Shortcuts" onPress={() => actions.browse()}>
                 <Home size={15} />
               </Button>
-              <Button isIconOnly size="sm" variant="ghost" aria-label="Üst klasör" isDisabled={!listing?.parent} onPress={() => actions.browse(listing?.parent)}>
+              <Button isIconOnly size="sm" variant="ghost" aria-label="Parent folder" isDisabled={!listing?.parent} onPress={() => actions.browse(listing?.parent)}>
                 <ArrowUp size={15} />
               </Button>
               <input
                 value={manual}
                 onChange={(e) => setManual(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && manual.trim() && actions.browse(manual.trim())}
-                placeholder="Yol yaz ve Enter'a bas"
+                placeholder="Type a path and press Enter"
                 className="font-code min-w-0 flex-1 rounded-md border border-field-border bg-field px-2 py-1.5 text-xs outline-none focus:border-accent"
-                aria-label="Klasör yolu"
+                aria-label="Folder path"
               />
             </div>
             <div className="h-72 overflow-y-auto rounded-lg border border-separator">
@@ -55,7 +55,7 @@ export function FolderPicker() {
                   <Spinner size="sm" />
                 </div>
               ) : listing.dirs.length === 0 ? (
-                <p className="p-4 text-center text-xs text-muted">Bu klasörde alt klasör yok.</p>
+                <p className="p-4 text-center text-xs text-muted">No subfolders in this folder.</p>
               ) : (
                 <ul>
                   {listing.dirs.map((d) => (
@@ -76,15 +76,15 @@ export function FolderPicker() {
                 </ul>
               )}
             </div>
-            <p className="text-[11px] text-muted">Tıklayınca içine girer. Çift tıklayınca ya da aşağıdaki butonla seçilir.</p>
+            <p className="text-[11px] text-muted">Click to open. Double-click or use the button below to select.</p>
           </Modal.Body>
           <Modal.Footer className="flex items-center gap-2">
-            <span className="font-code min-w-0 flex-1 truncate text-xs text-muted">{listing?.path || "Bir klasöre gir"}</span>
+            <span className="font-code min-w-0 flex-1 truncate text-xs text-muted">{listing?.path || "Open a folder"}</span>
             <Button size="sm" variant="secondary" onPress={() => actions.closeFolderPicker()}>
-              Vazgeç
+              Cancel
             </Button>
             <Button size="sm" variant="primary" isDisabled={!listing?.path} onPress={() => choose(listing!.path)}>
-              Bu klasörü seç
+              Select this folder
             </Button>
           </Modal.Footer>
         </Modal.Dialog>

@@ -3,7 +3,7 @@ import { MessageCircleQuestion, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { actions, type PermissionReq } from "../../store";
 
-/** Claude bir aracı kullanmak için izin istediğinde sohbetin altında çıkar. */
+/** Shown below the chat when Claude requests permission to use a tool. */
 export function PermissionCard({ req }: { req: PermissionReq }) {
   if (req.toolName === "AskUserQuestion") return <QuestionCard req={req} />;
 
@@ -12,21 +12,21 @@ export function PermissionCard({ req }: { req: PermissionReq }) {
     <div className="rounded-xl border border-warning/50 bg-warning-soft p-3 text-sm">
       <div className="mb-1.5 flex items-center gap-2 font-medium text-warning-soft-foreground">
         <ShieldAlert size={16} />
-        {req.title || `${req.toolName} kullanmak istiyor`}
+        {req.title || `${req.toolName} wants to use`}
       </div>
       {req.description && <p className="mb-2 text-xs text-muted">{req.description}</p>}
       {preview && <pre className="font-code mb-2 max-h-40 overflow-auto rounded-md bg-surface p-2 text-xs">{preview}</pre>}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="primary" onPress={() => actions.respondPermission(req.requestId, true)}>
-          İzin ver
+          Allow
         </Button>
         {req.canAlwaysAllow && (
           <Button size="sm" variant="secondary" onPress={() => actions.respondPermission(req.requestId, true, true)}>
-            Her zaman izin ver
+            Always allow
           </Button>
         )}
         <Button size="sm" variant="ghost" onPress={() => actions.respondPermission(req.requestId, false)}>
-          Reddet
+          Deny
         </Button>
       </div>
     </div>
@@ -52,7 +52,7 @@ type Question = {
   options: { label: string; description?: string }[];
 };
 
-/** Claude'un seçenekli sorusu (AskUserQuestion). Cevaplar araca `answers` olarak geri gider. */
+/** Claude's multiple-choice question (AskUserQuestion). Answers are sent back to the tool as `answers`. */
 function QuestionCard({ req }: { req: PermissionReq }) {
   const questions = (Array.isArray(req.input.questions) ? req.input.questions : []) as Question[];
   const [picked, setPicked] = useState<Record<string, string[]>>({});
@@ -75,14 +75,14 @@ function QuestionCard({ req }: { req: PermissionReq }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-accent/40 bg-accent-soft p-3 text-sm">
       <div className="flex items-center gap-2 font-medium text-accent-soft-foreground">
-        <MessageCircleQuestion size={16} /> Claude soruyor
+        <MessageCircleQuestion size={16} /> Claude asks
       </div>
       {questions.map((q) => (
         <div key={q.question} className="flex flex-col gap-1.5">
           <div>
             {q.header && <span className="mr-2 rounded bg-surface px-1.5 py-0.5 text-[10px] uppercase text-muted">{q.header}</span>}
             <span className="font-medium">{q.question}</span>
-            {q.multiSelect && <span className="ml-1 text-xs text-muted">(birden fazla seçilebilir)</span>}
+            {q.multiSelect && <span className="ml-1 text-xs text-muted">(select multiple)</span>}
           </div>
           <div className="flex flex-col gap-1">
             {q.options.map((o) => {
@@ -105,7 +105,7 @@ function QuestionCard({ req }: { req: PermissionReq }) {
                 setOther({ ...other, [q.question]: e.target.value });
                 if (!q.multiSelect && e.target.value) setPicked({ ...picked, [q.question]: [] });
               }}
-              placeholder="Diğer (kendi cevabın)"
+              placeholder="Other (your answer)"
               className="rounded-lg border border-separator bg-surface px-2.5 py-1.5 outline-none focus:border-accent"
             />
           </div>
@@ -123,10 +123,10 @@ function QuestionCard({ req }: { req: PermissionReq }) {
             })
           }
         >
-          Cevapla
+          Answer
         </Button>
         <Button size="sm" variant="ghost" onPress={() => actions.respondPermission(req.requestId, false)}>
-          Geç
+          Skip
         </Button>
       </div>
     </div>

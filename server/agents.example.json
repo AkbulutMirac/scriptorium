@@ -6,7 +6,7 @@
       "provider": "deepseek",
       "model": "deepseek-flash",
       "color": "#4D6BFE",
-      "description": "Hızlı ve ucuz. Net tanımlı, kendi içinde kapalı kod görevleri; uzun belgeleri okuma (1M bağlam)."
+      "description": "Fast and cheap. Well-defined, self-contained coding tasks; reading long documents (1M context)."
     },
     {
       "id": "deepseek-pro",
@@ -14,7 +14,7 @@
       "provider": "deepseek",
       "model": "deepseek-v4-pro",
       "color": "#2B47D9",
-      "description": "Flash'tan pahalı ama daha güçlü. Zor kod ve akıl yürütme görevleri."
+      "description": "Pricier than Flash but stronger. Hard coding and reasoning tasks."
     }
   ]
 }

@@ -1,6 +1,6 @@
 /**
- * Scriptorium arka ucu: arayüzü sunar, WebSocket üzerinden Claude oturumlarını ve işçileri yönetir.
- * Sadece bu bilgisayardan erişilebilir (127.0.0.1) ve sadece kendi arayüzümüzün bağlanmasına izin verir.
+ * Scriptorium backend: serves the UI, manages Claude sessions and workers over WebSocket.
+ * Accessible only from this machine (127.0.0.1) and only allows our own UI to connect.
  */
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -33,7 +33,7 @@ import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
 
 const HOST = "127.0.0.1";
 const WEB_DIST = path.resolve(SERVER_ROOT, "../web/dist");
-/** Bağlanmasına izin verilen arayüz adresleri: derlenmiş arayüz ve Vite geliştirme sunucusu. */
+/** Allowed UI origins: the built UI and the Vite dev server. */
 const ALLOWED_ORIGINS = new Set([
   `http://localhost:${config.port}`,
   `http://127.0.0.1:${config.port}`,
@@ -41,7 +41,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://127.0.0.1:5173",
 ]);
 
-// ─── Yayın ─────────────────────────────────────────────────────────────────────
+// ─── Broadcast ──────────────────────────────────────────────────────────────────
 
 const clients = new Set<WebSocket>();
 
@@ -54,7 +54,7 @@ function reply(ws: WebSocket, msg: ServerMsg) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
-/** Her ajanın son durumu: arayüz yeniden bağlanınca 3D sahne doğru başlasın diye. */
+/** Last state of each agent: so the 3D scene starts correctly when the UI reconnects. */
 const lastActivity = new Map<string, AgentActivity>();
 bus.on("activity", (a) => {
   lastActivity.set(a.agentId, a);
@@ -63,7 +63,7 @@ bus.on("activity", (a) => {
 bus.on("jobs", () => broadcast({ type: "jobs", jobs: listJobs() }));
 bus.on("requests", () => broadcast({ type: "worker.requests", requests: listRequests() }));
 
-// ─── DeepSeek bakiyesi: açılışta, 5 dakikada bir ve her DeepSeek işinden sonra ─────
+// ─── DeepSeek balance: on startup, every 5 minutes, and after every DeepSeek job ─────
 let lastBalance: Awaited<ReturnType<typeof deepseekBalance>> | null = null;
 let balanceTimer: ReturnType<typeof setTimeout> | null = null;
 async function refreshBalance() {
@@ -71,7 +71,7 @@ async function refreshBalance() {
   broadcast({ type: "deepseek.balance", balance: lastBalance });
 }
 setInterval(refreshBalance, 5 * 60_000);
-// Bir DeepSeek isteği bitince (ya da hata verince) bakiyeyi yenile
+// Refresh the balance when a DeepSeek request finishes (or errors)
 let runningIds = new Map<string, string>();
 bus.on("requests", async () => {
   const now = new Map(listRequests().filter((r) => r.status === "running").map((r) => [r.id, r.workerId]));
@@ -81,10 +81,10 @@ bus.on("requests", async () => {
   const workers = await loadWorkers();
   if (!finished.some((id) => workers.find((w) => w.id === id)?.provider === "deepseek")) return;
   if (balanceTimer) clearTimeout(balanceTimer);
-  balanceTimer = setTimeout(refreshBalance, 2000); // harcama bakiyeye birkaç saniyede yansır
+  balanceTimer = setTimeout(refreshBalance, 2000); // spending reflects in the balance within a few seconds
 });
 
-// ─── Claude oturumları ─────────────────────────────────────────────────────────
+// ─── Claude sessions ────────────────────────────────────────────────────────────
 
 type ChatState = {
   session: ClaudeSession;
@@ -133,12 +133,12 @@ function openChat(
 ) {
   const existing = chats.get(chatId);
   if (!existing && opts.attachOnly) {
-    // Sayfa yenilendi ama oturum sunucuda açık değil: yeniden başlatma, ilk mesajda açılır
+    // Page was refreshed but the session isn't open on the server: don't restart, it opens on the first message
     broadcast({ type: "claude.closed", chatId });
     return;
   }
   if (existing) {
-    // Sayfa yenilendi: aynı oturuma yeniden bağlan
+    // Page was refreshed: reconnect to the same session
     if (existing.session.sessionId) broadcast({ type: "claude.session", chatId, sessionId: existing.session.sessionId });
     broadcast({ type: "claude.busy", chatId, busy: existing.busy });
     return;
@@ -185,7 +185,7 @@ function openChat(
         signal.addEventListener("abort", () => {
           if (!pending.delete(requestId)) return;
           broadcast({ type: "claude.permissionResolved", requestId });
-          resolve({ behavior: "deny", message: "İstek iptal edildi." });
+          resolve({ behavior: "deny", message: "Request cancelled." });
         });
       }),
   });
@@ -196,15 +196,15 @@ function openChat(
     .catch((err) => broadcast({ type: "claude.closed", chatId, error: err instanceof Error ? err.message : String(err) }))
     .finally(() => {
       if (chats.get(chatId) === state) chats.delete(chatId);
-      denyPendingOf(chatId, "Oturum kapandı.");
+      denyPendingOf(chatId, "Session closed.");
       updateClaudeActivity();
     });
 }
 
 /**
- * Model listesi, kullanım limitleri ve slash komutları için tek, boş bir yardımcı oturum.
- * Hiç mesaj göndermez ve var olan bir sohbeti devam ettirmez: geçmişteki bir sohbete sadece bakmak
- * o sohbeti ikinci bir süreçte açmasın diye.
+ * A single, empty helper session for the model list, usage limits, and slash commands.
+ * It never sends messages and never resumes an existing chat: just looking at a past chat
+ * so it doesn't open that chat in a second process.
  */
 let infoSession: ClaudeSession | null = null;
 function getInfoSession(): ClaudeSession {
@@ -213,7 +213,7 @@ function getInfoSession(): ClaudeSession {
       cwd: config.claudeCwd,
       workerTools: "http",
       onMessage: () => {},
-      canUseTool: async () => ({ behavior: "deny", message: "Bilgi oturumu araç kullanmaz." }),
+      canUseTool: async () => ({ behavior: "deny", message: "The info session does not use tools." }),
     });
     s.done.catch(() => {}).finally(() => {
       if (infoSession === s) infoSession = null;
@@ -225,11 +225,11 @@ function getInfoSession(): ClaudeSession {
 
 function chatOrThrow(chatId: string): ChatState {
   const c = chats.get(chatId);
-  if (!c) throw new Error("Bu sohbet açık değil. Sayfayı yenileyip tekrar dene.");
+  if (!c) throw new Error("This chat is not open. Refresh the page and try again.");
   return c;
 }
 
-// ─── İşçiler ───────────────────────────────────────────────────────────────────
+// ─── Workers ───────────────────────────────────────────────────────────────────
 
 async function workersWithAvailability(): Promise<WorkerInfo[]> {
   const workers = await loadWorkers();
@@ -238,7 +238,7 @@ async function workersWithAvailability(): Promise<WorkerInfo[]> {
 
 const workerAborts = new Map<string, AbortController>();
 
-// ─── Mesaj işleyici ───────────────────────────────────────────────────────────
+// ─── Message handler ───────────────────────────────────────────────────────────
 
 async function handle(ws: WebSocket, msg: ClientMsg) {
   switch (msg.type) {
@@ -267,13 +267,13 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       const dirs: string[] = [];
       for (const d of msg.dirs) {
         const ok = await stat(d).then((st) => st.isDirectory()).catch(() => false);
-        if (!ok) throw new Error(`Klasör bulunamadı: ${d}`);
+        if (!ok) throw new Error(`Folder not found: ${d}`);
         dirs.push(d);
       }
       const c = chats.get(msg.chatId);
       if (c) {
-        if (c.busy) throw new Error("Claude çalışırken klasör eklenemez. Bitmesini bekle.");
-        // Ek klasörler oturum açılırken verilir: oturumu kaldığı yerden yeni klasörlerle yeniden aç
+        if (c.busy) throw new Error("Cannot add folders while Claude is working. Wait for it to finish.");
+        // Additional folders are given when the session opens: reopen the session from where it left off with the new folders
         const sessionId = c.session.sessionId;
         chats.delete(msg.chatId);
         c.session.close();
@@ -301,7 +301,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "claude.interrupt": {
       const c = chatOrThrow(msg.chatId);
-      denyPendingOf(msg.chatId, "Kullanıcı durdurdu.");
+      denyPendingOf(msg.chatId, "Stopped by user.");
       await c.session.interrupt();
       return;
     }
@@ -310,7 +310,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       const c = chats.get(msg.chatId);
       if (!c) return;
       chats.delete(msg.chatId);
-      denyPendingOf(msg.chatId, "Oturum kapandı.");
+      denyPendingOf(msg.chatId, "Session closed.");
       c.session.close();
       updateClaudeActivity();
       return;
@@ -329,7 +329,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       p.resolve(
         msg.allow
           ? { behavior: "allow", updatedInput: msg.updatedInput ?? p.input, updatedPermissions: msg.always ? p.suggestions : undefined }
-          : { behavior: "deny", message: "Kullanıcı izin vermedi." },
+          : { behavior: "deny", message: "Permission denied by user." },
       );
       broadcast({ type: "claude.permissionResolved", requestId: msg.requestId });
       return;
@@ -338,7 +338,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
     case "claude.sessions": {
       const toSummary = (s: Awaited<ReturnType<typeof listSessions>>[number]): SessionSummary => ({
         id: s.sessionId,
-        title: s.customTitle || s.summary || s.firstPrompt || "Adsız sohbet",
+        title: s.customTitle || s.summary || s.firstPrompt || "Untitled chat",
         updatedAt: s.lastModified,
         cwd: s.cwd,
         gitBranch: s.gitBranch,
@@ -458,7 +458,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "setup.claudeLogin":
       claudeLogin();
-      return reply(ws, { type: "setup.result", action: "claudeLogin", ok: true, message: "Tarayıcıda giriş sayfası açıldı." });
+      return reply(ws, { type: "setup.result", action: "claudeLogin", ok: true, message: "Login page opened in your browser." });
 
     case "setup.deepseekKey":
       try {
@@ -466,7 +466,7 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       } catch (err) {
         return reply(ws, { type: "setup.result", action: "deepseekKey", ok: false, message: err instanceof Error ? err.message : String(err) });
       }
-      reply(ws, { type: "setup.result", action: "deepseekKey", ok: true, message: "Anahtar kaydedildi." });
+      reply(ws, { type: "setup.result", action: "deepseekKey", ok: true, message: "Key saved." });
       broadcast({ type: "workers", workers: await workersWithAvailability() });
       await refreshBalance();
       return reply(ws, { type: "setup.status", status: await setupStatus() });
@@ -484,12 +484,12 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
     }
 
     case "app.shutdown":
-      console.log("Arayüzden kapatıldı.");
+      console.log("Shut down from the UI.");
       return shutdown();
   }
 }
 
-// ─── HTTP: derlenmiş arayüzü sun ───────────────────────────────────────────────
+// ─── HTTP: serve the built UI ───────────────────────────────────────────────────
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -506,7 +506,7 @@ const MIME: Record<string, string> = {
 async function serveStatic(req: IncomingMessage, res: ServerResponse) {
   if (!existsSync(WEB_DIST)) {
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    res.end("Arayüz henüz derlenmemiş.\nGeliştirme: npm run dev  (http://localhost:5173)\nDerleme: npm run build, sonra npm start");
+    res.end("The UI has not been built yet.\nDevelopment: npm run dev  (http://localhost:5173)\nBuild: npm run build, then npm start");
     return;
   }
   const urlPath = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
@@ -538,7 +538,7 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({
   server,
   path: "/ws",
-  maxPayload: 60 * 1024 * 1024, // ek dosyalar için
+  maxPayload: 60 * 1024 * 1024, // for attachments
   verifyClient: ({ origin }: { origin?: string }) => !!origin && ALLOWED_ORIGINS.has(origin),
 });
 
@@ -550,7 +550,7 @@ wss.on("connection", async (ws) => {
     try {
       msg = JSON.parse(raw.toString());
     } catch {
-      return reply(ws, { type: "error", message: "Geçersiz mesaj." });
+      return reply(ws, { type: "error", message: "Invalid message." });
     }
     try {
       await handle(ws, msg);
@@ -569,7 +569,7 @@ wss.on("connection", async (ws) => {
 });
 
 server.listen(config.port, HOST, () => {
-  console.log(`Scriptorium arka ucu: http://localhost:${config.port}  (Claude klasörü: ${config.claudeCwd})`);
+  console.log(`Scriptorium backend: http://localhost:${config.port}  (Claude folder: ${config.claudeCwd})`);
 });
 
 function shutdown() {

@@ -5,7 +5,7 @@ import { diffLineClass } from "../lib/diff";
 import { actions, useApp } from "../store";
 import { CopyButton, Markdown } from "./chat/Markdown";
 
-/** Uzun içerik (kod, diff, araç çıktısı) 3D sahnenin üstünde büyük açılır */
+/** Long content (code, diff, tool output) opens large above the 3D scene */
 export function ExpandOverlay() {
   const overlay = useApp((s) => s.overlay);
 
@@ -24,7 +24,7 @@ export function ExpandOverlay() {
         <div className="flex items-center gap-2 border-b border-separator px-3 py-2">
           <span className="font-code min-w-0 flex-1 truncate text-sm font-medium">{overlay.title}</span>
           <CopyButton text={overlay.body} />
-          <Button isIconOnly size="sm" variant="ghost" aria-label="Kapat" onPress={() => actions.showOverlay(null)}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="Close" onPress={() => actions.showOverlay(null)}>
             <X size={16} />
           </Button>
         </div>

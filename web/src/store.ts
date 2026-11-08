@@ -29,10 +29,10 @@ import type {
 
 export const CLAUDE_ID = "claude";
 
-/** Claude Code'un arka plan görevi (task_started / task_updated / task_notification olaylarından) */
+/** Claude Code's background task (from task_started / task_updated / task_notification events) */
 export type ClaudeTask = { id: string; description: string; status: string; error?: string; summary?: string };
 
-/** Oturum açılırken (init) gelen bilgiler */
+/** Info received when the session opens (init) */
 export type ClaudeInit = {
   version: string;
   slashCommands: string[];
@@ -44,10 +44,10 @@ export type ClaudeInit = {
 export type ClaudeChat = {
   chatId: string;
   sessionId?: string;
-  /** Yan sohbet: ilk mesajda bu oturumdan çatallanır */
+  /** Side chat: forks from this session on the first message */
   forkFrom?: string;
   isSide: boolean;
-  /** Sunucuda Claude Code süreci açık mı */
+  /** Whether the Claude Code process is open on the server */
   opened: boolean;
   busy: boolean;
   items: ChatItem[];
@@ -55,7 +55,7 @@ export type ClaudeChat = {
   streamThinking: string;
   model?: string;
   permissionMode?: PermissionMode;
-  /** Kullanıcının seçtiği ama henüz sunucuya iletilmemiş ayarlar */
+  /** Settings the user selected but not yet sent to the server */
   wantModel?: string;
   wantMode?: PermissionMode;
   effort?: EffortLevel;
@@ -63,7 +63,7 @@ export type ClaudeChat = {
   fastMode?: boolean;
   wantFast?: boolean;
   cwd: string;
-  /** Claude'un erişebileceği ek klasörler */
+  /** Additional folders Claude can access */
   dirs: string[];
   loadingHistory: boolean;
   init?: ClaudeInit;
@@ -79,13 +79,13 @@ export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: numb
 type State = {
   connection: ConnectionStatus;
   serverCwd: string;
-  /** Yeni Claude sohbetlerinin çalışacağı klasör (boşsa sunucunun varsayılanı) */
+  /** Folder where new Claude chats will run (server default if empty) */
   cwd: string;
   workers: WorkerInfo[];
   activity: Record<string, AgentActivity>;
-  /** İşçilere giden istekler (bütün Claude oturumlarından ve doğrudan sohbetlerden) */
+  /** Requests going to workers (from all Claude sessions and direct chats) */
   workerRequests: WorkerRequest[];
-  /** 3D ofiste hangi işi hangi işçi kopyası yapıyor */
+  /** Which worker copy is doing which job in the 3D office */
   workerCopies: CopyState;
   jobs: JobInfo[];
   selected: string;
@@ -99,28 +99,28 @@ type State = {
   workerChatLists: Record<string, WorkerChatSummary[]>;
   workerChats: Record<string, LiveWorkerChat>;
   activeWorkerChat: Record<string, string | undefined>;
-  /** İşçi başına sohbet ayarları (model, düşünme, sıcaklık, JSON, sistem talimatı) */
+  /** Per-worker chat settings (model, thinking, temperature, JSON, system prompt) */
   workerSettings: Record<string, WorkerSettings>;
   workerModels: Record<string, WorkerModel[]>;
 
-  /** Sohbet paneline göre alıntı: Claude için chatId, işçi için "w:<id>" */
+  /** Quote per chat panel: chatId for Claude, "w:<id>" for a worker */
   quotes: Record<string, string | undefined>;
   overlay: Overlay | null;
   workerModal: { open: boolean; worker?: WorkerInfo };
-  /** İlk kurulum penceresi */
+  /** Initial setup window */
   setup: { open: boolean; status?: SetupStatus; busy?: SetupAction };
   ui: UiPrefs;
   git: Record<string, GitInfo>;
-  /** Bilinen proje klasörleri (oturumu olanlar + projeler klasörü) */
+  /** Known project folders (those with sessions + the projects folder) */
   projects: ProjectInfo[];
-  /** Tüm projelerin Claude oturumları (geçmiş panelinde projelere göre gruplanır) */
+  /** Claude sessions of all projects (grouped by project in the history panel) */
   allSessions: SessionSummary[];
   deepseekBalance?: DeepSeekBalance;
-  /** Sohbetten bağımsız bilgi: modeller, kullanım limitleri, komutlar */
+  /** Chat-independent info: models, usage limits, commands */
   globalInfo?: ClaudeInfo;
-  /** Bilgi panelinde açılıp görünür kılınacak bölüm ("Tümünü gör" gibi) */
+  /** Section to open and reveal in the info panel (like "See all") */
   infoFocus: { section: string; n: number } | null;
-  /** Klasör gezgini */
+  /** Folder browser */
   folderPicker: { open: boolean; purpose: "cwd" | "dir"; chatId?: string; listing?: DirListing };
 };
 
@@ -163,19 +163,19 @@ export const useApp = create<State>(() => ({
 const get = useApp.getState;
 const set = useApp.setState;
 
-// Her işçide en son açık olan sohbet hatırlanır: uygulama açılınca kaldığın sohbet gelir
+// The last open chat is remembered per worker: on app launch you return to the chat you left
 useApp.subscribe((s, prev) => {
   if (s.activeWorkerChat !== prev.activeWorkerChat) save("activeWorkerChat", s.activeWorkerChat);
 });
 
-/** İşçinin sohbet listesini ve en son açık sohbetini yükler */
+/** Loads the worker's chat list and its last open chat */
 function loadWorker(workerId: string) {
   socket.send({ type: "worker.chats", workerId });
   const chatId = get().activeWorkerChat[workerId];
   if (chatId && !get().workerChats[chatId]) socket.send({ type: "worker.chat", chatId });
 }
 
-// ─── Yardımcılar ───────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 function updateChat(chatId: string, fn: (c: ClaudeChat) => ClaudeChat) {
   const c = get().chats[chatId];
@@ -219,7 +219,7 @@ function refreshSessions() {
   socket.send({ type: "claude.sessions", all: true });
 }
 
-/** Sunucuda hâlâ açıksa sohbete yeniden bağlanır; değilse hiçbir şey başlatmaz (sayfa yenilenince / yeniden bağlanınca). */
+/** Reattaches to the chat if it's still open on the server; otherwise starts nothing (on page refresh / reconnect). */
 function reattach(chatId: string) {
   const c = get().chats[chatId];
   if (!c) return;
@@ -227,7 +227,7 @@ function reattach(chatId: string) {
   updateChat(chatId, (x) => ({ ...x, opened: true }));
 }
 
-/** Sohbetin Claude Code sürecini gerekiyorsa açar (ilk mesajda). */
+/** Opens the chat's Claude Code process if needed (on the first message). */
 function ensureOpen(chatId: string) {
   const c = get().chats[chatId];
   if (!c || c.opened) return;
@@ -255,7 +255,7 @@ function closeChat(chatId: string | null) {
   set({ chats, permissions: get().permissions.filter((p) => p.chatId !== chatId) });
 }
 
-// ─── Sunucu mesajları ──────────────────────────────────────────────────────────
+// ─── Server messages ──────────────────────────────────────────────────────────
 
 function onServer(msg: ServerMsg) {
   const s = get();
@@ -263,7 +263,7 @@ function onServer(msg: ServerMsg) {
     case "welcome": {
       socket.send({ type: "projects.list" });
       socket.send({ type: "claude.globalInfo" });
-      // Sohbet, sunucunun varsayılan klasörü gelmeden açılmış olabilir: boş klasörleri doldur
+      // The chat may have opened before the server's default folder arrived: fill in empty folders
       const chats = Object.fromEntries(Object.entries(s.chats).map(([id, c]) => [id, c.cwd ? c : { ...c, cwd: msg.cwd }]));
       set({ serverCwd: msg.cwd, chats });
       refreshSessions();
@@ -350,8 +350,8 @@ function onServer(msg: ServerMsg) {
     case "git.diff":
       set({
         overlay: {
-          title: msg.file ? `Değişiklik: ${msg.file}` : "Tüm değişiklikler",
-          body: msg.diff || "Değişiklik yok.",
+          title: msg.file ? `Change: ${msg.file}` : "All changes",
+          body: msg.diff || "No changes.",
           mono: true,
           diff: true,
         },
@@ -372,7 +372,7 @@ function onServer(msg: ServerMsg) {
         ...c,
         opened: false,
         busy: false,
-        items: msg.error ? [...c.items, { kind: "notice", id: uuid(), text: `Claude Code oturumu kapandı: ${msg.error}`, tone: "danger" }] : c.items,
+        items: msg.error ? [...c.items, { kind: "notice", id: uuid(), text: `Claude Code session closed: ${msg.error}`, tone: "danger" }] : c.items,
       }));
       return;
 
@@ -391,7 +391,7 @@ function onServer(msg: ServerMsg) {
     case "claude.history":
       for (const c of Object.values(s.chats)) {
         if (c.sessionId === msg.sessionId && c.loadingHistory) {
-          // Oturum başka bir klasöre aitse doğru klasörde devam ettirilsin
+          // If the session belongs to another folder, continue it in the correct folder
           const cwd = msg.cwd && !c.opened ? msg.cwd : c.cwd;
           updateChat(c.chatId, (x) => ({ ...x, items: historyToItems(msg.messages), loadingHistory: false, cwd }));
           if (cwd !== c.cwd) socket.send({ type: "git.info", cwd });
@@ -438,7 +438,7 @@ function onServer(msg: ServerMsg) {
 
     case "worker.requests": {
       set({ workerRequests: msg.requests, workerCopies: assignCopies(s.workerCopies, msg.requests, Date.now()) });
-      // Odadan çıkan kopyalar yürüyüp gittikten sonra silinsin
+      // Copies leaving the room should be removed after they walk away
       if (Object.values(get().workerCopies.copies).some((c) => c.leavingAt)) {
         setTimeout(() => set({ workerCopies: assignCopies(get().workerCopies, get().workerRequests, Date.now()) }), LEAVE_MS + 50);
       }
@@ -459,7 +459,7 @@ function onServer(msg: ServerMsg) {
 
     case "setup.result":
       set({ setup: { ...s.setup, busy: undefined } });
-      if (!msg.ok) toast.danger(msg.message ?? "Olmadı.");
+      if (!msg.ok) toast.danger(msg.message ?? "Failed.");
       else if (msg.message) toast.success(msg.message);
       return;
 
@@ -469,7 +469,7 @@ function onServer(msg: ServerMsg) {
   }
 }
 
-// ─── Bağlantı ──────────────────────────────────────────────────────────────────
+// ─── Connection ──────────────────────────────────────────────────────────────────
 
 let started = false;
 
@@ -481,23 +481,23 @@ export function startConnection() {
   socket.onOpen(() => {
     const { mainChatId, chats, selected } = get();
     if (!mainChatId) {
-      // Kapatırken açık olan sohbet geri gelir; seçili ajan (Claude ya da bir işçi) değişmez
+      // The chat that was open on close comes back; the selected agent (Claude or a worker) doesn't change
       if (savedMain?.sessionId) actions.openClaudeSession(savedMain.sessionId, savedMain.chatId, true);
       else actions.newClaudeChat(undefined, true);
     } else {
-      // Yeniden bağlandık: açık sohbetlere yeniden bağlan (sunucu yeniden başladıysa oturum devam ettirilir)
+      // Reconnected: reattach to open chats (session is resumed if the server restarted)
       for (const c of Object.values(chats)) {
         if (c.opened) reattach(c.chatId);
       }
     }
     if (selected !== CLAUDE_ID) loadWorker(selected);
-    // İlk açılışta kurulum penceresi (Kurulum'a Ayarlar menüsünden her zaman dönülebilir)
+    // Setup window on first launch (Setup can always be reopened from the Settings menu)
     if (!load("setupDone", false)) actions.openSetup();
   });
   socket.connect();
 }
 
-// ─── Eylemler ──────────────────────────────────────────────────────────────────
+// ─── Actions ──────────────────────────────────────────────────────────────────
 
 export const actions = {
   selectAgent(id: string) {
@@ -520,7 +520,7 @@ export const actions = {
 
   // Claude ─────────────────────────────────────
 
-  /** Yeni Claude sohbeti. cwd verilirse o klasörde açılır ve varsayılan klasör olarak hatırlanır. */
+  /** New Claude chat. If cwd is given, it opens in that folder and is remembered as the default folder. */
   newClaudeChat(cwd?: string, keepSelection = false) {
     const prev = get().chats[get().mainChatId ?? ""];
     closeChat(get().sideChatId);
@@ -533,7 +533,7 @@ export const actions = {
     persistMain();
   },
 
-  /** Henüz başlamamış sohbetin klasörünü değiştirir; başlamışsa o klasörde yeni sohbet açar. */
+  /** Changes the folder of a chat that hasn't started yet; if it has started, opens a new chat in that folder. */
   setChatCwd(chatId: string, cwd: string) {
     const c = get().chats[chatId];
     if (!c) return;
@@ -541,7 +541,7 @@ export const actions = {
       actions.newClaudeChat(cwd);
       return;
     }
-    // Henüz mesaj yok: önceden açılmış boş oturumu kapat, ilk mesajda yeni klasörde açılır
+    // No messages yet: close the previously opened empty session, it will open in the new folder on the first message
     if (c.opened) socket.send({ type: "claude.close", chatId });
     actions.setCwd(cwd);
     updateChat(chatId, (x) => ({ ...x, cwd, opened: false, info: undefined, init: undefined }));
@@ -562,7 +562,7 @@ export const actions = {
     updateChat(chatId, (x) => ({ ...x, fastMode: on, wantFast: on }));
   },
 
-  /** Arka planda çalışan sunucuyu kapatır (kısayol pencere açmadan çalıştırıyor) */
+  /** Shuts down the server running in the background (the shortcut runs it without opening a window) */
   shutdownServer() {
     socket.send({ type: "app.shutdown" });
   },
@@ -588,7 +588,7 @@ export const actions = {
     set({ folderPicker: { open: false, purpose: "cwd" } });
   },
 
-  /** Geçmişteki bir oturumu açar. reattach=true: sayfa yenilendi, sunucuda hâlâ açık olabilir. */
+  /** Opens a session from history. reattach=true: the page was refreshed, it may still be open on the server. */
   openClaudeSession(sessionId: string, chatId = uuid(), reattachToServer = false) {
     if (get().chats[get().mainChatId ?? ""]?.sessionId === sessionId && !reattachToServer) return;
     closeChat(get().sideChatId);
@@ -615,8 +615,8 @@ export const actions = {
   },
 
   /**
-   * Bilgi paneli ve menüler için verileri iste. Sohbeti açmaz: geçmişteki bir sohbete bakmak onu
-   * yeniden başlatmasın. Sohbet açık değilse modeller, kullanım ve komutlar ortak bilgiden gelir.
+   * Request data for the info panel and menus. Doesn't open the chat: viewing a chat from history shouldn't
+   * restart it. If the chat isn't open, models, usage and commands come from the shared info.
    */
   requestInfo(chatId: string) {
     const c = get().chats[chatId];
@@ -676,7 +676,7 @@ export const actions = {
   openSideChat(quote?: string) {
     const main = get().chats[get().mainChatId ?? ""];
     if (!main?.sessionId) {
-      toast.warning("Yan sohbet için önce ana sohbette bir mesaj gönder.");
+      toast.warning("Send a message in the main chat first to start a side chat.");
       return;
     }
     closeChat(get().sideChatId);
@@ -690,7 +690,7 @@ export const actions = {
         {
           kind: "notice",
           id: uuid(),
-          text: "Yan sohbet: ana sohbetin bu ana kadarki bağlamını biliyor. Burada konuşulanlar ana sohbete karışmaz.",
+          text: "Side chat: it knows the main chat's context up to this point. Messages here don't affect the main chat.",
           tone: "info",
         },
       ],
@@ -708,7 +708,7 @@ export const actions = {
     setTimeout(refreshSessions, 300);
   },
 
-  /** Birden çok sohbeti kalıcı olarak siler (klasöre ve dosyalara dokunmaz) */
+  /** Permanently deletes multiple chats (doesn't touch folders or files) */
   deleteSessions(ids: string[]) {
     for (const id of ids) socket.send({ type: "claude.delete", sessionId: id });
     if (ids.includes(get().chats[get().mainChatId ?? ""]?.sessionId ?? "")) actions.newClaudeChat();
@@ -723,7 +723,7 @@ export const actions = {
 
   refreshSessions,
 
-  // İşçiler ────────────────────────────────────
+  // Workers ────────────────────────────────────
 
   newWorkerChat(workerId: string) {
     set({ activeWorkerChat: { ...get().activeWorkerChat, [workerId]: undefined } });
@@ -743,7 +743,7 @@ export const actions = {
       : {
           id: chatId,
           workerId,
-          title: (text || attachments[0]?.name || "Sohbet").slice(0, 60),
+          title: (text || attachments[0]?.name || "Chat").slice(0, 60),
           updatedAt: Date.now(),
           messages: [user],
           busy: true,
@@ -791,13 +791,13 @@ export const actions = {
     socket.send({ type: "workers.delete", workerId });
   },
 
-  // Arayüz ─────────────────────────────────────
+  // Interface ─────────────────────────────────────
 
   setQuote(key: string, quote: string | undefined) {
     set({ quotes: { ...get().quotes, [key]: quote } });
   },
 
-  /** Bilgi panelini açıp bir bölümüne odaklan */
+  /** Open the info panel and focus on a section */
   focusInfo(section: string) {
     actions.setUi({ infoOpen: true });
     set({ infoFocus: { section, n: Date.now() }, selected: CLAUDE_ID });
@@ -812,7 +812,7 @@ export const actions = {
     socket.send({ type: "setup.status" });
   },
 
-  /** Pencereyi açmadan kurulum durumunu tazeler (işçi penceresindeki Ollama model önerileri için) */
+  /** Refreshes setup status without opening the window (for Ollama model suggestions in the worker window) */
   loadSetupStatus() {
     socket.send({ type: "setup.status" });
   },
@@ -839,17 +839,17 @@ export const actions = {
   },
 };
 
-/** Ajan adı ve rengi (Claude dahil) */
+/** Agent name and color (including Claude) */
 export function agentMeta(id: string, workers: WorkerInfo[]): { name: string; color: string } {
   if (id === CLAUDE_ID) return { name: "Claude", color: "#D97757" };
   const w = workers.find((x) => x.id === id);
   return { name: w?.name ?? id, color: w?.color ?? "#888780" };
 }
 
-/** task_* olaylarını görev listesine işler */
+/** Applies task_* events to the task list */
 function updateTasks(tasks: Record<string, ClaudeTask>, m: Record<string, unknown>): Record<string, ClaudeTask> {
   const id = String(m.task_id);
-  const prev = tasks[id] ?? { id, description: "Görev", status: "running" };
+  const prev = tasks[id] ?? { id, description: "Task", status: "running" };
   if (m.subtype === "task_started") return { ...tasks, [id]: { ...prev, description: String(m.description ?? prev.description), status: "running" } };
   if (m.subtype === "task_updated") {
     const patch = (m.patch ?? {}) as { status?: string; description?: string; error?: string };

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { AgentActivity } from "./protocol.js";
 
-/** Uygulama içi olay yolu. WebSocket sunucusu bunları dinleyip arayüze iletir. */
+/** In-app event bus. The WebSocket server listens to these and forwards them to the UI. */
 export const bus = new EventEmitter<{
   activity: [AgentActivity];
   jobs: [];
@@ -11,7 +11,7 @@ export const bus = new EventEmitter<{
 const ERROR_VISIBLE_MS = 12_000;
 const errorTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-/** Ajan durumunu bildirir. Hata durumu bir süre görünür, sonra kendiliğinden "boşta"ya döner. */
+/** Reports agent status. The error state stays visible for a while, then automatically reverts to "idle". */
 export function reportActivity(a: AgentActivity) {
   clearTimeout(errorTimers.get(a.agentId));
   errorTimers.delete(a.agentId);

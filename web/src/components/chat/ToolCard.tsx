@@ -28,38 +28,38 @@ type Props = { name: string; input: Record<string, unknown>; result?: ToolResult
 const str = (v: unknown) => (typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v));
 const shortPath = (p: unknown) => str(p).replaceAll("\\", "/").split("/").slice(-3).join("/");
 
-/** Bilinen araçlar için başlık ve ikon */
+/** Title and icon for known tools */
 function describe(name: string, input: Record<string, unknown>): { icon: LucideIcon; title: string; detail?: string } {
   switch (name) {
     case "Read":
-      return { icon: FileText, title: "Okudu", detail: shortPath(input.file_path) };
+      return { icon: FileText, title: "Read", detail: shortPath(input.file_path) };
     case "Write":
-      return { icon: FilePlus, title: "Yazdı", detail: shortPath(input.file_path) };
+      return { icon: FilePlus, title: "Wrote", detail: shortPath(input.file_path) };
     case "Edit":
     case "MultiEdit":
-      return { icon: FilePen, title: "Düzenledi", detail: shortPath(input.file_path) };
+      return { icon: FilePen, title: "Edited", detail: shortPath(input.file_path) };
     case "NotebookEdit":
-      return { icon: FilePen, title: "Notebook düzenledi", detail: shortPath(input.notebook_path) };
+      return { icon: FilePen, title: "Edited notebook", detail: shortPath(input.notebook_path) };
     case "Bash":
     case "PowerShell":
-      return { icon: Terminal, title: str(input.description) || "Komut çalıştırdı", detail: truncate(str(input.command), 120) };
+      return { icon: Terminal, title: str(input.description) || "Ran command", detail: truncate(str(input.command), 120) };
     case "Grep":
-      return { icon: Search, title: "Aradı", detail: str(input.pattern) };
+      return { icon: Search, title: "Searched", detail: str(input.pattern) };
     case "Glob":
-      return { icon: FolderSearch, title: "Dosya aradı", detail: str(input.pattern) };
+      return { icon: FolderSearch, title: "Searched files", detail: str(input.pattern) };
     case "WebFetch":
-      return { icon: Globe, title: "Sayfa okudu", detail: str(input.url) };
+      return { icon: Globe, title: "Read page", detail: str(input.url) };
     case "WebSearch":
-      return { icon: Search, title: "Web'de aradı", detail: str(input.query) };
+      return { icon: Search, title: "Searched the web", detail: str(input.query) };
     case "TodoWrite":
-      return { icon: ListTodo, title: "Yapılacaklar listesi" };
+      return { icon: ListTodo, title: "To-do list" };
     case "Task":
     case "Agent":
-      return { icon: Bot, title: "Alt ajan", detail: str(input.description) };
+      return { icon: Bot, title: "Subagent", detail: str(input.description) };
     case "mcp__workers__list_workers":
-      return { icon: Users, title: "İşçilere baktı" };
+      return { icon: Users, title: "Checked workers" };
     case "mcp__workers__job_status":
-      return { icon: Users, title: "Arka plan işine baktı", detail: str(input.job_id) };
+      return { icon: Users, title: "Checked background job", detail: str(input.job_id) };
     default:
       return { icon: Wrench, title: name.replace(/^mcp__/, "").replaceAll("__", " · ") };
   }
@@ -94,13 +94,13 @@ function GenericToolCard({ name, input, result }: Props) {
         {d.detail && <span className="font-code min-w-0 flex-1 truncate text-xs text-muted">{d.detail}</span>}
         <span className="flex-1" />
         {pending && <Spinner size="sm" />}
-        {result?.isError && <span className="text-xs text-danger">hata</span>}
+        {result?.isError && <span className="text-xs text-danger">error</span>}
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-separator p-2.5">
-          {isEdit ? <EditPreview name={name} input={input} /> : <Block label="Girdi" text={JSON.stringify(input, null, 2)} />}
+          {isEdit ? <EditPreview name={name} input={input} /> : <Block label="Input" text={JSON.stringify(input, null, 2)} />}
           {result && (result.text || !result.images?.length) && (
-            <Block label={result.isError ? "Hata" : "Sonuç"} text={result.text || "(boş)"} danger={result.isError} />
+            <Block label={result.isError ? "Error" : "Result"} text={result.text || "(empty)"} danger={result.isError} />
           )}
           <Thumbs images={result?.images} />
         </div>
@@ -117,7 +117,7 @@ function Block({ label, text, danger }: { label: string; text: string; danger?: 
         <span>{label}</span>
         {long && (
           <button type="button" className="flex items-center gap-1 hover:text-foreground" onClick={() => actions.showOverlay({ title: label, body: text, mono: true })}>
-            <Maximize2 size={11} /> Ortada aç
+            <Maximize2 size={11} /> Open in center
           </button>
         )}
       </div>
@@ -128,7 +128,7 @@ function Block({ label, text, danger }: { label: string; text: string; danger?: 
   );
 }
 
-/** Edit/Write için basit kırmızı-yeşil fark görünümü */
+/** Simple red-green diff view for Edit/Write */
 function EditPreview({ name, input }: { name: string; input: Record<string, unknown> }) {
   const edits: { old: string; new: string }[] =
     name === "Write"
@@ -150,7 +150,7 @@ function EditPreview({ name, input }: { name: string; input: Record<string, unkn
           className="flex items-center gap-1 hover:text-foreground"
           onClick={() => actions.showOverlay({ title: shortPath(input.file_path), body: diffText, mono: true, diff: true })}
         >
-          <Maximize2 size={11} /> Ortada aç
+          <Maximize2 size={11} /> Open in center
         </button>
       </div>
       <pre className="font-code max-h-72 overflow-auto rounded-md bg-background-secondary p-2 text-xs">
@@ -172,7 +172,7 @@ function TodoCard({ input }: { input: Record<string, unknown> }) {
   return (
     <div className="rounded-lg border border-separator p-2.5 text-sm">
       <div className="mb-1.5 flex items-center gap-2 font-medium">
-        <ListTodo size={14} className="text-muted" /> Yapılacaklar
+        <ListTodo size={14} className="text-muted" /> To-dos
       </div>
       <ul className="flex flex-col gap-1">
         {todos.map((t, i) => (
@@ -188,7 +188,7 @@ function TodoCard({ input }: { input: Record<string, unknown> }) {
   );
 }
 
-/** Claude bir işi işçiye devrettiğinde gösterilen kart */
+/** Card shown when Claude delegates a task to a worker */
 function DelegationCard({ input, result, background }: { input: Record<string, unknown>; result?: ToolResult; background: boolean }) {
   const workers = useApp((s) => s.workers);
   const [open, setOpen] = useState(false);
@@ -205,18 +205,18 @@ function DelegationCard({ input, result, background }: { input: Record<string, u
       >
         <Send size={14} style={{ color: meta.color }} className="shrink-0" />
         <span className="min-w-0 max-w-[55%] shrink-0 truncate font-medium">
-          {meta.name}'e {background ? "arka plan işi verildi" : "devredildi"}
+          {meta.name}'e {background ? "background job assigned" : "delegated"}
         </span>
-        {input.sensitive === true && <span className="shrink-0 rounded bg-warning-soft px-1.5 text-[10px] text-warning-soft-foreground">hassas</span>}
+        {input.sensitive === true && <span className="shrink-0 rounded bg-warning-soft px-1.5 text-[10px] text-warning-soft-foreground">sensitive</span>}
         <span className="min-w-0 flex-1 truncate text-xs text-muted">{truncate(str(input.task), 90)}</span>
-        {!result ? <Spinner size="sm" /> : result.isError ? <span className="text-xs text-danger">hata</span> : <span className="text-xs text-success">bitti</span>}
+        {!result ? <Spinner size="sm" /> : result.isError ? <span className="text-xs text-danger">error</span> : <span className="text-xs text-success">done</span>}
         <ChevronRight size={14} className={`shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-separator p-2.5">
-          <Block label="Görev" text={str(input.task)} />
-          {files.length > 0 && <Block label="Gönderilen dosyalar" text={files.join("\n")} />}
-          {result && <Block label={result.isError ? "Hata" : `${meta.name} cevabı`} text={result.text} danger={result.isError} />}
+          <Block label="Task" text={str(input.task)} />
+          {files.length > 0 && <Block label="Sent files" text={files.join("\n")} />}
+          {result && <Block label={result.isError ? "Error" : `${meta.name} response`} text={result.text} danger={result.isError} />}
         </div>
       )}
     </div>

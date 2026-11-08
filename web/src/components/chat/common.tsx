@@ -1,7 +1,7 @@
 import { Label, ListBox, Select } from "@heroui/react";
 import { useEffect, useRef } from "react";
 
-/** Liste en alttayken yeni içerik gelince aşağı kaydırır; kullanıcı yukarı çıktıysa dokunmaz. */
+/** Scrolls down when new content arrives while the list is at the bottom; does nothing if the user has scrolled up. */
 export function useAutoScroll<T extends HTMLElement>(deps: unknown[]) {
   const ref = useRef<T>(null);
   const atBottom = useRef(true);
@@ -19,10 +19,10 @@ export function useAutoScroll<T extends HTMLElement>(deps: unknown[]) {
 
 export type Option = { value: string; label: string };
 
-/** Başlıktaki küçük seçiciler (model, izin modu) */
+/** Small selectors in the header (model, permission mode) */
 export function MiniSelect(props: { label: string; value: string; options: Option[]; onChange: (v: string) => void; className?: string }) {
   return (
-    // Boş değer ("varsayılan") liste anahtarı olarak "_" ile temsil edilir
+    // Empty value ("default") is represented by "_" as the list key
     <Select
       value={props.value || "_"}
       onChange={(k) => k != null && props.onChange(String(k) === "_" ? "" : String(k))}

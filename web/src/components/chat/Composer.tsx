@@ -5,7 +5,7 @@ import type { Attachment, SlashCommandInfo } from "../../protocol";
 import { actions, useApp } from "../../store";
 import { PlusMenu } from "./PlusMenu";
 
-/** Alıntıyı Markdown alıntısına çevirip mesajın başına ekler */
+/** Converts the quote to a Markdown quote and prepends it to the message */
 export function withQuote(text: string, quote?: string) {
   if (!quote) return text;
   const quoted = quote
@@ -18,17 +18,17 @@ export function withQuote(text: string, quote?: string) {
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const TEXT_EXT = /\.(txt|md|json|ya?ml|csv|tsv|xml|html?|css|scss|js|jsx|ts|tsx|py|java|c|cpp|h|cs|go|rs|rb|php|sh|ps1|bat|sql|toml|ini|env|log)$/i;
 
-/** Tarayıcı dosyasını Claude'a gönderilebilecek eke çevirir */
+/** Converts a browser file into an attachment that can be sent to Claude */
 async function toAttachment(file: File): Promise<Attachment | null> {
   if (file.size > MAX_FILE_BYTES) {
-    toast.warning(`${file.name} çok büyük (en fazla 10 MB).`);
+    toast.warning(`${file.name} is too large (max 10 MB).`);
     return null;
   }
   const isImage = /^image\/(png|jpeg|gif|webp)$/.test(file.type);
   const isPdf = file.type === "application/pdf";
   const isText = file.type.startsWith("text/") || TEXT_EXT.test(file.name) || file.type === "application/json";
   if (!isImage && !isPdf && !isText) {
-    toast.warning(`${file.name}: bu dosya türü desteklenmiyor (görsel, PDF ya da metin dosyası olmalı).`);
+    toast.warning(`${file.name}: this file type is not supported (must be an image, PDF, or text file).`);
     return null;
   }
   const data = await new Promise<string>((resolve, reject) => {
@@ -40,7 +40,7 @@ async function toAttachment(file: File): Promise<Attachment | null> {
   return { name: file.name, mediaType: isImage || isPdf ? file.type : "text/plain", data };
 }
 
-/** Komutları sorguya göre sıralar: baştan eşleşen > ":" sonrası eşleşen (plugin:komut) > içinde geçen */
+/** Ranks commands by query: prefix match > match after ":" (plugin:command) > substring match */
 function rankCommands(commands: SlashCommandInfo[], q: string): SlashCommandInfo[] {
   const score = (name: string) => {
     const n = name.toLowerCase();
@@ -61,11 +61,11 @@ export function Composer(props: {
   placeholder: string;
   busy: boolean;
   disabledReason?: string;
-  /** Verilirse "+" menüsü, ek dosyalar ve slash komut önerileri açılır (Claude sohbeti) */
+  /** If provided, the "+" menu, attachments and slash command suggestions are enabled (Claude chat) */
   claudeChatId?: string;
-  /** Yazma kutusunun altındaki çubuk (verilmezse kısa ipucu yazısı gösterilir) */
+  /** The bar below the input box (if not provided, a short hint text is shown) */
   footer?: React.ReactNode;
-  /** Claude dışında da ek dosya ve "+" menüsü (işçiler): menüyü çizen fonksiyon */
+  /** Attachments and "+" menu also outside Claude (workers): function that renders the menu */
   workerPlus?: (pickFiles: () => void) => React.ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
@@ -80,10 +80,10 @@ export function Composer(props: {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const claude = !!props.claudeChatId;
-  /** Ek dosya, yapıştırma ve sürükle-bırak: Claude'da ve işçilerde */
+  /** Attachments, paste and drag-and-drop: in Claude and workers */
   const canAttach = claude || !!props.workerPlus;
 
-  // Yükseklik içeriğe göre büyüsün (en fazla ~10 satır)
+  // Let the height grow with content (at most ~10 lines)
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -95,7 +95,7 @@ export function Composer(props: {
     if (quote) ref.current?.focus();
   }, [quote]);
 
-  // Slash komut önerileri: "/" ile başlayan, henüz boşluk içermeyen metin
+  // Slash command suggestions: text starting with "/" that does not yet contain a space
   const commands: SlashCommandInfo[] = useMemo(
     () => chat?.info?.commands ?? globalCommands ?? chat?.init?.slashCommands.map((name) => ({ name, description: "" })) ?? [],
     [chat?.info?.commands, globalCommands, chat?.init?.slashCommands],
@@ -123,7 +123,7 @@ export function Composer(props: {
   const send = () => {
     const t = text.trim();
     if ((!t && !attachments.length) || props.busy || props.disabledReason) return;
-    props.onSend(withQuote(t || "Ekteki dosyalara bak.", quote), attachments);
+    props.onSend(withQuote(t || "Look at the attached files.", quote), attachments);
     setText("");
     setAttachments([]);
     actions.setQuote(props.quoteKey, undefined);
@@ -140,7 +140,7 @@ export function Composer(props: {
       }}
     >
       {suggestions.length > 0 && (
-        <ul className="absolute bottom-full left-3 right-3 z-20 mb-1 overflow-hidden rounded-xl border border-separator bg-overlay p-1 shadow-lg" role="listbox" aria-label="Slash komutları">
+        <ul className="absolute bottom-full left-3 right-3 z-20 mb-1 overflow-hidden rounded-xl border border-separator bg-overlay p-1 shadow-lg" role="listbox" aria-label="Slash commands">
           {suggestions.map((c, i) => (
             <li key={c.name} role="option" aria-selected={i === slashIndex}>
               <button
@@ -162,7 +162,7 @@ export function Composer(props: {
         <div className="mb-2 flex items-start gap-2 rounded-lg bg-default-soft px-2.5 py-1.5 text-xs text-muted">
           <Quote size={13} className="mt-0.5 shrink-0" />
           <span className="line-clamp-3 min-w-0 flex-1 whitespace-pre-wrap">{quote}</span>
-          <button type="button" aria-label="Alıntıyı kaldır" onClick={() => actions.setQuote(props.quoteKey, undefined)} className="shrink-0 hover:text-foreground">
+          <button type="button" aria-label="Remove quote" onClick={() => actions.setQuote(props.quoteKey, undefined)} className="shrink-0 hover:text-foreground">
             <X size={13} />
           </button>
         </div>
@@ -180,7 +180,7 @@ export function Composer(props: {
                 <FileText size={13} className="shrink-0 text-muted" />
               )}
               <span className="truncate">{a.name}</span>
-              <button type="button" aria-label={`${a.name} ekini kaldır`} onClick={() => setAttachments(attachments.filter((_, j) => j !== i))} className="shrink-0 text-muted hover:text-foreground">
+              <button type="button" aria-label={`${a.name} remove attachment`} onClick={() => setAttachments(attachments.filter((_, j) => j !== i))} className="shrink-0 text-muted hover:text-foreground">
                 <X size={12} />
               </button>
             </span>
@@ -238,22 +238,22 @@ export function Composer(props: {
             }
           }}
           placeholder={props.disabledReason ?? props.placeholder}
-          aria-label="Mesaj"
+          aria-label="Message"
           className="max-h-60 min-h-6 flex-1 resize-none bg-transparent px-1 py-1 text-[0.9375rem] outline-none placeholder:text-field-placeholder"
         />
         {props.busy ? (
           <Tooltip delay={300}>
-            <Button isIconOnly size="sm" variant="danger" aria-label="Durdur" onPress={props.onStop}>
+            <Button isIconOnly size="sm" variant="danger" aria-label="Stop" onPress={props.onStop}>
               <Square size={14} fill="currentColor" />
             </Button>
-            <Tooltip.Content>Durdur</Tooltip.Content>
+            <Tooltip.Content>Stop</Tooltip.Content>
           </Tooltip>
         ) : (
           <Button
             isIconOnly
             size="sm"
             variant="primary"
-            aria-label="Gönder"
+            aria-label="Send"
             isDisabled={(!text.trim() && !attachments.length) || !!props.disabledReason}
             onPress={send}
           >
@@ -274,11 +274,11 @@ export function Composer(props: {
       />
       {props.footer ?? (
       <p className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-muted">
-        Enter gönderir, Shift+Enter yeni satır
+        Enter sends, Shift+Enter for a new line
         {claude && (
           <>
             {" "}
-            · <span className="font-code">/</span> komutlar · <ImageIcon size={11} /> yapıştır veya sürükle
+            · <span className="font-code">/</span> commands · <ImageIcon size={11} /> paste or drag
           </>
         )}
       </p>

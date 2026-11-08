@@ -2,25 +2,25 @@ import type { CopyState } from "../../lib/workerCopies";
 import type { AgentActivity, WorkerInfo, WorkerRequest } from "../../protocol";
 import { DESKS_PER_ROW, LOUNGE_SEATS, SEAT_HEIGHT, type Seat, type Vec3, type Workstation } from "./layout";
 
-/** working: masada yazıyor · reading: kitap okuyor · sleeping: masada uyukluyor · error: hata · leaving: işi bitti, çıkıyor */
+/** working: typing at the desk · reading: reading a book · sleeping: dozing at the desk · error: error · leaving: done, leaving */
 export type Pose = "working" | "reading" | "sleeping" | "error" | "leaving";
 
-/** Sahnedeki bir işçi karakteri: asıl işçi (copy 1) ya da aynı anda gelen başka bir iş için kopyası */
+/** A worker character on stage: the main worker (copy 1) or a copy for another job arriving at the same time */
 export type WorkerFigure = {
-  /** "deepseek" ya da "deepseek#2" */
+  /** "deepseek" or "deepseek#2" */
   key: string;
   worker: WorkerInfo;
   copy: number;
   pose: Pose;
   seat: Seat;
-  /** Kopyanın odaya girdiği yer (asıl işçi için yok) */
+  /** Where the copy enters the room (none for the main worker) */
   spawn?: Vec3;
   request?: WorkerRequest;
-  /** Bu işçinin sırada bekleyen işleri */
+  /** Jobs queued for this worker */
   queued: number;
 };
 
-/** Ek masa sayısı: kopyalar için gerektiği kadar, en az bir tane, son sırayı dolduracak şekilde */
+/** Extra desk count: as many as needed for copies, at least one, filling the last row */
 export function hotDeskCount(workerCount: number, copies: CopyState): number {
   const needed = Math.max(0, ...Object.values(copies.copies).map((c) => c.desk + 1));
   const total = Math.ceil((workerCount + Math.max(1, needed)) / DESKS_PER_ROW) * DESKS_PER_ROW;
@@ -28,8 +28,8 @@ export function hotDeskCount(workerCount: number, copies: CopyState): number {
 }
 
 /**
- * Kim nerede: işi olan asıl işçi kendi masasında, kopyalar ek masalarda; boştakiler sırayla
- * dinlenme köşesinde (yer kalmazsa masasında uyukluyor). Kopyalar odanın ön tarafından girip çıkar.
+ * Who is where: the main worker with a job at their own desk, copies at extra desks; idle ones in turn
+ * in the lounge corner (dozing at their desk if no room). Copies enter and exit from the front of the room.
  */
 export function computeFigures(
   workers: WorkerInfo[],
@@ -74,7 +74,7 @@ export function computeFigures(
   return figures;
 }
 
-/** Claude hep baş masasında: boştayken orada kitap okur */
+/** Claude is always at the head desk: reads a book there when idle */
 export function claudePose(a?: AgentActivity): Pose {
   return a?.status === "working" ? "working" : a?.status === "error" ? "error" : "reading";
 }

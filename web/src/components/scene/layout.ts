@@ -1,18 +1,18 @@
 export type Vec3 = [number, number, number];
 
-/** Karakterin oturduğu yer ve baktığı yön (y ekseni dönüşü; 0 = kameraya doğru, +z) */
+/** Where the character sits and the direction they face (y-axis rotation; 0 = toward the camera, +z) */
 export type Seat = { pos: Vec3; rot: number };
 
 export type Workstation = { desk: Vec3; seat: Seat };
 
-/** Oda: sol duvar x = -ROOM_HALF_X, arka duvar z = ROOM_BACK_Z. Ön ve sağ taraf açık (izometrik kesit). */
+/** Room: left wall x = -ROOM_HALF_X, back wall z = ROOM_BACK_Z. Front and right sides are open (isometric cutaway). */
 export const ROOM_HALF_X = 7.5;
 export const ROOM_BACK_Z = -6;
 
-/** Oturunca karakterin yerden yüksekliği */
+/** Height of the character from the ground when seated */
 export const SEAT_HEIGHT = 0.18;
 
-/** Baş yazıcının masası: arka duvarın önünde, raflarla çevrili */
+/** Head writer's desk: in front of the back wall, surrounded by shelves */
 export const CLAUDE_STATION: Workstation = { desk: [-3, 0, -3.95], seat: { pos: [-3, SEAT_HEIGHT, -4.75], rot: 0 } };
 
 const COLUMNS = [-4.6, -1.4, 1.8];
@@ -20,7 +20,7 @@ export const DESKS_PER_ROW = COLUMNS.length;
 const FIRST_ROW_Z = -1.0;
 const ROW_GAP = 3.0;
 
-/** İşçi masaları: sıra sıra, her sırada üç masa. Herkes kameraya dönük çalışır. */
+/** Worker desks: row by row, three desks per row. Everyone works facing the camera. */
 export function workstations(count: number): Workstation[] {
   return Array.from({ length: count }, (_, i) => {
     const x = COLUMNS[i % COLUMNS.length];
@@ -29,13 +29,13 @@ export function workstations(count: number): Workstation[] {
   });
 }
 
-/** Odanın ön kenarı (işçi sayısı arttıkça oda uzar) */
+/** Front edge of the room (the room grows longer as the number of workers increases) */
 export function roomFrontZ(count: number) {
   const rows = Math.max(1, Math.ceil(count / COLUMNS.length));
   return Math.max(5.5, FIRST_ROW_Z + (rows - 1) * ROW_GAP + 2.8);
 }
 
-/** Dinlenme köşesi (sağ arka): boştaki işçiler burada oturup kitap okur */
+/** Lounge corner (back right): idle workers sit here and read books */
 export const LOUNGE_SEATS: Seat[] = [
   { pos: [4.25, SEAT_HEIGHT + 0.05, -4.95], rot: 0 },
   { pos: [5.3, SEAT_HEIGHT + 0.05, -4.95], rot: 0 },
@@ -45,7 +45,7 @@ export const LOUNGE_SEATS: Seat[] = [
   { pos: [5.3, SEAT_HEIGHT - 0.06, -1.55], rot: Math.PI },
 ];
 
-/** Tekrarlanabilir rastgele sayı üreteci (raflardaki kitaplar her açılışta aynı dursun) */
+/** Repeatable random number generator (so the books on the shelves stay the same on every load) */
 export function seeded(seed: number) {
   let s = seed;
   return () => {

@@ -5,26 +5,26 @@ import type { ReasoningLevel, TokenUsage, WorkerInfo } from "../../protocol";
 import { actions, useApp } from "../../store";
 
 const REASONING: { value: ReasoningLevel | ""; label: string; hint: string }[] = [
-  { value: "", label: "Varsayılan", hint: "Modelin kendi ayarı" },
-  { value: "none", label: "Kapalı", hint: "Düşünmeden hemen cevap verir (hızlı, ucuz)" },
-  { value: "low", label: "Düşük", hint: "Kısa düşünür" },
-  { value: "medium", label: "Orta", hint: "DeepSeek'te Yüksek ile aynı" },
-  { value: "high", label: "Yüksek", hint: "Dikkatli düşünür" },
-  { value: "max", label: "Maks", hint: "En uzun düşünme, en yavaş ve pahalı" },
+  { value: "", label: "Default", hint: "The model's own setting" },
+  { value: "none", label: "Off", hint: "Answers right away without thinking (fast, cheap)" },
+  { value: "low", label: "Low", hint: "Thinks briefly" },
+  { value: "medium", label: "Medium", hint: "Same as High on DeepSeek" },
+  { value: "high", label: "High", hint: "Thinks carefully" },
+  { value: "max", label: "Max", hint: "Longest thinking, slowest and most expensive" },
 ];
 
 const fmt = (n?: number) => (n === undefined ? "–" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
 
-/** Token kullanımı: "↑1,2K ↓340 · önbellek %60 · düşünme 120" */
+/** Token usage: "↑1.2K ↓340 · cache 60 · thinking 120" */
 export function usageText(u?: TokenUsage): string {
   if (!u) return "";
   const parts = [`↑${fmt(u.prompt)} ↓${fmt(u.completion)}`];
-  if (u.cacheHit && u.prompt) parts.push(`önbellek %${Math.round((u.cacheHit / u.prompt) * 100)}`);
-  if (u.reasoning) parts.push(`düşünme ${fmt(u.reasoning)}`);
+  if (u.cacheHit && u.prompt) parts.push(`cache ${Math.round((u.cacheHit / u.prompt) * 100)}%`);
+  if (u.reasoning) parts.push(`thinking ${fmt(u.reasoning)}`);
   return parts.join(" · ");
 }
 
-/** İşçi yazma kutusunun solundaki "+" menüsü */
+/** The "+" menu to the left of the worker's input box */
 export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; onPickFiles: () => void }) {
   const settings = useApp((s) => s.workerSettings[worker.id]) ?? {};
   const [open, setOpen] = useState(false);
@@ -42,7 +42,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
         }
       }}
     >
-      <Button isIconOnly size="sm" variant="ghost" aria-label="Ekle ve ayarlar">
+      <Button isIconOnly size="sm" variant="ghost" aria-label="Add and settings">
         <Plus size={18} />
       </Button>
       <Popover.Content placement="top start" className="w-80">
@@ -51,8 +51,8 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
             <ul className="flex flex-col">
               <MenuButton
                 icon={<Paperclip size={15} />}
-                label="Dosya veya fotoğraf ekle"
-                hint={worker.provider === "deepseek" ? "Görsel, PDF, metin" : "Görsel, metin"}
+                label="Add file or photo"
+                hint={worker.provider === "deepseek" ? "Image, PDF, text" : "Image, text"}
                 onPress={() => {
                   setOpen(false);
                   onPickFiles();
@@ -60,14 +60,14 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
               />
               <MenuButton
                 icon={<ScrollText size={15} />}
-                label="Sistem talimatı"
-                hint={settings.system ? "açık" : undefined}
+                label="System instruction"
+                hint={settings.system ? "on" : undefined}
                 onPress={() => setView("system")}
               />
               <li className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
                 <FileJson size={15} className="text-muted" />
-                <span className="flex-1">JSON çıktı</span>
-                <Switch size="sm" isSelected={!!settings.json} onChange={(json) => actions.setWorkerSettings(worker.id, { json })} aria-label="JSON çıktı">
+                <span className="flex-1">JSON output</span>
+                <Switch size="sm" isSelected={!!settings.json} onChange={(json) => actions.setWorkerSettings(worker.id, { json })} aria-label="JSON output">
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
@@ -76,8 +76,8 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
             </ul>
           ) : (
             <div className="flex flex-col gap-2 p-1">
-              <span className="text-sm font-semibold">Sistem talimatı</span>
-              <p className="text-xs text-muted">Bu işçiyle her sohbetin başına eklenir. Örn: "Kısa ve Türkçe cevap ver."</p>
+              <span className="text-sm font-semibold">System instruction</span>
+              <p className="text-xs text-muted">Added to the start of every chat with this worker. E.g.: "Answer briefly and in Turkish."</p>
               <textarea
                 autoFocus
                 value={system}
@@ -87,7 +87,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
               />
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="ghost" onPress={() => setView("main")}>
-                  Geri
+                  Back
                 </Button>
                 <Button
                   size="sm"
@@ -97,7 +97,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
                     setOpen(false);
                   }}
                 >
-                  Kaydet
+                  Save
                 </Button>
               </div>
             </div>
@@ -120,18 +120,18 @@ function MenuButton({ icon, label, hint, onPress }: { icon: React.ReactNode; lab
   );
 }
 
-/** İşçi yazma kutusunun altındaki çubuk: model, düşünme, ayarlar, son token kullanımı */
+/** The bar below the worker's input box: model, thinking, settings, last token usage */
 export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUsage?: TokenUsage }) {
   const settings = useApp((s) => s.workerSettings[worker.id]) ?? {};
   const models = useApp((s) => s.workerModels[worker.id]);
   const [modelOpen, setModelOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
-  // Ollama aynı modeli "ad" ve "ad:latest" diye ikisiyle de tanır
+  // Ollama recognizes the same model both as "name" and "name:latest"
   const norm = (m: string) => m.replace(/:latest$/, "");
   const model = norm(settings.model || worker.model);
   const defaultModel = norm(worker.model);
   const shortModel = model.split("/").pop()?.replace(/^hf\.co\//, "") ?? model;
-  // Local işçilerde seçilmediyse düşünme kapalı (sunucu da öyle gönderir)
+  // For local workers, thinking is off if not selected (the server sends it that way too)
   const effective = settings.reasoning ?? (worker.local ? "none" : "");
   const reasoning = REASONING.find((r) => r.value === effective) ?? REASONING[0];
   const thinkingOff = effective === "none";
@@ -153,9 +153,9 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
         <Popover.Content placement="top start" className="w-80">
           <Popover.Dialog className="p-1">
             {!models ? (
-              <p className="px-2 py-3 text-xs text-muted">Yükleniyor…</p>
+              <p className="px-2 py-3 text-xs text-muted">Loading…</p>
             ) : models.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-muted">{worker.provider === "ollama" ? "Ollama çalışmıyor ya da kurulu model yok." : "Model bulunamadı."}</p>
+              <p className="px-2 py-3 text-xs text-muted">{worker.provider === "ollama" ? "Ollama is not running or no models are installed." : "No models found."}</p>
             ) : (
               <ul className="flex max-h-72 flex-col overflow-y-auto">
                 {models.map((m) => (
@@ -173,11 +173,11 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
                         <div className="font-code truncate text-xs">{m.id}</div>
                         {worker.provider === "ollama" && (
                           <div className="text-[10px] text-muted">
-                            {[m.size, m.vision ? "görsel de okur, daha yavaş" : "sadece metin, daha hızlı"].filter(Boolean).join(" · ")}
+                            {[m.size, m.vision ? "also reads images, slower" : "text only, faster"].filter(Boolean).join(" · ")}
                           </div>
                         )}
                       </div>
-                      {m.id === defaultModel && <span className="text-[10px] text-muted">varsayılan</span>}
+                      {m.id === defaultModel && <span className="text-[10px] text-muted">default</span>}
                       {m.id === model && <Check size={14} className="text-accent" />}
                     </button>
                   </li>
@@ -188,11 +188,11 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
         </Popover.Content>
       </Popover>
 
-      {/* Düşünme */}
+      {/* Thinking */}
       <Popover isOpen={reasonOpen} onOpenChange={setReasonOpen}>
-        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Düşünme">
+        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Thinking">
           <Brain size={13} className={thinkingOff ? "text-muted" : "text-accent"} />
-          <span>{reasoning.value ? `Düşünme: ${reasoning.label}` : "Düşünme"}</span>
+          <span>{reasoning.value ? `Thinking: ${reasoning.label}` : "Thinking"}</span>
           <ChevronDown size={12} className="text-muted" />
         </Button>
         <Popover.Content placement="top start" className="w-72">
@@ -221,7 +221,7 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
         </Popover.Content>
       </Popover>
 
-      {/* Diğer ayarlar */}
+      {/* Other settings */}
       <SettingsMenu worker={worker} thinkingOff={thinkingOff} />
 
       <span className="flex-1" />
@@ -233,9 +233,9 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
           </button>
           <Tooltip.Content>
             <div className="flex flex-col text-xs">
-              <span className="font-medium">Son cevabın token kullanımı</span>
-              <span>Girdi: {lastUsage.prompt.toLocaleString("tr-TR")}{lastUsage.cacheHit ? ` (önbellekten ${lastUsage.cacheHit.toLocaleString("tr-TR")})` : ""}</span>
-              <span>Çıktı: {lastUsage.completion.toLocaleString("tr-TR")}{lastUsage.reasoning ? ` (düşünme ${lastUsage.reasoning.toLocaleString("tr-TR")})` : ""}</span>
+              <span className="font-medium">Token usage of the last reply</span>
+              <span>Input: {lastUsage.prompt.toLocaleString("en-US")}{lastUsage.cacheHit ? ` (from cache ${lastUsage.cacheHit.toLocaleString("en-US")})` : ""}</span>
+              <span>Output: {lastUsage.completion.toLocaleString("en-US")}{lastUsage.reasoning ? ` (thinking ${lastUsage.reasoning.toLocaleString("en-US")})` : ""}</span>
             </div>
           </Tooltip.Content>
         </Tooltip>
@@ -244,7 +244,7 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
   );
 }
 
-/** Bağlam doluluğu halkası: son cevaptaki girdi + çıktı, modelin bağlam sınırına göre */
+/** Context usage ring: input + output of the last reply, relative to the model's context limit */
 function ContextRing({ usage }: { usage?: TokenUsage }) {
   if (!usage?.contextWindow) return null;
   const used = usage.prompt + usage.completion;
@@ -254,7 +254,7 @@ function ContextRing({ usage }: { usage?: TokenUsage }) {
   const color = pct > 85 ? "var(--danger)" : pct > 65 ? "var(--warning)" : "var(--accent)";
   return (
     <Tooltip delay={150}>
-      <button type="button" className="flex cursor-default items-center gap-1 rounded px-1 text-[11px] tabular-nums text-muted hover:bg-default-soft" aria-label="Bağlam doluluğu">
+      <button type="button" className="flex cursor-default items-center gap-1 rounded px-1 text-[11px] tabular-nums text-muted hover:bg-default-soft" aria-label="Context usage">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
           <circle cx="8" cy="8" r={r} fill="none" stroke="var(--border)" strokeWidth="2.5" />
           <circle
@@ -269,15 +269,15 @@ function ContextRing({ usage }: { usage?: TokenUsage }) {
             transform="rotate(-90 8 8)"
           />
         </svg>
-        %{pct < 1 ? "<1" : Math.round(pct)}
+        {pct < 1 ? "<1" : Math.round(pct)}%
       </button>
       <Tooltip.Content>
         <div className="flex flex-col text-xs">
-          <span className="font-medium">Bağlam</span>
+          <span className="font-medium">Context</span>
           <span>
-            {used.toLocaleString("tr-TR")} / {usage.contextWindow.toLocaleString("tr-TR")} token
+            {used.toLocaleString("en-US")} / {usage.contextWindow.toLocaleString("en-US")} token
           </span>
-          <span className="text-muted">Sohbet uzadıkça dolar; dolunca model eski mesajları unutur.</span>
+          <span className="text-muted">Fills up as the chat grows; once full, the model forgets older messages.</span>
         </div>
       </Tooltip.Content>
     </Tooltip>
@@ -292,15 +292,15 @@ function SettingsMenu({ worker, thinkingOff }: { worker: WorkerInfo; thinkingOff
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button isIconOnly size="sm" variant="ghost" className={`h-7 w-7 min-w-7 ${active ? "text-accent" : ""}`} aria-label="Ayarlar">
+      <Button isIconOnly size="sm" variant="ghost" className={`h-7 w-7 min-w-7 ${active ? "text-accent" : ""}`} aria-label="Settings">
         <SlidersHorizontal size={14} />
       </Button>
       <Popover.Content placement="top start" className="w-72">
         <Popover.Dialog className="flex flex-col gap-3 p-2">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between text-xs">
-              <span className="font-medium">Sıcaklık</span>
-              <span className="tabular-nums text-muted">{temp === undefined ? "varsayılan" : temp.toFixed(1)}</span>
+              <span className="font-medium">Temperature</span>
+              <span className="tabular-nums text-muted">{temp === undefined ? "default" : temp.toFixed(1)}</span>
             </div>
             <input
               type="range"
@@ -310,15 +310,15 @@ function SettingsMenu({ worker, thinkingOff }: { worker: WorkerInfo; thinkingOff
               value={temp ?? 1}
               onChange={(e) => actions.setWorkerSettings(worker.id, { temperature: Number(e.target.value) })}
               className="accent-[var(--accent)]"
-              aria-label="Sıcaklık"
+              aria-label="Temperature"
             />
             <p className="text-[10px] text-muted">
-              Düşük: tutarlı, yüksek: yaratıcı.{" "}
-              {!thinkingOff && worker.provider === "deepseek" && "DeepSeek'te sadece düşünme kapalıyken etkili."}
+              Low: consistent, high: creative.{" "}
+              {!thinkingOff && worker.provider === "deepseek" && "On DeepSeek it only takes effect when thinking is off."}
             </p>
           </div>
           <label className="flex items-center justify-between gap-2 text-xs">
-            <span className="font-medium">En fazla token</span>
+            <span className="font-medium">Max tokens</span>
             <input
               type="number"
               min={1}
@@ -330,8 +330,8 @@ function SettingsMenu({ worker, thinkingOff }: { worker: WorkerInfo; thinkingOff
             />
           </label>
           <label className="flex items-center justify-between gap-2 text-xs">
-            <span className="font-medium">JSON çıktı</span>
-            <Switch size="sm" isSelected={!!settings.json} onChange={(json) => actions.setWorkerSettings(worker.id, { json })} aria-label="JSON çıktı">
+            <span className="font-medium">JSON output</span>
+            <Switch size="sm" isSelected={!!settings.json} onChange={(json) => actions.setWorkerSettings(worker.id, { json })} aria-label="JSON output">
               <Switch.Control>
                 <Switch.Thumb />
               </Switch.Control>
@@ -342,7 +342,7 @@ function SettingsMenu({ worker, thinkingOff }: { worker: WorkerInfo; thinkingOff
             variant="ghost"
             onPress={() => actions.setWorkerSettings(worker.id, { temperature: undefined, maxTokens: undefined, json: undefined })}
           >
-            Varsayılana dön
+            Reset to default
           </Button>
         </Popover.Dialog>
       </Popover.Content>

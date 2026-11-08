@@ -1,19 +1,19 @@
 import { Label, ListBox, Select } from "@heroui/react";
 import { actions, CLAUDE_ID, useApp } from "../../store";
 
-/** Sohbet panelinin başındaki ajan seçici: Claude ve tüm işçiler */
+/** Agent selector at the top of the chat panel: Claude and all workers */
 export function AgentSelect() {
   const selected = useApp((s) => s.selected);
   const workers = useApp((s) => s.workers);
 
   const options = [
-    { id: CLAUDE_ID, name: "Claude", color: "#D97757", ok: true, hint: "Baş yazıcı" },
+    { id: CLAUDE_ID, name: "Claude", color: "#D97757", ok: true, hint: "Head scribe" },
     ...workers.map((w) => ({ id: w.id, name: w.name, color: w.color, ok: w.available?.ok ?? false, hint: w.local ? "local" : w.model })),
   ];
 
   return (
     <Select value={selected} onChange={(k) => k != null && actions.selectAgent(String(k))} className="min-w-0 flex-1">
-      <Label className="sr-only">Ajan</Label>
+      <Label className="sr-only">Agent</Label>
       <Select.Trigger>
         <Select.Value />
         <Select.Indicator />

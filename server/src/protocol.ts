@@ -1,6 +1,6 @@
 /**
- * Arayüz ile arka uç arasındaki WebSocket mesajları. Arayüz bu dosyayı `import type` ile kullanır,
- * o yüzden burada sadece tip olmalı (Node'a özel import yok).
+ * WebSocket messages between the UI and the backend. The UI uses this file with `import type`,
+ * so only types should be here (no Node-specific imports).
  */
 import type { PermissionMode, PermissionUpdate, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
@@ -15,24 +15,24 @@ export type WorkerInfo = {
   model: string;
   color: string;
   description: string;
-  /** true ise veri bilgisayardan çıkmaz */
+  /** if true, data never leaves the computer */
   local: boolean;
   available?: { ok: boolean; reason?: string };
 };
 
 export type AgentStatus = "idle" | "working" | "error";
 
-/** İşi kim verdi: bir Claude oturumu (label: proje klasörü) ya da kullanıcı (doğrudan sohbet) */
+/** Who assigned the job: a Claude session (label: project folder) or the user (direct chat) */
 export type WorkerCaller = { kind: "claude" | "user"; label?: string };
 
 /**
- * İşçiye giden tek bir istek. Aynı işçiye aynı anda birden fazla oturumdan iş gelebilir:
- * 3D ofiste her çalışan istek ayrı bir işçi kopyası olarak görünür.
+ * A single request sent to a worker. The same worker can receive jobs from multiple sessions at once:
+ * in the 3D office, each request appears as a separate worker copy.
  */
 export type WorkerRequest = {
   id: string;
   workerId: string;
-  /** queued: işçinin aynı anda kaldırabileceği iş sınırı dolu, sırada bekliyor */
+  /** queued: the worker's concurrent job limit is full, waiting in line */
   status: "queued" | "running" | "error";
   task: string;
   error?: string;
@@ -41,13 +41,13 @@ export type WorkerRequest = {
   startedAt?: number;
 };
 
-/** 3D kütüphanedeki Claude karakterini hareket ettiren olay (işçiler WorkerRequest kullanır). */
+/** Event that moves the Claude character in the 3D library (workers use WorkerRequest). */
 export type AgentActivity = {
   agentId: string;
   status: AgentStatus;
   task?: string;
   error?: string;
-  /** İşi kim verdi: "claude" (devretme) ya da "user" (doğrudan sohbet) */
+  /** Who assigned the job: "claude" (delegation) or "user" (direct chat) */
   by?: "claude" | "user";
 };
 
@@ -59,7 +59,7 @@ export type SessionSummary = {
   gitBranch?: string;
 };
 
-/** Claude oturum geçmişinden okunan mesaj (canlı SDK mesajlarıyla aynı şekilde çizilir). */
+/** Message read from Claude session history (rendered the same way as live SDK messages). */
 export type HistoryMessage = {
   type: "user" | "assistant" | "system";
   uuid: string;
@@ -67,25 +67,25 @@ export type HistoryMessage = {
   parent_tool_use_id: string | null;
 };
 
-/** İşçi model menüsündeki bir model */
+/** A model in the worker model menu */
 export type WorkerModel = {
   id: string;
-  /** Görsel okuyabiliyor mu (Ollama'nın bildirdiği yeteneklerden) */
+  /** Whether it can read images (from the capabilities Ollama reports) */
   vision?: boolean;
-  /** Parametre sayısı, örn. "26.9B" */
+  /** Parameter count, e.g. "26.9B" */
   size?: string;
 };
 
-/** İşçinin düşünme seviyesi. "none" düşünmeyi kapatır. */
+/** The worker's reasoning level. "none" turns reasoning off. */
 export type ReasoningLevel = "none" | "low" | "medium" | "high" | "max";
 
-/** İşçiyle doğrudan sohbetin ayarları (işçi başına hatırlanır) */
+/** Settings for direct chat with the worker (remembered per worker) */
 export type WorkerSettings = {
-  /** Boşsa işçinin varsayılan modeli */
+  /** If empty, the worker's default model */
   model?: string;
-  /** Boşsa modelin varsayılanı */
+  /** If empty, the model's default */
   reasoning?: ReasoningLevel;
-  /** Sadece düşünme kapalıyken etkili */
+  /** Only effective when reasoning is off */
   temperature?: number;
   json?: boolean;
   maxTokens?: number;
@@ -97,7 +97,7 @@ export type TokenUsage = {
   completion: number;
   cacheHit?: number;
   reasoning?: number;
-  /** Modelin o anki bağlam sınırı (token). Bağlam doluluğu = prompt + completion */
+  /** The model's current context limit (tokens). Context fullness = prompt + completion */
   contextWindow?: number;
 };
 
@@ -106,9 +106,9 @@ export type WorkerChatMessage = {
   content: string;
   at: number;
   error?: boolean;
-  /** Modelin düşünce metni (varsa) */
+  /** The model's reasoning text (if any) */
   reasoning?: string;
-  /** Kullanıcının eklediği dosyalar (görseller dahil, base64) */
+  /** Files added by the user (including images, base64) */
   attachments?: Attachment[];
   usage?: TokenUsage;
   model?: string;
@@ -129,7 +129,7 @@ export type JobInfo = {
   error?: string;
 };
 
-/** Mesaja eklenen dosya. Görseller ve PDF'ler Claude'a dosya olarak, metin dosyaları içerik olarak gider. */
+/** File attached to a message. Images and PDFs go to Claude as files, text files as content. */
 export type Attachment = { name: string; mediaType: string; /** base64 */ data: string };
 
 export type McpServerInfo = { name: string; status: string; error?: string; toolCount?: number; scope?: string };
@@ -149,7 +149,7 @@ export type ModelOption = {
 
 export type LimitWindow = { utilization: number | null; resetsAt: string | null };
 
-/** Claude aboneliğinin kullanım limitleri (sadece abonelik girişinde dolu gelir) */
+/** Usage limits of the Claude subscription (only populated when logged in with a subscription) */
 export type UsageInfo = {
   subscription: string | null;
   available: boolean;
@@ -160,13 +160,13 @@ export type UsageInfo = {
   sessionCostUsd?: number;
 };
 
-/** DeepSeek hesap bakiyesi (GET /user/balance) */
-/** İlk kurulum penceresinin gösterdiği durum */
+/** DeepSeek account balance (GET /user/balance) */
+/** Status shown by the initial setup window */
 export type SetupStatus = {
   claude: {
-    /** Claude Code programı bulundu mu (kurulu ya da Scriptorium'un dahili sürümü) */
+    /** Whether the Claude Code program was found (installed or Scriptorium's bundled version) */
     found: boolean;
-    cliSource?: "kurulu" | "dahili";
+    cliSource?: "installed" | "bundled";
     loggedIn: boolean;
     email?: string;
     authMethod?: string;
@@ -174,9 +174,9 @@ export type SetupStatus = {
   };
   deepseek: { configured: boolean };
   ollama: { running: boolean; models: WorkerModel[] };
-  /** İşçi araçları bütün Claude Code oturumlarına eklendi mi */
+  /** Whether worker tools were added to all Claude Code sessions */
   mcp: boolean;
-  /** ~/.claude/CLAUDE.md içinde devretme kuralları var mı */
+  /** Whether delegation rules exist in ~/.claude/CLAUDE.md */
   rules: boolean;
 };
 
@@ -185,7 +185,7 @@ export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules";
 export type DeepSeekBalance = {
   ok: boolean;
   error?: string;
-  /** Bakiye API çağrısı için yeterli mi */
+  /** Whether the balance is sufficient for API calls */
   available?: boolean;
   currency?: string;
   total?: number;
@@ -226,7 +226,7 @@ export type ClientMsg =
       additionalDirectories?: string[];
       model?: string;
       effort?: EffortLevel;
-      /** true: sadece sunucuda zaten açıksa yeniden bağlan, değilse hiçbir şey başlatma (sayfa yenilenince) */
+      /** true: only reconnect if already open on the server, otherwise start nothing (on page refresh) */
       attachOnly?: boolean;
     }
   | { type: "claude.setEffort"; chatId: string; effort: EffortLevel }
@@ -236,7 +236,7 @@ export type ClientMsg =
   | { type: "fs.list"; path?: string }
   | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
   | { type: "claude.info"; chatId: string }
-  /** Sohbetten bağımsız bilgi (modeller, kullanım, komutlar): sunucunun boş yardımcı oturumundan */
+  /** Chat-independent info (models, usage, commands): from the server's empty helper session */
   | { type: "claude.globalInfo" }
   | { type: "claude.setDirs"; chatId: string; dirs: string[] }
   | { type: "claude.mcpToggle"; chatId: string; server: string; enabled: boolean }
@@ -253,7 +253,7 @@ export type ClientMsg =
       requestId: string;
       allow: boolean;
       always?: boolean;
-      /** Aracın girdisini değiştirerek izin ver (örneğin AskUserQuestion cevapları: { answers: { soru: cevap } }) */
+      /** Allow by modifying the tool's input (e.g. AskUserQuestion answers: { answers: { question: answer } }) */
       updatedInput?: Record<string, unknown>;
     }
   | { type: "claude.sessions"; cwd?: string; all?: boolean }
@@ -303,7 +303,7 @@ export type ServerMsg =
     }
   | { type: "claude.permissionResolved"; requestId: string }
   | { type: "claude.sessions"; sessions: SessionSummary[] }
-  | { type: "claude.history"; sessionId: string; messages: HistoryMessage[]; /** Oturumun ait olduğu klasör */ cwd?: string }
+  | { type: "claude.history"; sessionId: string; messages: HistoryMessage[]; /** The folder the session belongs to */ cwd?: string }
   | { type: "worker.chats"; workerId: string; chats: WorkerChatSummary[] }
   | { type: "worker.chat"; chat: WorkerChat }
   | { type: "worker.token"; chatId: string; text: string }
@@ -318,5 +318,5 @@ export type ServerMsg =
   | { type: "setup.result"; action: SetupAction; ok: boolean; message?: string }
   | { type: "error"; message: string };
 
-/** Sunucu tarafında saklanan izin önerileri (arayüze gönderilmez). */
+/** Permission suggestions stored on the server side (not sent to the UI). */
 export type PendingPermission = { suggestions?: PermissionUpdate[] };

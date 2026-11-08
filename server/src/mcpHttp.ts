@@ -8,10 +8,10 @@ import { fileURLToPath } from "node:url";
 import { WORKER_INSTRUCTIONS, WORKER_SERVER_NAME, WORKER_TOOLS, type ToolCtx } from "./workerTools.js";
 
 /**
- * İşçi araçlarını http://127.0.0.1:<port>/mcp adresinde MCP sunucusu olarak açar. Böylece terminaldeki
- * ve masaüstü uygulamasındaki Claude Code oturumları da işçileri kullanır:
+ * Exposes the worker tools as an MCP server at http://127.0.0.1:<port>/mcp. This way, Claude Code sessions in the terminal
+ * and in the desktop app also use the workers:
  *   claude mcp add --scope user --transport http scriptorium http://127.0.0.1:7777/mcp
- * Bütün oturumlar aynı sıraları paylaşır ve 3D ofiste görünür.
+ * All sessions share the same queues and appear in the 3D office.
  */
 
 const MAX_BODY = 10 * 1024 * 1024;
@@ -28,7 +28,7 @@ function readJson(req: IncomingMessage): Promise<unknown> {
     req.on("data", (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY) {
-        reject(new Error("İstek çok büyük"));
+        reject(new Error("Request too large"));
         req.destroy();
       } else chunks.push(c);
     });
@@ -49,8 +49,8 @@ function jsonError(res: ServerResponse, status: number, message: string) {
 }
 
 /**
- * Oturumun çalışma klasörünü istemciden (MCP "roots") bir kez sorar. Claude Code klasörünü
- * buradan verirse dosya yolları ona göre çözülür ve 3D ofiste proje adı görünür.
+ * Asks the client (MCP "roots") once for the session's working folder. If Claude Code provides its folder
+ * here, file paths are resolved accordingly and the project name appears in the 3D office.
  */
 async function resolveCtx(s: Session, extra: { sendRequest: (req: { method: "roots/list" }, schema: typeof ListRootsResultSchema) => Promise<{ roots: { uri: string }[] }> }) {
   if (s.rootsTried) return s.ctx;
@@ -59,7 +59,7 @@ async function resolveCtx(s: Session, extra: { sendRequest: (req: { method: "roo
   try {
     const { roots } = await Promise.race([
       extra.sendRequest({ method: "roots/list" }, ListRootsResultSchema),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("zaman aşımı")), 3000)),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 3000)),
     ]);
     const uri = roots[0]?.uri;
     if (uri?.startsWith("file:")) {
@@ -67,7 +67,7 @@ async function resolveCtx(s: Session, extra: { sendRequest: (req: { method: "roo
       s.ctx.caller.label = path.basename(s.ctx.cwd) || s.ctx.caller.label;
     }
   } catch {
-    /* klasör öğrenilemedi: Claude project_dir verirse o kullanılır */
+    /* could not learn the folder: if Claude provides project_dir, that is used */
   }
   return s.ctx;
 }
@@ -77,7 +77,7 @@ function newSession(): StreamableHTTPServerTransport {
   const session = { ctx: { caller: { kind: "claude", label: "Claude Code" } }, rootsTried: false, server } as Session;
 
   for (const t of WORKER_TOOLS) {
-    // anthropic/alwaysLoad: Claude Code araçları ToolSearch arkasına saklamaz, ilk mesajdan itibaren hazır olur
+    // anthropic/alwaysLoad: Claude Code does not hide tools behind ToolSearch; they are ready from the first message
     server.registerTool(t.name, { description: t.description, inputSchema: t.schema, _meta: { "anthropic/alwaysLoad": true } }, (async (args: unknown, extra: Parameters<typeof resolveCtx>[1]) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (t.handler as any)(args, await resolveCtx(session, extra))) as never);
@@ -87,7 +87,7 @@ function newSession(): StreamableHTTPServerTransport {
     sessionIdGenerator: randomUUID,
     onsessioninitialized: (id) => {
       sessions.set(id, session);
-      // Kapanmadan kaybolan eski oturumları temizle
+      // Clean up old sessions that disappeared without closing
       while (sessions.size > MAX_SESSIONS) {
         const [oldId, old] = sessions.entries().next().value!;
         sessions.delete(oldId);
@@ -103,13 +103,13 @@ function newSession(): StreamableHTTPServerTransport {
   return transport;
 }
 
-/** /mcp isteklerini karşılar. Sadece bu bilgisayardan; tarayıcıdaki başka siteler erişemez. */
+/** Handles /mcp requests. Only from this computer; other sites in the browser cannot access it. */
 export function createMcpHandler(allowedOrigins: Set<string>) {
   return async (req: IncomingMessage, res: ServerResponse) => {
-    // DNS rebinding ve tarayıcıdan gelen isteklere karşı: Host yerel olmalı, Origin varsa bizim arayüz olmalı
-    if (!LOCAL_HOST.test(req.headers.host ?? "")) return jsonError(res, 403, "Yasak");
+    // Against DNS rebinding and requests from the browser: Host must be local, and if Origin is present it must be our UI
+    if (!LOCAL_HOST.test(req.headers.host ?? "")) return jsonError(res, 403, "Forbidden");
     const origin = req.headers.origin;
-    if (origin && !allowedOrigins.has(origin)) return jsonError(res, 403, "Yasak");
+    if (origin && !allowedOrigins.has(origin)) return jsonError(res, 403, "Forbidden");
 
     try {
       const body = req.method === "POST" ? await readJson(req) : undefined;
@@ -118,14 +118,14 @@ export function createMcpHandler(allowedOrigins: Set<string>) {
 
       if (id) {
         const s = sessions.get(id);
-        // Sunucu yeniden başladıysa: 404 ile istemci yeni oturum açar
-        if (!s) return jsonError(res, 404, "Oturum bulunamadı");
+        // If the server restarted: with 404 the client opens a new session
+        if (!s) return jsonError(res, 404, "Session not found");
         return await s.transport.handleRequest(req, res, body);
       }
       if (req.method === "POST" && isInitializeRequest(body)) {
         return await newSession().handleRequest(req, res, body);
       }
-      return jsonError(res, 400, "Geçersiz istek: önce initialize gönder");
+      return jsonError(res, 400, "Invalid request: send initialize first");
     } catch (err) {
       if (!res.headersSent) jsonError(res, 500, err instanceof Error ? err.message : String(err));
     }

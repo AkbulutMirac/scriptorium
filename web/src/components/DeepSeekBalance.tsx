@@ -8,10 +8,10 @@ const SYMBOL: Record<string, string> = { USD: "$", CNY: "¥" };
 export function money(n: number | undefined, currency?: string) {
   if (n === undefined || Number.isNaN(n)) return "–";
   const sym = SYMBOL[currency ?? ""] ?? "";
-  return `${sym}${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${sym ? "" : ` ${currency ?? ""}`}`;
+  return `${sym}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${sym ? "" : ` ${currency ?? ""}`}`;
 }
 
-/** DeepSeek kalan bakiyesi. Üzerine gelince ayrıntı, tıklayınca yenilenir. */
+/** DeepSeek remaining balance. Hover for details, click to refresh. */
 export function DeepSeekBalanceChip({ compact = false }: { compact?: boolean }) {
   const b = useApp((s) => s.deepseekBalance);
   const hasDeepseek = useApp((s) => s.workers.some((w) => w.provider === "deepseek"));
@@ -27,27 +27,27 @@ export function DeepSeekBalanceChip({ compact = false }: { compact?: boolean }) 
         type="button"
         onClick={() => actions.refreshDeepseekBalance()}
         className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-default-soft ${tone}`}
-        aria-label="DeepSeek bakiyesi"
+        aria-label="DeepSeek balance"
       >
         <Wallet size={14} />
         {!compact && <span>DeepSeek</span>}
-        <span className="tabular-nums">{b.ok ? money(b.total, b.currency) : "hata"}</span>
+        <span className="tabular-nums">{b.ok ? money(b.total, b.currency) : "error"}</span>
       </button>
       <Tooltip.Content placement="bottom end" className="p-2">
         <div className="flex w-60 flex-col gap-1.5 text-xs">
-          <span className="font-medium">DeepSeek bakiyesi</span>
+          <span className="font-medium">DeepSeek balance</span>
           {b.ok ? (
             <>
-              <Row label="Toplam" value={money(b.total, b.currency)} strong />
-              <Row label="Yüklenen" value={money(b.toppedUp, b.currency)} />
-              <Row label="Hediye" value={money(b.granted, b.currency)} />
-              {b.available === false && <span className="text-danger">Bakiye yetersiz: DeepSeek işçileri çalışmaz.</span>}
-              {low && b.available !== false && <span className="text-warning">Bakiye azaldı.</span>}
+              <Row label="Total" value={money(b.total, b.currency)} strong />
+              <Row label="Topped up" value={money(b.toppedUp, b.currency)} />
+              <Row label="Granted" value={money(b.granted, b.currency)} />
+              {b.available === false && <span className="text-danger">Insufficient balance: DeepSeek workers won't run.</span>}
+              {low && b.available !== false && <span className="text-warning">Balance is low.</span>}
             </>
           ) : (
             <span className="text-danger">{b.error}</span>
           )}
-          <span className="text-[10px] text-muted">Son kontrol {relativeTime(b.checkedAt)} · yenilemek için tıkla</span>
+          <span className="text-[10px] text-muted">Last checked {relativeTime(b.checkedAt)} · click to refresh</span>
         </div>
       </Tooltip.Content>
     </Tooltip>

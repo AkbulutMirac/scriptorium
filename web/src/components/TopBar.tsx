@@ -18,12 +18,12 @@ export function TopBar() {
           isIconOnly
           size="sm"
           variant="ghost"
-          aria-label={historyOpen ? "Geçmişi gizle" : "Geçmişi göster"}
+          aria-label={historyOpen ? "Hide history" : "Show history"}
           onPress={() => actions.setUi({ historyOpen: !historyOpen })}
         >
           <PanelLeft size={18} />
         </Button>
-        <Tooltip.Content>{historyOpen ? "Geçmişi gizle" : "Geçmişi göster"}</Tooltip.Content>
+        <Tooltip.Content>{historyOpen ? "Hide history" : "Show history"}</Tooltip.Content>
       </Tooltip>
 
       <div className="flex items-center gap-2 font-semibold tracking-tight">
@@ -35,7 +35,7 @@ export function TopBar() {
 
       {runningJobs > 0 && (
         <Chip size="sm" variant="soft" color="accent">
-          {runningJobs} arka plan işi
+          {runningJobs} background jobs
         </Chip>
       )}
       <DeepSeekBalanceChip />
@@ -48,9 +48,9 @@ export function TopBar() {
 
 function ConnectionDot({ status }: { status: string }) {
   const map = {
-    open: { color: "bg-success", text: "Bağlı" },
-    connecting: { color: "bg-warning", text: "Bağlanıyor…" },
-    closed: { color: "bg-danger", text: "Bağlantı yok, yeniden deneniyor" },
+    open: { color: "bg-success", text: "Connected" },
+    connecting: { color: "bg-warning", text: "Connecting…" },
+    closed: { color: "bg-danger", text: "No connection, retrying" },
   } as const;
   const m = map[status as keyof typeof map] ?? map.closed;
   return (
@@ -62,9 +62,9 @@ function ConnectionDot({ status }: { status: string }) {
 }
 
 const MODES: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
-  { id: "light", label: "Açık", icon: <Sun size={15} /> },
-  { id: "dark", label: "Koyu", icon: <Moon size={15} /> },
-  { id: "system", label: "Sistem", icon: <Monitor size={15} /> },
+  { id: "light", label: "Light", icon: <Sun size={15} /> },
+  { id: "dark", label: "Dark", icon: <Moon size={15} /> },
+  { id: "system", label: "System", icon: <Monitor size={15} /> },
 ];
 
 function SettingsPopover() {
@@ -75,15 +75,15 @@ function SettingsPopover() {
 
   return (
     <Popover onOpenChange={(open) => open && setDraft(cwd)}>
-      <Button isIconOnly size="sm" variant="ghost" aria-label="Ayarlar">
+      <Button isIconOnly size="sm" variant="ghost" aria-label="Settings">
         <Settings size={18} />
       </Button>
       <Popover.Content placement="bottom end" className="w-80">
         <Popover.Dialog className="flex flex-col gap-4 p-1">
-          <Popover.Heading className="text-sm font-semibold">Görünüm</Popover.Heading>
+          <Popover.Heading className="text-sm font-semibold">Appearance</Popover.Heading>
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs text-muted">Mod</span>
+            <span className="text-xs text-muted">Mode</span>
             <div className="grid grid-cols-3 gap-1">
               {MODES.map((m) => (
                 <Button key={m.id} size="sm" variant={mode === m.id ? "primary" : "secondary"} onPress={() => setMode(m.id)}>
@@ -95,7 +95,7 @@ function SettingsPopover() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs text-muted">Vurgu rengi</span>
+            <span className="text-xs text-muted">Accent color</span>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(ACCENTS) as AccentName[]).map((a) => (
                 <Tooltip key={a} delay={300}>
@@ -117,29 +117,29 @@ function SettingsPopover() {
               <Switch.Control>
                 <Switch.Thumb />
               </Switch.Control>
-              <span className="text-sm">Piksel görünüm (3D sahne)</span>
+              <span className="text-sm">Pixel view (3D scene)</span>
             </Switch.Content>
           </Switch>
 
           <div className="flex flex-col gap-2 border-t border-separator pt-3">
             <TextField value={draft} onChange={setDraft} fullWidth>
-              <Label>Claude'un çalışma klasörü</Label>
+              <Label>Claude's working folder</Label>
               <Input variant="secondary" placeholder={serverCwd} className="font-code text-xs" />
             </TextField>
-            <p className="text-xs text-muted">Yeni sohbetler bu klasörde açılır. Boş bırakırsan .env'deki varsayılan kullanılır.</p>
+            <p className="text-xs text-muted">New chats open in this folder. If left empty, the default from .env is used.</p>
             <Button size="sm" variant="secondary" isDisabled={draft === cwd} onPress={() => actions.setCwd(draft.trim())}>
-              Kaydet
+              Save
             </Button>
           </div>
 
           <div className="flex flex-col gap-2 border-t border-separator pt-3">
             <Button size="sm" variant="secondary" onPress={() => actions.openSetup()}>
-              Kurulum (Claude, DeepSeek, local modeller)
+              Setup (Claude, DeepSeek, local models)
             </Button>
             <Button size="sm" variant="danger-soft" onPress={() => actions.shutdownServer()}>
-              <Power size={14} /> Scriptorium'u kapat
+              <Power size={14} /> Shut down Scriptorium
             </Button>
-            <p className="text-xs text-muted">Arka planda çalışan sunucuyu kapatır. Açık Claude oturumları da kapanır. Tekrar açmak için masaüstü kısayolu.</p>
+            <p className="text-xs text-muted">Shuts down the background server. Open Claude sessions will close too. Use the desktop shortcut to reopen.</p>
           </div>
         </Popover.Dialog>
       </Popover.Content>
@@ -147,7 +147,7 @@ function SettingsPopover() {
   );
 }
 
-/** Claude aboneliğinin kullanım limitleri (ana sohbetin bilgisinden). Üzerine gelince kart, tıklayınca ayrıntı. */
+/** Claude subscription usage limits (from the main chat's info). Hover shows a card, click shows details. */
 function UsageChip() {
   const usage = useApp((s) => s.chats[s.mainChatId ?? ""]?.info?.usage ?? s.globalInfo?.usage);
   if (!usage?.available) return null;
@@ -162,11 +162,11 @@ function UsageChip() {
         type="button"
         onClick={() => actions.focusInfo("usage")}
         className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-default-soft ${tone}`}
-        aria-label="Kullanım limitleri"
+        aria-label="Usage limits"
       >
         <Gauge size={14} />
-        {five != null && <span>5s %{five}</span>}
-        {week != null && <span>· Haftalık %{week}</span>}
+        {five != null && <span>5h {five}%</span>}
+        {week != null && <span>· Weekly {week}%</span>}
       </button>
       <Tooltip.Content placement="bottom end" className="p-2">
         <UsageCard usage={usage} />

@@ -7,7 +7,7 @@ const COLORS = ["#4D6BFE", "#7F77DD", "#22A06B", "#E8A23A", "#E5487A", "#14B8A6"
 
 const DEEPSEEK_MODELS = ["deepseek-flash", "deepseek-v4-pro"];
 
-/** Türkçe karakterleri sadeleştirip id üretir: "Kod Ustası" → "kod-ustasi" */
+/** Simplifies Turkish characters and generates an id: "Code Master" → "kod-ustasi" */
 function slugify(text: string) {
   const map: Record<string, string> = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
   return text
@@ -20,12 +20,12 @@ function slugify(text: string) {
 
 const empty = (): WorkerInfo => ({ id: "", name: "", provider: "deepseek", model: "deepseek-flash", color: COLORS[0], description: "", local: false });
 
-/** İşçi ekleme ve düzenleme penceresi. Kaydedilen işçiyi Claude anında görür. */
+/** Worker add and edit window. Claude sees the saved worker immediately. */
 export function WorkerModal() {
   const { open, worker } = useApp((s) => s.workerModal);
   const workers = useApp((s) => s.workers);
-  // Ollama önerileri: bu bilgisayarda kurulu modeller (kurulum durumundan)
-  // Seçici sabit referans döndürmeli (her seferinde yeni dizi sonsuz yeniden çizime yol açar)
+  // Ollama suggestions: models installed on this computer (from setup status)
+  // Selector must return a stable reference (a new array each time causes infinite re-renders)
   const ollamaList = useApp((s) => s.setup.status?.ollama.models);
   const ollamaModels = (ollamaList ?? []).map((m) => m.id);
   const hints: Record<Provider, string[]> = { deepseek: DEEPSEEK_MODELS, ollama: ollamaModels };
@@ -61,17 +61,17 @@ export function WorkerModal() {
       <Modal.Container size="md">
         <Modal.Dialog>
           <Modal.Header>
-            <Modal.Heading>{editing ? "İşçiyi düzenle" : "Yeni işçi"}</Modal.Heading>
+            <Modal.Heading>{editing ? "Edit worker" : "New worker"}</Modal.Heading>
           </Modal.Header>
           <Modal.Body className="flex flex-col gap-4">
             <TextField value={form.name} onChange={(name) => update({ name })} fullWidth autoFocus>
-              <Label>Ad</Label>
-              <Input variant="secondary" placeholder="Kod Ustası" />
+              <Label>Name</Label>
+              <Input variant="secondary" placeholder="Code Master" />
             </TextField>
-            {!editing && id && <p className={`-mt-2 text-xs ${idTaken ? "text-danger" : "text-muted"}`}>id: {id}{idTaken && " (bu id zaten var)"}</p>}
+            {!editing && id && <p className={`-mt-2 text-xs ${idTaken ? "text-danger" : "text-muted"}`}>id: {id}{idTaken && " (this id already exists)"}</p>}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Sağlayıcı</span>
+              <span className="text-sm font-medium">Provider</span>
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant={form.provider === "deepseek" ? "primary" : "secondary"} onPress={() => setProvider("deepseek")}>
                   DeepSeek API
@@ -89,7 +89,7 @@ export function WorkerModal() {
               </TextField>
               <div className="flex flex-wrap gap-1">
                 {form.provider === "ollama" && ollamaModels.length === 0 && (
-                  <span className="text-[11px] text-muted">Ollama'da kurulu model bulunamadı. Önce ollama pull ile bir model indir.</span>
+                  <span className="text-[11px] text-muted">No models installed in Ollama. Download one first with ollama pull.</span>
                 )}
                 {hints[form.provider].map((m) => (
                   <button key={m} type="button" onClick={() => update({ model: m })} className="font-code rounded-md bg-default-soft px-2 py-0.5 text-[11px] hover:bg-default-soft-hover">
@@ -100,24 +100,24 @@ export function WorkerModal() {
             </div>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Açıklama (Claude ne zaman bu işçiyi kullanacağına buna bakarak karar verir)</span>
+              <span className="text-sm font-medium">Description (Claude decides when to use this worker based on this)</span>
               <textarea
                 value={form.description}
                 onChange={(e) => update({ description: e.target.value })}
                 rows={3}
-                placeholder="Örn: Hızlı ve ucuz. Net tanımlı kod görevleri için."
+                placeholder="e.g. Fast and cheap. For well-defined coding tasks."
                 className="resize-none rounded-xl border border-field-border bg-field px-3 py-2 text-sm outline-none focus:border-accent"
               />
             </label>
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Renk</span>
+              <span className="text-sm font-medium">Color</span>
               <div className="flex gap-2">
                 {COLORS.map((c) => (
                   <button
                     key={c}
                     type="button"
-                    aria-label={`Renk ${c}`}
+                    aria-label={`Color ${c}`}
                     onClick={() => update({ color: c })}
                     className={`size-7 rounded-full transition ${form.color === c ? "ring-2 ring-offset-2 ring-offset-surface" : "hover:scale-110"}`}
                     style={{ background: c, ["--tw-ring-color" as string]: c }}
@@ -131,7 +131,7 @@ export function WorkerModal() {
                 <Switch.Control>
                   <Switch.Thumb />
                 </Switch.Control>
-                <span className="text-sm">Local: veri bu bilgisayardan çıkmaz (hassas işler sadece bunlara gider)</span>
+                <span className="text-sm">Local: data never leaves this computer (sensitive work only goes to these)</span>
               </Switch.Content>
             </Switch>
           </Modal.Body>
@@ -146,19 +146,19 @@ export function WorkerModal() {
                     actions.closeWorkerModal();
                   }}
                 >
-                  Evet, sil
+                  Yes, delete
                 </Button>
               ) : (
                 <Button size="sm" variant="ghost" onPress={() => setConfirmDelete(true)}>
-                  İşçiyi sil
+                  Delete worker
                 </Button>
               ))}
             <span className="flex-1" />
             <Button size="sm" variant="secondary" onPress={() => actions.closeWorkerModal()}>
-              Vazgeç
+              Cancel
             </Button>
             <Button size="sm" variant="primary" isDisabled={!valid} onPress={save}>
-              Kaydet
+              Save
             </Button>
           </Modal.Footer>
         </Modal.Dialog>

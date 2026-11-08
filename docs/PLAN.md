@@ -1,187 +1,189 @@
 # Scriptorium — Plan
 
-**Durum:** Bütün aşamalar tamam: Claude, DeepSeek ve local (Ollama) işçiler çalışıyor. Kurulum ve çalıştırma için README'ye bak.
-**Ad:** Scriptorium. Ortaçağ manastırlarında yazıcıların masalarında el yazması kopyaladığı oda. Claude baş yazıcı, işçiler yazıcılar. (Eski çalışma adı: isci-mcp)
-**Arayüz kararı:** Kendi arayüzümüz, HeroUI ile (aşağıda, "Arayüz tasarımı" bölümünde).
+**Status:** All phases complete: Claude, DeepSeek, and local (Ollama) workers are running. See the README for setup and usage.
+**Name:** Scriptorium. The room in medieval monasteries where scribes copied manuscripts at their desks. Claude is the head scribe, the workers are scribes. (Former working name: isci-mcp)
+**Interface decision:** Our own interface, built with HeroUI (see "Interface design" section below).
 
-## Hedef
+## Goal
 
-Tek bir web arayüzü:
-- **Sohbet paneli:** Claude'la (patron) ya da herhangi bir işçiyle doğrudan mesajlaşma
-- **3D kütüphane:** Hangi işçinin ne yaptığı, kimin boşta oturduğu canlı olarak görünür
-- **İşçi ekleme:** Arayüzden yeni işçi eklenir, Claude da onu anında kullanabilir
+A single web interface:
+- **Chat panel:** Direct messaging with Claude (the boss) or any worker
+- **3D library:** Live view of which worker is doing what and who is sitting idle
+- **Adding workers:** New workers are added from the interface, and Claude can use them immediately
 
-Claude işi kime vereceğine kendisi karar verir.
+Claude decides for itself who to assign work to.
 
 ```
-              Tarayıcı (React)
+              Browser (React)
    ┌────────────────────┬──────────────────────┐
-   │ Sohbet paneli      │ 3D kütüphane         │
-   │ (ajan seç, yaz)    │ (kim ne yapıyor)     │
-   │ + Terminal sekmesi │                      │
+   │ Chat panel         │ 3D library           │
+   │ (select agent,     │ (who's doing what)   │
+   │  type)             │                      │
+   │ + Terminal tab     │                      │
    └─────────┬──────────┴──────────▲───────────┘
-             │ WebSocket           │ işçi olayları
+             │ WebSocket           │ worker events
    ┌─────────▼─────────────────────┴────────────┐
-   │ Arka uç (Node / TypeScript + Agent SDK)    │
-   │  - Claude Code → Claude (patron)           │
-   │  - DeepSeek API sohbeti (işçi)             │
-   │  - Ollama sohbeti (local modeller)         │
-   │  - işçi araçları (SDK MCP) + agents.json   │
+   │ Backend (Node / TypeScript + Agent SDK)    │
+   │  - Claude Code → Claude (boss)             │
+   │  - DeepSeek API chat (worker)              │
+   │  - Ollama chat (local models)              │
+   │  - worker tools (SDK MCP) + agents.json    │
    └─────────┬──────────────────────────────────┘
              ▼
-   Kurulu claude CLI · DeepSeek API · Ollama
+   Installed claude CLI · DeepSeek API · Ollama
 ```
 
-## Alınan kararlar
+## Decisions made
 
-- **Claude bağlantısı:** Arkada çalışan gerçek Claude Code'a bağlanılır.
-  - Claude Agent SDK (TypeScript) zaten Claude Code'u alt süreç olarak çalıştırıyor.
-  - `pathToClaudeCodeExecutable` seçeneği bilgisayarda kurulu `claude` CLI'ı gösterir. CLI kendi kendini güncellediği için yeni modeller, araçlar ve özellikler kendiliğinden gelir.
-  - `settingSources` varsayılan ayarda kalır. Böylece CLAUDE.md, MCP sunucuları, skill'ler ve plugin'ler terminaldekiyle aynı olur.
-  - Oturumlar aynı klasörde tutulur, terminalden de devam ettirilebilir (doğrulanacak).
-  - SDK'nın kendi güncellemesi tek komut: `npm update`. SDK ile CLI sürümleri birbirinden çok uzaklaşırsa uyumsuzluk çıkabilir.
-- **Abonelik:** Kişisel kullanımda Claude aboneliğiyle giriş yapılabiliyor. Anthropic planladığı değişikliği durdurdu, kullanım abonelik limitinden düşüyor. Bu politika değişebilir, başlarken support.claude.com'daki "Use the Claude Agent SDK with your Claude plan" makalesini tekrar kontrol et. Yedek plan: Console API anahtarı.
-- **Güncellemelere dayanıklı arayüz:** Arayüzün tanımadığı mesaj türleri genel bir kart olarak gösterilir, hiçbir şey bozulmaz, sonradan güzelleştirilir. Opsiyonel olarak bir "Terminal" sekmesi (xterm.js) eklenir: sohbet panelinin henüz desteklemediği her özellik orada gerçek Claude Code ekranıyla kullanılır.
-- **Tek dil:** Arka uç ve işçi araçları TypeScript ile yazılır. İşçi araçları SDK'nın kendi içindeki MCP sunucusu olur, böylece olaylar doğrudan arayüze akar.
-- **Her ajan ayrı:** Claude Code üzerinden sadece Claude çalışır. DeepSeek ve local modeller Claude Code'dan bağımsızdır.
-  - Arayüzdeki ajan seçiciden herhangi biriyle doğrudan sohbet edilir. Her ajanın kendi sohbet geçmişi olur.
-  - Claude da onlara işçi araçları üzerinden iş verir.
-- **DeepSeek bağlantısı:** Doğrudan DeepSeek API'si (OpenAI uyumlu). Ollama da aynı formatı kullandığı için ikisi tek bir istemciyle konuşur. Modeller: `deepseek-flash` (V4.1-Flash, ucuz) ve `deepseek-v4-pro` (güçlü).
-- **Kod akışı (plan, henüz yapılmadı):**
-  1. Claude görevi ve testleri yazar.
-  2. İşçi aracı ilgili dosyaları okuyup DeepSeek'e gönderir, gelen kodu ayrı bir git worktree'ye yazar.
-  3. Testler otomatik çalışır.
-  4. Claude yalnızca diff'e ve sonuca bakar.
-- **Local işçiler (Ollama, ücretsiz):**
-  - `qwen3.8-27b-metin`: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB) modelinin görsel modülü çıkarılmış kopyası. Bağlam 16K. Ölçülen (RTX 4060 Laptop, %41 CPU / %59 GPU): çıktı ~3,7 token/sn, girdi ~250 token/sn, ilk yükleme ~15 sn. Düşünme kapalı çalışır (açıkken dakikalar sürer).
-  - Küçük bir embedding modeli: arama ve RAG için
-- **Local işçilerin rolü:**
-  - Gece çalışan toplu işler (örneğin görsel ön eleme)
-  - Gizli veri
-  - Arama indeksi (embedding)
-  - Acelesi olmayan toplu işler (log özetlemek vb.)
-  - Kod yazımı local'e değil DeepSeek'e gider.
-- **Kural: Uzun işler arka planda çalışır.** Claude işi başlatır, bir iş numarası alır, sonucu sonra kontrol eder. Böylece kilitlenip beklemez.
-- **Kural: Gizlilik.** "hassas" diye işaretlenen dosya ve işler sadece local işçiye gider. DeepSeek'e giden veri Çin'deki sunuculara gidiyor.
-- **İşçi listesi:** `agents.json`. Claude'un araçları: `list_workers`, `ask_worker(isim, görev, dosyalar)`, `start_job` ve `job_status` (arka plan işleri için).
-- **Dosyalar:** Dosyaları Claude değil araç kendisi okur, böylece Claude token harcamaz.
-- **Para güvenliği:** DeepSeek ön ödemeli, bakiye bitince `402` hatası verip durur. Ödemeyi limitli bir kartla yapmak önerilir. Araçta çağrı başına `max_tokens` limiti olur.
+- **Claude connection:** Connects to the real Claude Code running in the background.
+  - The Claude Agent SDK (TypeScript) already runs Claude Code as a subprocess.
+  - The `pathToClaudeCodeExecutable` option points to the installed `claude` CLI on the machine. Since the CLI updates itself, new models, tools, and features arrive automatically.
+  - `settingSources` stays at its default setting. This way CLAUDE.md, MCP servers, skills, and plugins are the same as in the terminal.
+  - Sessions are kept in the same folder and can also be resumed from the terminal (to be verified).
+  - Updating the SDK itself is a single command: `npm update`. If the SDK and CLI versions drift too far apart, incompatibilities may arise.
+- **Subscription:** For personal use, login with a Claude subscription works. Anthropic halted the change they had planned; usage counts against the subscription limit. This policy may change, so when starting out, re-check the "Use the Claude Agent SDK with your Claude plan" article at support.claude.com. Fallback plan: Console API key.
+- **Update-proof interface:** Message types the interface doesn't recognize are shown as a generic card; nothing breaks, and they can be prettified later. Optionally, a "Terminal" tab (xterm.js) is added: any feature the chat panel doesn't yet support can be used there with the real Claude Code screen.
+- **Single language:** The backend and worker tools are written in TypeScript. Worker tools become the MCP server inside the SDK itself, so events flow directly to the interface.
+- **Each agent is separate:** Only Claude runs through Claude Code. DeepSeek and local models are independent of Claude Code.
+  - You can chat directly with any of them from the agent selector in the interface. Each agent has its own chat history.
+  - Claude also assigns work to them through the worker tools.
+- **DeepSeek connection:** Direct DeepSeek API (OpenAI-compatible). Since Ollama uses the same format, both are spoken to with a single client. Models: `deepseek-flash` (V4.1-Flash, cheap) and `deepseek-v4-pro` (powerful).
+- **Code flow (planned, not yet done):**
+  1. Claude writes the task and tests.
+  2. The worker tool reads the relevant files and sends them to DeepSeek, writing the returned code to a separate git worktree.
+  3. Tests run automatically.
+  4. Claude only looks at the diff and the result.
+- **Local workers (Ollama, free):**
+  - `qwen3.8-27b-metin`: a copy of `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB) with the vision module removed. Context 16K. Measured (RTX 4060 Laptop, 41% CPU / 59% GPU): output ~3.7 tokens/s, input ~250 tokens/s, initial load ~15 s. Runs with thinking disabled (with it on, it takes minutes).
+  - A small embedding model: for search and RAG
+- **Role of local workers:**
+  - Batch jobs that run overnight (e.g., image pre-screening)
+  - Confidential data
+  - Search index (embedding)
+  - Non-urgent batch jobs (log summarization, etc.)
+  - Code writing goes to DeepSeek, not local.
+- **Rule: Long jobs run in the background.** Claude starts the job, gets a job number, and checks the result later. This way it doesn't lock up waiting.
+- **Rule: Privacy.** Files and jobs marked "sensitive" go only to the local worker. Data sent to DeepSeek goes to servers in China.
+- **Worker list:** `agents.json`. Claude's tools: `list_workers`, `ask_worker(name, task, files)`, `start_job`, and `job_status` (for background jobs).
+- **Files:** The tool itself reads the files, not Claude, so Claude doesn't spend tokens.
+- **Money safety:** DeepSeek is prepaid; when the balance runs out it returns a `402` error and stops. Paying with a limited card is recommended. The tool has a per-call `max_tokens` limit.
 
-## Arayüz tasarımı (karar: 2026-11-07)
+## Interface design (decision: 2026-11-07)
 
-**Teknoloji:** React + HeroUI + react-three-fiber (3D).
-- Sohbet bileşenleri HeroUI ile kendimiz yazılır. Gerekirse assistant-ui'ın başsız (headless) parçaları kullanılır.
-- Claude oturumlarının nasıl yönetildiğini görmek için CloudCLI'ın (siteboon/claudecodeui) koduna referans olarak bakılır.
+**Technology:** React + HeroUI + react-three-fiber (3D).
+- Chat components are written ourselves with HeroUI. If needed, headless parts of assistant-ui are used.
+- The code of CloudCLI (siteboon/claudecodeui) is consulted as a reference for how Claude sessions are managed.
 
-**Yerleşim (3 sütun, hedef ekran 1920x1080, %100 ölçek):**
+**Layout (3 columns, target screen 1920x1080, 100% scale):**
 
 ```
 ┌──────────┬──────────────────────────────┬──────────────┐
-│ Geçmiş   │        3D kütüphane          │ Sohbet       │
-│ (seçili  │  Claude ortada, işçiler      │ (seçili      │
-│  ajanın) │  etrafta, "+ işçi" butonu    │  ajanla)     │
+│ History  │        3D library            │ Chat         │
+│ (of the  │  Claude in the center,       │ (with the    │
+│  selected│  workers around,             │  selected    │
+│  agent)  │  "+ worker" button           │  agent)      │
 └──────────┴──────────────────────────────┴──────────────┘
-   ~280px            kalan alan               ~520px
+   ~280px            remaining space           ~520px
 ```
 
-- **Sohbet paneli boyutlandırılabilir.** Kenarından sürüklenir, genişliği hatırlanır.
-- **Geçmiş paneli daraltılabilir (odak modu).** Sadece ikonlar kalır, sohbet genişler.
-- **Uzun içerik ortada açılır.** Diff ve dosya gibi geniş içerikler 3D sahnenin üstünde açılır, çünkü 80-100 karakterlik kod satırları ~520px'lik sohbete sığmaz.
-- **3D sahnede bir karaktere tıklamak o ajanı seçer.** Sohbet ve geçmiş o ajana geçer.
+- **The chat panel is resizable.** It is dragged from its edge, and its width is remembered.
+- **The history panel is collapsible (focus mode).** Only icons remain, and the chat expands.
+- **Long content opens in the center.** Wide content like diffs and files opens over the 3D scene, because 80–100 character code lines don't fit in the ~520px chat.
+- **Clicking a character in the 3D scene selects that agent.** The chat and history switch to that agent.
 
-**Claude paneli, Claude desktop uygulamasının Code sekmesi gibi çalışır:**
-- **Yan sohbet (side chat):** Ana sohbeti bozmadan bir mesaj hakkında ayrı konuşma açılır. Sohbetin bağlamını bilir ama ana sohbete karışmaz. Teknik olarak SDK'daki `resume` + `forkSession` ile yapılır.
-  - Yan sohbet, ana sohbetin sağında ek bir sütun olarak açılır. 3D sahne o sırada daralır.
-- **Mesaja yanıt verme:** Bir mesajın tamamı ya da seçili bir kısmı alıntılanarak soru sorulur.
-- **Renk temaları:** Açık ve koyu mod ile birkaç vurgu rengi. Seçim hatırlanır.
-- CloudCLI'ın arayüzünden esinlenilir.
+**The Claude panel works like the Code tab of the Claude desktop app:**
+- **Side chat:** A separate conversation about a message opens without disturbing the main chat. It knows the chat's context but doesn't mix into the main chat. Technically done with `resume` + `forkSession` in the SDK.
+  - The side chat opens as an additional column to the right of the main chat. The 3D scene narrows at that time.
+- **Replying to a message:** A question is asked by quoting the whole message or a selected portion of it.
+- **Color themes:** Light and dark mode plus a few accent colors. The selection is remembered.
+- Inspired by CloudCLI's interface.
 
-**GitHub düzeni:**
+**GitHub layout:**
 
 ```
 scriptorium/
 ├── README.md, LICENSE (MIT), .gitignore, .env.example
 ├── package.json          (npm workspaces: server, web)
 ├── docs/PLAN.md
-├── server/               (Node/TS arka uç)
+├── server/               (Node/TS backend)
 │   ├── agents.example.json
 │   └── src/
 └── web/                  (React + HeroUI + react-three-fiber)
 ```
 
-- Sırlar (API anahtarları) sadece `.env` dosyasında durur, `.gitignore`'da yer alır. Repoya `.env.example` girer.
-- Kişisel işçi listesi `server/agents.json` da gitignore'da. Repoya `agents.example.json` girer.
+- Secrets (API keys) live only in the `.env` file, which is in `.gitignore`. `.env.example` goes into the repo.
+- The personal worker list `server/agents.json` is also in gitignore. `agents.example.json` goes into the repo.
 
-**Ortam (2026-11-07'de kontrol edildi):**
-- Node v22.19, Claude Code CLI 2.1.263 (npm ile kurulu).
-- `pathToClaudeCodeExecutable` için `claude.ps1` kısayolu değil, gerçek dosya yolu bulunacak.
+**Environment (checked on 2026-11-07):**
+- Node v22.19, Claude Code CLI 2.1.263 (installed via npm).
+- For `pathToClaudeCodeExecutable`, the real file path will be found, not the `claude.ps1` shortcut.
 
-## "Eksiksiz entegrasyon" kontrol listesi (sohbet paneli)
+## "Full integration" checklist (chat panel)
 
-- [x] Ajan seçici: Claude, DeepSeek ve local modeller. Her ajanın ayrı sohbet geçmişi var.
-- [x] Akış halinde cevap, düşünme blokları açılıp kapanıyor.
-- [x] Claude'un araç çağrıları kartlarla gösteriliyor: okuma, komut, Edit/Write için kırmızı-yeşil fark, yapılacaklar listesi, alt ajan adımları girintili.
-- [x] İzin onayı: İzin ver / Her zaman izin ver / Reddet. Claude'un seçenekli soruları (AskUserQuestion) da cevaplanabiliyor.
-- [x] Durdurma butonu
-- [x] Oturum geçmişi: terminaldeki Claude Code oturumlarıyla ortak. Açılabiliyor, yeniden adlandırılabiliyor, silinebiliyor. Sayfa yenilenince kaldığı yerden devam ediyor.
-- [x] "→ DeepSeek'e devredildi" kartı ve 3D'de karakterin masaya yürümesi
-- [x] Tanınmayan mesaj türleri genel kartla gösteriliyor (Claude Code güncellemelerine dayanıklı).
-- [x] Yan sohbet (forkSession): ana sohbetin bağlamını biliyor, ana sohbete karışmıyor.
-- [x] Mesaja alıntıyla yanıt verme (seçili metin ya da mesajın tamamı)
-- [x] Tema seçici (açık/koyu/sistem + 6 vurgu rengi) ve pixel görünüm anahtarı
-- [x] **Oturum bilgi paneli** (sağ üst): ortam ve git dalı, ek klasörler, bağlam doluluğu, bağlayıcılar (aç/kapa, yeniden bağlan), çıktılar (yazılan dosyalar), git değişiklikleri (+/− ve diff), arka plan görevleri (durdurulabilir) ve işçi işleri
-- [x] **"+" menüsü** (sol alt): dosya veya fotoğraf ekle (görsel, PDF, metin; yapıştırma ve sürükle-bırak da çalışıyor), klasör ekle, slash komutları, bağlayıcılar, eklentiler
-- [x] Slash komut önerileri: `/` yazınca açılıyor, ok tuşları ve Tab/Enter ile seçiliyor.
-- [x] Yazma kutusu altında çubuk: klasör seçici (projeler + klasör gezgini), model / efor / hızlı mod menüsü, izin modu, kullanım halkası
-- [x] Üst barda abonelik kullanım limitleri (5 saatlik, 7 günlük)
-- [x] Geçmiş paneli projelere göre gruplu (PROJECTS_DIR otomatik). Sağ tık menüsü: yeni sohbet, yolu kopyala, gizle/göster, tüm sohbetleri sil (onaylı, dosyalara dokunmaz), sohbet aç/yeniden adlandır/sil.
-- [x] 3D etiketleri drei <Html> yerine sahne üstü katmanda: React 19'da kaybolma sorunu çözüldü
-- [x] Karanlık modda meşaleler ve mangal (titreyen sıcak ışık)
-- [x] İlk kurulum penceresi: Claude girişi, DeepSeek anahtarı, local modeller, bütün Claude Code oturumlarına bağlama
-- [x] İşçi araçları HTTP MCP sunucusu olarak da açık: terminal ve masaüstü Claude Code oturumları da kullanıyor
-- [x] Aynı işçiye aynı anda gelen her iş için 3D'de ayrı kopya; üzerine gelince iş kartı
-- [x] İşçi panelinde ek dosya, model ve düşünme menüsü, ayarlar, token kullanımı ve bağlam halkası
-- [ ] Terminal sekmesi (opsiyonel, sonraya bırakıldı): gerçek Claude Code ekranı. node-pty yerel derleme gerektiriyor.
+- [x] Agent selector: Claude, DeepSeek, and local models. Each agent has a separate chat history.
+- [x] Streaming responses, thinking blocks open and close.
+- [x] Claude's tool calls are shown with cards: read, command, red-green diff for Edit/Write, todo list, sub-agent steps indented.
+- [x] Permission approval: Allow / Always allow / Deny. Claude's multiple-choice questions (AskUserQuestion) can also be answered.
+- [x] Stop button
+- [x] Session history: shared with Claude Code sessions in the terminal. Can be opened, renamed, deleted. Resumes where it left off after a page refresh.
+- [x] "→ Delegated to DeepSeek" card and the character walking to the desk in 3D
+- [x] Unrecognized message types are shown with a generic card (resilient to Claude Code updates).
+- [x] Side chat (forkSession): knows the main chat's context, doesn't mix into the main chat.
+- [x] Replying to a message with a quote (selected text or the whole message)
+- [x] Theme selector (light/dark/system + 6 accent colors) and pixel look toggle
+- [x] **Session info panel** (top right): environment and git branch, additional folders, context fullness, connectors (open/close, reconnect), outputs (written files), git changes (+/− and diff), background tasks (stoppable), and worker jobs
+- [x] **"+" menu** (bottom left): attach file or photo (image, PDF, text; paste and drag-and-drop also work), add folder, slash commands, connectors, plugins
+- [x] Slash command suggestions: opens when typing `/`, selected with arrow keys and Tab/Enter.
+- [x] Bar under the input box: folder picker (projects + folder explorer), model / effort / fast mode menu, permission mode, usage ring
+- [x] Subscription usage limits in the top bar (5-hour, 7-day)
+- [x] History panel grouped by project (PROJECTS_DIR automatic). Right-click menu: new chat, copy path, hide/show, delete all chats (with confirmation, doesn't touch files), open/rename/delete chat.
+- [x] 3D labels in a scene-overlay layer instead of drei `<Html>`: disappearance issue in React 19 resolved
+- [x] Torches and brazier in dark mode (flickering warm light)
+- [x] Initial setup window: Claude login, DeepSeek key, local models, connecting to all Claude Code sessions
+- [x] Worker tools also exposed as an HTTP MCP server: terminal and desktop Claude Code sessions use them too
+- [x] A separate copy in 3D for each job arriving at the same worker simultaneously; job card on hover
+- [x] Worker panel with extra files, model and thinking menu, settings, token usage, and context ring
+- [ ] Terminal tab (optional, postponed): real Claude Code screen. node-pty requires a native build.
 
-## İlk kurulum
+## Initial setup
 
-Uygulama ilk açılışta Kurulum penceresini gösterir (sonra Ayarlar menüsünden açılır):
+On first launch, the app shows the Setup window (later opened from the Settings menu):
 
-1. Claude hesabıyla giriş (tarayıcıda Anthropic giriş sayfası açılır)
-2. DeepSeek API anahtarı (isteğe bağlı, sadece yerel `.env` dosyasına yazılır)
-3. Ollama'da kurulu modellerden local işçi ekleme (isteğe bağlı)
-4. İşçi araçlarını bütün Claude Code oturumlarına ekleme ve devretme kuralları (isteğe bağlı)
+1. Log in with a Claude account (the Anthropic login page opens in the browser)
+2. DeepSeek API key (optional, written only to the local `.env` file)
+3. Adding local workers from models installed in Ollama (optional)
+4. Adding worker tools to all Claude Code sessions and delegation rules (optional)
 
-## Aşamalar
+## Phases
 
-### Aşama 1: Arka uç iskeleti + işçi araçları ✅
-- [x] Agent SDK, `pathToClaudeCodeExecutable` ile kurulu `claude`'a bağlanıyor. Abonelik girişiyle, CLI kendini güncellediğinde yeni sürüm otomatik kullanılıyor.
-- [x] SDK içi MCP işçi araçları: `list_workers`, `ask_worker`, `start_job`, `job_status` (`alwaysLoad`). Gizlilik kuralı: `sensitive: true` sadece local işçilere gider.
-- [x] DeepSeek ve Ollama için tek bir OpenAI uyumlu istemci, `max_tokens` limiti
-- [x] DeepSeek bağlandı (2026-11-07): bakiye okunuyor, doğrudan sohbet uçtan uca çalışıyor (cevap 1,1 sn), 3D durumları doğru. Claude'un devretme testi kullanıcıyla yapılacak.
+### Phase 1: Backend skeleton + worker tools ✅
+- [x] Agent SDK connects to the installed `claude` via `pathToClaudeCodeExecutable`. With subscription login, the new version is used automatically when the CLI updates itself.
+- [x] In-SDK MCP worker tools: `list_workers`, `ask_worker`, `start_job`, `job_status` (`alwaysLoad`). Privacy rule: `sensitive: true` goes only to local workers.
+- [x] A single OpenAI-compatible client for DeepSeek and Ollama, with a `max_tokens` limit
+- [x] DeepSeek connected (2026-11-07): balance is read, direct chat works end-to-end (response 1.1 s), 3D states are correct. Claude's delegation test will be done with the user.
 
-### Aşama 2: Sohbet arayüzü ✅
-- [x] WebSocket köprüsü: sadece 127.0.0.1'e açık, yalnızca izinli arayüz adreslerinden bağlantı kabul ediyor.
-- [x] Yukarıdaki kontrol listesi (terminal sekmesi hariç)
+### Phase 2: Chat interface ✅
+- [x] WebSocket bridge: open only on 127.0.0.1, accepts connections only from allowed interface addresses.
+- [x] The checklist above (except the terminal tab)
 
-### Aşama 3: 3D sahne ✅
-- [x] İzometrik ofis-kütüphane (ortografik kamera, pixel görünüm). Claude arkada baş masada, işçiler sıra sıra monitörlü masalarda.
-- [x] Durumlar:
-  - çalışıyor: masada yazıyor, ekran yanıyor, görev etiketi görünüyor
-  - boşta: dinlenme köşesinde kitap okuyor
-  - yer kalmazsa: masada uyukluyor
-  - hata: kırmızı etiket, 12 sn sonra kendiliğinden boşta durumuna dönüyor
-- [x] Karaktere tıklamak o ajanı seçiyor. Açık ve koyu modda aydınlatma farklı.
+### Phase 3: 3D scene ✅
+- [x] Isometric office-library (orthographic camera, pixel look). Claude at the head desk in the back, workers in rows at desks with monitors.
+- [x] States:
+  - working: typing at the desk, screen lit, task label visible
+  - idle: reading a book in the rest corner
+  - if no space left: dozing at the desk
+  - error: red label, automatically returns to idle after 12 s
+- [x] Clicking a character selects that agent. Lighting differs in light and dark mode.
 
-### Aşama 4: İşçi ekleme + arka plan işleri ✅
-- [x] "İşçi ekle" penceresi: ekle, düzenle, sil. `agents.json`'a yazıyor, Claude yeni işçiyi hemen görüyor.
-- [x] `start_job` / `job_status` iş kuyruğu. Aynı işçinin işleri sırayla çalışıyor.
+### Phase 4: Adding workers + background jobs ✅
+- [x] "Add worker" window: add, edit, delete. Writes to `agents.json`; Claude sees the new worker immediately.
+- [x] `start_job` / `job_status` job queue. Jobs for the same worker run in order.
 
-## Sınırlar (unutma)
+## Limits (remember)
 
-- Devretmek en çok şu işlerde kazandırır:
-  - net tanımlı, kendi içinde kapalı kod görevleri
-  - büyük girdi alıp küçük çıktı veren işler
-  - gizli veri
-- Karmaşık debug ve mimari kararlar Claude'da kalmalı.
-- Test bilgisayarı: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. Local model 16K bağlamla çalışıyor (4K: %15 daha hızlı, 32K: %25 daha yavaş ve 11 GB bellek).
+- Delegation pays off most for:
+  - clearly defined, self-contained code tasks
+  - jobs that take large input and produce small output
+  - confidential data
+- Complex debugging and architectural decisions should stay with Claude.
+- Test machine: RTX 4060 Laptop (8 GB VRAM), 16 GB RAM. The local model runs with 16K context (4K: 15% faster, 32K: 25% slower and 11 GB memory).

@@ -1,8 +1,8 @@
 /**
- * Terminalden test aracı. Arayüz hazır olana kadar Claude oturumunu ve işçi araçlarını buradan deneriz.
+ * Terminal test tool. We test the Claude session and worker tools from here until the UI is ready.
  *
- *   npm run cli                  → sohbet modu
- *   npm run cli -- "mesaj"       → tek mesaj gönderir, cevabı yazar, çıkar
+ *   npm run cli                  → chat mode
+ *   npm run cli -- "mesaj"       → sends a single message, prints the reply, exits
  */
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
@@ -15,7 +15,7 @@ const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 
 bus.on("activity", (e) => {
   const detail = e.task ? `: ${e.task.slice(0, 80)}` : e.error ? `: ${e.error}` : "";
-  console.log(dim(`\n[işçi ${e.agentId} → ${e.status}${detail}]`));
+  console.log(dim(`\n[worker ${e.agentId} → ${e.status}${detail}]`));
 });
 
 let finishTurn: (() => void) | null = null;
@@ -30,8 +30,8 @@ function render(msg: SDKMessage) {
     case "system":
       if (msg.subtype === "init") {
         const mcpTools = msg.tools.filter((t) => t.startsWith("mcp__scriptorium__"));
-        const auth = msg.apiKeySource === "none" ? "abonelik girişi" : `API anahtarı (${msg.apiKeySource})`;
-        console.log(dim(`[Claude Code ${msg.claude_code_version} · ${msg.model} · ${auth} · işçi araçları: ${mcpTools.join(", ") || "YOK"}]`));
+        const auth = msg.apiKeySource === "none" ? "subscription login" : `API key (${msg.apiKeySource})`;
+        console.log(dim(`[Claude Code ${msg.claude_code_version} · ${msg.model} · ${auth} · worker tools: ${mcpTools.join(", ") || "NONE"}]`));
       }
       break;
     case "stream_event": {
@@ -42,16 +42,16 @@ function render(msg: SDKMessage) {
     case "assistant":
       for (const block of msg.message.content) {
         if (block.type === "tool_use") {
-          console.log(dim(`\n[araç] ${block.name} ${JSON.stringify(block.input).slice(0, 200)}`));
+          console.log(dim(`\n[tool] ${block.name} ${JSON.stringify(block.input).slice(0, 200)}`));
         }
       }
       break;
     case "result":
       if (msg.is_error) {
         const reason = "result" in msg ? msg.result : msg.subtype;
-        console.log(`\n\x1b[31m[hata] ${reason}\x1b[0m`);
+        console.log(`\n\x1b[31m[error] ${reason}\x1b[0m`);
       }
-      console.log(dim(`\n[tur bitti: ${msg.subtype}, ${(msg.duration_ms / 1000).toFixed(1)} sn]`));
+      console.log(dim(`\n[turn finished: ${msg.subtype}, ${(msg.duration_ms / 1000).toFixed(1)} s]`));
       finishTurn?.();
       finishTurn = null;
       break;
@@ -60,11 +60,11 @@ function render(msg: SDKMessage) {
 
 const canUseTool: CanUseTool = async (toolName, input, { title }) => {
   const answer = await rl.question(
-    `\n${title ?? toolName}\n${dim(JSON.stringify(input).slice(0, 300))}\nİzin verilsin mi? (e/h) `,
+    `\n${title ?? toolName}\n${dim(JSON.stringify(input).slice(0, 300))}\nAllow? (y/n) `,
   );
-  return answer.trim().toLowerCase().startsWith("e")
+  return answer.trim().toLowerCase().startsWith("y")
     ? { behavior: "allow", updatedInput: input }
-    : { behavior: "deny", message: "Kullanıcı izin vermedi." };
+    : { behavior: "deny", message: "User denied permission." };
 };
 
 async function runTurn(session: ClaudeSession, text: string) {
@@ -79,21 +79,21 @@ const oneShot = process.argv.slice(2).join(" ").trim();
 if (oneShot) {
   await runTurn(main, oneShot);
 } else {
-  console.log(dim("Komutlar: /yan <mesaj> → yan sohbet (ana sohbeti bozmaz), /cik → çıkış"));
+  console.log(dim("Commands: /side <message> → side chat (does not disturb the main chat), /quit → exit"));
   while (true) {
     const line = (await rl.question("\n> ")).trim();
     if (!line) continue;
-    if (line === "/cik") break;
-    if (line.startsWith("/yan ")) {
+    if (line === "/quit") break;
+    if (line.startsWith("/side ")) {
       if (!main.sessionId) {
-        console.log("Önce ana sohbete bir mesaj yaz.");
+        console.log("First send a message to the main chat.");
         continue;
       }
       const side = new ClaudeSession({ resume: main.sessionId, fork: true, onMessage: render, canUseTool });
-      console.log(dim("[yan sohbet açıldı]"));
-      await runTurn(side, line.slice(5));
+      console.log(dim("[side chat opened]"));
+      await runTurn(side, line.slice(6));
       side.close();
-      console.log(dim("[yan sohbet kapandı, ana sohbete dönüldü]"));
+      console.log(dim("[side chat closed, returned to main chat]"));
       continue;
     }
     await runTurn(main, line);

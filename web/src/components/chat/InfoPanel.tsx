@@ -19,9 +19,9 @@ import { load, save } from "../../lib/storage";
 import { UsageCard } from "./UsageCard";
 import { actions, agentMeta, useApp, type ClaudeChat } from "../../store";
 
-const fmt = (n: number) => n.toLocaleString("tr-TR");
+const fmt = (n: number) => n.toLocaleString("en-US");
 
-/** Claude oturumunun bilgi paneli: ortam, bağlam, bağlayıcılar, çıktılar, değişiklikler, arka plan görevleri */
+/** Info panel for the Claude session: environment, context, connectors, outputs, changes, background tasks */
 export function InfoPanel({ chatId }: { chatId: string }) {
   const chat = useApp((s) => s.chats[chatId]);
   const git = useApp((s) => s.git[s.chats[chatId]?.cwd ?? ""]);
@@ -37,21 +37,21 @@ export function InfoPanel({ chatId }: { chatId: string }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-separator px-3 py-2.5">
         <Info size={16} className="text-accent" />
-        <span className="flex-1 text-sm font-semibold">Oturum bilgisi</span>
+        <span className="flex-1 text-sm font-semibold">Session info</span>
         <Tooltip delay={300}>
-          <Button isIconOnly size="sm" variant="ghost" aria-label="Yenile" onPress={() => actions.requestInfo(chatId)}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="Refresh" onPress={() => actions.requestInfo(chatId)}>
             <RefreshCw size={14} />
           </Button>
-          <Tooltip.Content>Yenile</Tooltip.Content>
+          <Tooltip.Content>Refresh</Tooltip.Content>
         </Tooltip>
-        <Button isIconOnly size="sm" variant="ghost" aria-label="Paneli kapat" onPress={() => actions.setUi({ infoOpen: false })}>
+        <Button isIconOnly size="sm" variant="ghost" aria-label="Close panel" onPress={() => actions.setUi({ infoOpen: false })}>
           <X size={16} />
         </Button>
       </div>
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 text-sm">
         <Environment chat={chat} branch={git?.branch} />
         <ContextSection chat={chat} />
-        <Section id="usage" title="Kullanım">
+        <Section id="usage" title="Usage">
           <UsageCard usage={chat.info?.usage ?? globalUsage} fluid />
         </Section>
         <Connectors chat={chat} />
@@ -63,7 +63,7 @@ export function InfoPanel({ chatId }: { chatId: string }) {
   );
 }
 
-/** Bölümlerin varsayılan açık/kapalı durumu; kullanıcının seçimi hatırlanır */
+/** Default open/off state of sections; the user's choice is remembered */
 const SECTION_DEFAULTS: Record<string, boolean> = {
   env: true,
   context: true,
@@ -79,7 +79,7 @@ function Section({ id, title, right, children }: { id: string; title: string; ri
   const focus = useApp((s) => s.infoFocus);
   const ref = useRef<HTMLElement>(null);
 
-  // "Tümünü gör" gibi bir yerden bu bölüme odaklanıldıysa aç ve görünür kıl
+  // If this section is focused from somewhere like "View all", open it and make it visible
   useEffect(() => {
     if (focus?.section !== id) return;
     setOpen(true);
@@ -126,8 +126,8 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
     setAdding(false);
   };
   return (
-    <Section id="env" title="Ortam">
-      <Row icon={<Monitor size={14} />}>Bu bilgisayar</Row>
+    <Section id="env" title="Environment">
+      <Row icon={<Monitor size={14} />}>This computer</Row>
       <Row icon={<Folder size={14} />} title={chat.cwd}>
         <span className="font-medium">{folder}</span> <span className="font-code text-xs text-muted">{chat.cwd}</span>
       </Row>
@@ -137,7 +137,7 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
             <span className="font-code min-w-0 flex-1 truncate text-xs">{d}</span>
             <button
               type="button"
-              aria-label="Klasörü çıkar"
+              aria-label="Remove folder"
               className="shrink-0 text-muted hover:text-danger"
               onClick={() => actions.setDirs(chat.chatId, chat.dirs.filter((x) => x !== d))}
             >
@@ -165,20 +165,20 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
               if (e.key === "Enter") add();
               if (e.key === "Escape") setAdding(false);
             }}
-            placeholder="C:\Users\...\proje"
+            placeholder="C:\Users\...\project"
             className="font-code min-w-0 flex-1 rounded-md border border-field-border bg-field px-2 py-1 text-xs outline-none focus:border-accent"
           />
           <Button size="sm" variant="secondary" onPress={add}>
-            Ekle
+            Add
           </Button>
         </div>
       ) : (
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => actions.openFolderPicker("dir", chat.chatId)} className="flex items-center gap-2 text-xs text-muted hover:text-foreground">
-            <FolderPlus size={14} /> Klasör ekle
+            <FolderPlus size={14} /> Add folder
           </button>
           <button type="button" onClick={() => setAdding(true)} className="text-[11px] text-muted hover:text-foreground">
-            yol yaz
+            type path
           </button>
         </div>
       )}
@@ -189,7 +189,7 @@ function Environment({ chat, branch }: { chat: ClaudeChat; branch?: string }) {
 function ContextSection({ chat }: { chat: ClaudeChat }) {
   const ctx = chat.info?.context;
   return (
-    <Section id="context" title="Bağlam" right={ctx && <span className="text-xs tabular-nums text-muted">%{Math.round(ctx.percentage)}</span>}>
+    <Section id="context" title="Context" right={ctx && <span className="text-xs tabular-nums text-muted">{Math.round(ctx.percentage)}%</span>}>
       {ctx ? (
         <>
           <div className="h-1.5 overflow-hidden rounded-full bg-default-soft">
@@ -205,7 +205,7 @@ function ContextSection({ chat }: { chat: ClaudeChat }) {
       ) : chat.opened ? (
         <Loading />
       ) : (
-        <p className="text-xs text-muted">Sohbet başlayınca görünür.</p>
+        <p className="text-xs text-muted">Visible once the chat starts.</p>
       )}
     </Section>
   );
@@ -219,20 +219,20 @@ const STATUS_COLOR: Record<string, string> = {
   disabled: "bg-default",
 };
 const STATUS_TEXT: Record<string, string> = {
-  connected: "bağlı",
-  pending: "bağlanıyor",
-  "needs-auth": "giriş gerekli",
-  failed: "hata",
-  disabled: "kapalı",
+  connected: "connected",
+  pending: "connecting",
+  "needs-auth": "auth required",
+  failed: "error",
+  disabled: "off",
 };
 
 export function ConnectorList({ chat }: { chat: ClaudeChat }) {
   const globalMcp = useApp((s) => s.globalInfo?.mcp);
   const list = chat.info?.mcp ?? chat.init?.mcpServers ?? globalMcp ?? [];
   if (!chat.info && !chat.init && !globalMcp) return <Loading />;
-  // Sohbet açık değilken liste ortak bilgiden gelir; aç/kapa ve yeniden bağlanma sohbet açılınca çalışır
+  // When the chat is not open, the list comes from shared info; toggle and reconnect work once the chat is opened
   const live = chat.opened;
-  if (!list.length) return <p className="text-xs text-muted">Bağlayıcı yok.</p>;
+  if (!list.length) return <p className="text-xs text-muted">No connectors.</p>;
   return (
     <ul className="flex flex-col gap-1.5">
       {list.map((m) => {
@@ -241,23 +241,23 @@ export function ConnectorList({ chat }: { chat: ClaudeChat }) {
           <li key={m.name} className="flex items-center gap-2">
             <span className={`size-2 shrink-0 rounded-full ${STATUS_COLOR[m.status] ?? "bg-default"}`} />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm">{m.name === "workers" ? "Scriptorium işçileri" : m.name}</div>
+              <div className="truncate text-sm">{m.name === "scriptorium" ? "Scriptorium workers" : m.name}</div>
               <div className="truncate text-[11px] text-muted" title={extra.error}>
                 {STATUS_TEXT[m.status] ?? m.status}
-                {extra.toolCount !== undefined && ` · ${extra.toolCount} araç`}
+                {extra.toolCount !== undefined && ` · ${extra.toolCount} tools`}
                 {extra.error && ` · ${extra.error}`}
               </div>
             </div>
             {live && (m.status === "failed" || m.status === "needs-auth") && (
               <Tooltip delay={300}>
-                <Button isIconOnly size="sm" variant="ghost" aria-label="Yeniden bağlan" onPress={() => actions.reconnectMcp(chat.chatId, m.name)}>
+                <Button isIconOnly size="sm" variant="ghost" aria-label="Reconnect" onPress={() => actions.reconnectMcp(chat.chatId, m.name)}>
                   <RotateCw size={13} />
                 </Button>
-                <Tooltip.Content>Yeniden bağlan</Tooltip.Content>
+                <Tooltip.Content>Reconnect</Tooltip.Content>
               </Tooltip>
             )}
             {live && m.name !== "workers" && (
-              <Switch size="sm" isSelected={m.status !== "disabled"} onChange={(on) => actions.toggleMcp(chat.chatId, m.name, on)} aria-label={`${m.name} aç/kapat`}>
+              <Switch size="sm" isSelected={m.status !== "disabled"} onChange={(on) => actions.toggleMcp(chat.chatId, m.name, on)} aria-label={`${m.name} on/off`}>
                 <Switch.Control>
                   <Switch.Thumb />
                 </Switch.Control>
@@ -273,7 +273,7 @@ export function ConnectorList({ chat }: { chat: ClaudeChat }) {
 function Connectors({ chat }: { chat: ClaudeChat }) {
   const count = (chat.info?.mcp ?? chat.init?.mcpServers ?? []).length;
   return (
-    <Section id="connectors" title="Bağlayıcılar" right={count > 0 && <span className="text-xs text-muted">{count}</span>}>
+    <Section id="connectors" title="Connectors" right={count > 0 && <span className="text-xs text-muted">{count}</span>}>
       <ConnectorList chat={chat} />
     </Section>
   );
@@ -281,7 +281,7 @@ function Connectors({ chat }: { chat: ClaudeChat }) {
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 
-/** Claude'un bu oturumda yazdığı/düzenlediği dosyalar (en son dokunulan önce) */
+/** Files written/edited by Claude in this session (most recently touched first) */
 function Outputs({ chat, isRepo }: { chat: ClaudeChat; isRepo: boolean }) {
   const files = useMemo(() => {
     const seen = new Map<string, number>();
@@ -300,9 +300,9 @@ function Outputs({ chat, isRepo }: { chat: ClaudeChat; isRepo: boolean }) {
   };
 
   return (
-    <Section id="outputs" title="Çıktılar" right={files.length > 0 && <span className="text-xs text-muted">{files.length}</span>}>
+    <Section id="outputs" title="Outputs" right={files.length > 0 && <span className="text-xs text-muted">{files.length}</span>}>
       {files.length === 0 ? (
-        <p className="text-xs text-muted">Bu oturumda henüz dosya yazılmadı.</p>
+        <p className="text-xs text-muted">No files written in this session yet.</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
           {files.map((f) => (
@@ -310,7 +310,7 @@ function Outputs({ chat, isRepo }: { chat: ClaudeChat; isRepo: boolean }) {
               <button
                 type="button"
                 title={f}
-                onClick={() => (isRepo ? actions.showGitDiff(chat.cwd, rel(f)) : actions.showOverlay({ title: f, body: "Bu klasör bir git deposu değil, fark gösterilemiyor.", mono: true }))}
+                onClick={() => (isRepo ? actions.showGitDiff(chat.cwd, rel(f)) : actions.showOverlay({ title: f, body: "This folder is not a git repository, cannot show diff.", mono: true }))}
                 className="flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left hover:bg-default-soft"
               >
                 <FileCode2 size={14} className="shrink-0 text-muted" />
@@ -329,7 +329,7 @@ function Changes({ chat }: { chat: ClaudeChat }) {
   return (
     <Section
       id="changes"
-      title="Değişiklikler"
+      title="Changes"
       right={
         git?.isRepo ? (
           <span className="text-xs tabular-nums">
@@ -341,9 +341,9 @@ function Changes({ chat }: { chat: ClaudeChat }) {
       {!git ? (
         <Loading />
       ) : !git.isRepo ? (
-        <p className="text-xs text-muted">Bu klasör bir git deposu değil.</p>
+        <p className="text-xs text-muted">This folder is not a git repository.</p>
       ) : git.files.length === 0 ? (
-        <p className="text-xs text-muted">Değişiklik yok.</p>
+        <p className="text-xs text-muted">No changes.</p>
       ) : (
         <>
           <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
@@ -357,7 +357,7 @@ function Changes({ chat }: { chat: ClaudeChat }) {
                 >
                   <span className="min-w-0 flex-1 truncate text-xs">
                     {f.path}
-                    {f.untracked && <span className="ml-1 text-[10px] text-success">yeni</span>}
+                    {f.untracked && <span className="ml-1 text-[10px] text-success">new</span>}
                   </span>
                   <span className="shrink-0 text-[11px] tabular-nums">
                     <span className="text-success">+{f.added}</span> <span className="text-danger">−{f.removed}</span>
@@ -368,9 +368,9 @@ function Changes({ chat }: { chat: ClaudeChat }) {
           </ul>
           <div className="flex gap-1">
             <Button size="sm" variant="secondary" onPress={() => actions.showGitDiff(chat.cwd)}>
-              <GitCompareArrows size={14} /> Tüm farkı gör
+              <GitCompareArrows size={14} /> View full diff
             </Button>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Yenile" onPress={() => actions.refreshGit(chat.cwd)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Refresh" onPress={() => actions.refreshGit(chat.cwd)}>
               <RefreshCw size={13} />
             </Button>
           </div>
@@ -381,16 +381,16 @@ function Changes({ chat }: { chat: ClaudeChat }) {
 }
 
 const TASK_TEXT: Record<string, string> = {
-  pending: "bekliyor",
-  queued: "sırada",
-  running: "çalışıyor",
-  paused: "duraklatıldı",
-  completed: "bitti",
-  done: "bitti",
-  failed: "hata",
-  error: "hata",
-  killed: "durduruldu",
-  stopped: "durduruldu",
+  pending: "pending",
+  queued: "queued",
+  running: "working",
+  paused: "paused",
+  completed: "done",
+  done: "done",
+  failed: "error",
+  error: "error",
+  killed: "stopped",
+  stopped: "stopped",
 };
 
 function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
@@ -400,8 +400,8 @@ function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
   const running = tasks.filter((t) => t.status === "running" || t.status === "pending").length + jobs.filter((j) => j.status === "running" || j.status === "queued").length;
 
   return (
-    <Section id="tasks" title="Arka plan görevleri" right={running > 0 && <span className="text-xs text-accent">{running} aktif</span>}>
-      {tasks.length === 0 && jobs.length === 0 && <p className="text-xs text-muted">Arka planda çalışan görev yok.</p>}
+    <Section id="tasks" title="Background tasks" right={running > 0 && <span className="text-xs text-accent">{running} active</span>}>
+      {tasks.length === 0 && jobs.length === 0 && <p className="text-xs text-muted">No tasks running in the background.</p>}
       {tasks.map((t) => (
         <div key={t.id} className="flex items-center gap-2">
           {t.status === "running" ? <Spinner size="sm" /> : <span className={`size-2 rounded-full ${t.status === "failed" ? "bg-danger" : "bg-success"}`} />}
@@ -416,10 +416,10 @@ function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
           </div>
           {t.status === "running" && (
             <Tooltip delay={300}>
-              <Button isIconOnly size="sm" variant="ghost" aria-label="Görevi durdur" onPress={() => actions.stopTask(chat.chatId, t.id)}>
+              <Button isIconOnly size="sm" variant="ghost" aria-label="Stop task" onPress={() => actions.stopTask(chat.chatId, t.id)}>
                 <CircleStop size={14} />
               </Button>
-              <Tooltip.Content>Durdur</Tooltip.Content>
+              <Tooltip.Content>Stop</Tooltip.Content>
             </Tooltip>
           )}
         </div>
@@ -430,7 +430,7 @@ function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
           <button
             key={j.id}
             type="button"
-            onClick={() => j.result && actions.showOverlay({ title: `${meta.name} · iş ${j.id}`, body: j.result })}
+            onClick={() => j.result && actions.showOverlay({ title: `${meta.name} · job ${j.id}`, body: j.result })}
             className="flex items-center gap-2 text-left"
           >
             {j.status === "running" ? <Spinner size="sm" /> : <span className="size-2 rounded-full" style={{ background: meta.color }} />}
@@ -453,7 +453,7 @@ function BackgroundTasks({ chat }: { chat: ClaudeChat }) {
 function Loading() {
   return (
     <div className="flex items-center gap-2 text-xs text-muted">
-      <Spinner size="sm" /> Yükleniyor…
+      <Spinner size="sm" /> Loading…
     </div>
   );
 }

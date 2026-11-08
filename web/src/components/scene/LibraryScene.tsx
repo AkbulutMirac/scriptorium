@@ -11,7 +11,7 @@ import { claudePose, computeFigures, hotDeskCount, type Pose } from "./placement
 import { CLAUDE_STATION, ROOM_BACK_Z, ROOM_HALF_X, roomFrontZ, workstations } from "./layout";
 import { ComputerDesk, Lounge, OfficeChair, palette, Room } from "./Office";
 
-/** Ortografik kamerayı odanın tamamı görünecek şekilde yakınlaştırır */
+/** Zooms the orthographic camera so the whole room is visible */
 function CameraFit({ frontZ }: { frontZ: number }) {
   const camera = useThree((s) => s.camera);
   const width = useThree((s) => s.size.width);
@@ -28,9 +28,9 @@ function CameraFit({ frontZ }: { frontZ: number }) {
 }
 
 /**
- * Ortadaki izometrik ofis-kütüphane: Claude arkada baş masada, işçiler sıra sıra, boştakiler
- * dinlenme köşesinde. Aynı işçiye aynı anda birden fazla iş gelirse her iş için bir kopyası
- * odaya girip ek masalardan birine oturur, işi bitince çıkar.
+ * The central isometric office-library: Claude at the head desk in the back, workers in rows, idle ones
+ * in the lounge corner. If the same worker gets multiple jobs at once, a copy of each job
+ * enters the room and sits at one of the extra desks, leaving when the job is done.
  */
 export function LibraryScene() {
   const workers = useApp((s) => s.workers);
@@ -93,7 +93,7 @@ export function LibraryScene() {
       <Room p={p} frontZ={frontZ} isDark={isDark} />
       <Lounge p={p} isDark={isDark} />
 
-      {/* Baş yazıcı */}
+      {/* Head printer */}
       <ComputerDesk position={CLAUDE_STATION.desk} p={p} big screenOn={cPose === "working"} accentHex={accentHex} isDark={isDark} />
       <OfficeChair position={[CLAUDE_STATION.seat.pos[0], 0, CLAUDE_STATION.seat.pos[2] - 0.15]} color="#7a3b2e" />
       <AgentFigure
@@ -108,7 +108,7 @@ export function LibraryScene() {
         onSelect={() => actions.selectAgent(CLAUDE_ID)}
       />
 
-      {/* Masalar: önce her işçinin kendi masası, sonra kopyalar için ek masalar */}
+      {/* Desks: first each worker's own desk, then extra desks for copies */}
       {stations.map((st, i) => {
         const w = workers[i];
         const busyHot = !w && occupied.has(i - workers.length);
@@ -121,7 +121,7 @@ export function LibraryScene() {
         );
       })}
 
-      {/* İşçiler ve kopyaları */}
+      {/* Workers and their copies */}
       {figures.map((f) => (
         <AgentFigure
           key={f.key}
@@ -168,7 +168,7 @@ export function LibraryScene() {
   );
 }
 
-/** Her karede karakterlerin baş üstü noktalarını ekran koordinatına çevirip etiketleri taşır */
+/** Each frame, projects the characters' overhead anchor points to screen coordinates and moves the labels */
 function LabelTracker() {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
@@ -189,16 +189,16 @@ type LabelItem = {
   id: string;
   name: string;
   pose: Pose;
-  /** İşçinin üzerinde çalıştığı iş */
+  /** The job the worker is working on */
   request?: WorkerRequest;
-  /** Claude'un şu anki işi */
+  /** Claude's current job */
   claudeTask?: string;
   error?: string;
   queued: number;
   always?: boolean;
 };
 
-/** "2 dk 05 sn" — her saniye güncellenir (sadece kart açıkken) */
+/** "2 min 05 s" — updates every second (only while the card is open) */
 function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -206,15 +206,15 @@ function Elapsed({ since }: { since: number }) {
     return () => clearInterval(t);
   }, []);
   const s = Math.max(0, Math.round((now - since) / 1000));
-  return <>{s < 60 ? `${s} sn` : `${Math.floor(s / 60)} dk ${String(s % 60).padStart(2, "0")} sn`}</>;
+  return <>{s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`}</>;
 }
 
 function callerText(r: WorkerRequest) {
-  if (r.caller.kind === "user") return "Senin için (doğrudan sohbet)";
-  return r.caller.label ? `Claude · ${r.caller.label} için` : "Claude için";
+  if (r.caller.kind === "user") return "For you (direct chat)";
+  return r.caller.label ? `Claude · ${r.caller.label} for` : "For Claude";
 }
 
-/** Üzerine gelinince açılan kart: hangi işi, kimin için, ne zamandır yapıyor */
+/** Card that opens on hover: which job, for whom, and for how long it has been running */
 function AgentCard({ it }: { it: LabelItem }) {
   const r = it.request;
   const working = it.pose === "working";
@@ -226,12 +226,12 @@ function AgentCard({ it }: { it: LabelItem }) {
           <div className="agent-card-caller">{callerText(r)}</div>
           <div className="agent-card-task">{r.task}</div>
           {it.pose === "error" ? (
-            <div className="agent-card-error">⚠ {it.error ?? "Hata"}</div>
+            <div className="agent-card-error">⚠ {it.error ?? "Error"}</div>
           ) : (
             working && r.startedAt && (
               <div className="agent-card-meta">
                 <Elapsed since={r.startedAt} />
-                {"'dir çalışıyor"}
+                {" working"}
               </div>
             )
           )}
@@ -239,18 +239,18 @@ function AgentCard({ it }: { it: LabelItem }) {
       ) : it.claudeTask && working ? (
         <div className="agent-card-task">{it.claudeTask}</div>
       ) : it.pose === "error" ? (
-        <div className="agent-card-error">⚠ {it.error ?? "Hata"}</div>
+        <div className="agent-card-error">⚠ {it.error ?? "Error"}</div>
       ) : (
-        <div className="agent-card-meta">{it.pose === "leaving" ? "İşini bitirdi, çıkıyor" : "Boşta"}</div>
+        <div className="agent-card-meta">{it.pose === "leaving" ? "Done, leaving" : "Idle"}</div>
       )}
-      {it.queued > 0 && <div className="agent-card-meta">{it.queued} iş sırada bekliyor</div>}
+      {it.queued > 0 && <div className="agent-card-meta">{it.queued} jobs waiting in queue</div>}
     </div>
   );
 }
 
 /**
- * Sahnenin üstündeki etiket katmanı. Çalışan ve hata veren karakterlerin adı hep görünür;
- * üzerine gelince hangi işi kimin için yaptığını gösteren kart açılır.
+ * Label layer above the scene. Names of working and erroring characters are always visible;
+ * on hover, a card opens showing which job is being done for whom.
  */
 function SceneLabels({ items, selected }: { items: LabelItem[]; selected: string }) {
   const hovered = useHovered((s) => s.id);
@@ -260,7 +260,7 @@ function SceneLabels({ items, selected }: { items: LabelItem[]; selected: string
         const isHovered = hovered === it.id;
         const busy = it.pose === "working" || it.pose === "error";
         const showName = it.always || busy || selected === it.id || selected === it.id.split("#")[0];
-        const caller = it.request?.caller.kind === "user" ? "sen" : it.request?.caller.label;
+        const caller = it.request?.caller.kind === "user" ? "you" : it.request?.caller.label;
         return (
           <div
             key={it.id}

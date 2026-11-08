@@ -11,7 +11,7 @@ import { config } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
 import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
 
-/** Kullanıcı mesajlarını SDK'ya akış halinde veren basit kuyruk. Oturum açık kaldıkça yeni mesaj beklenir. */
+/** Simple queue that streams user messages to the SDK. As long as the session stays open, it waits for new messages. */
 class MessageQueue implements AsyncIterable<SDKUserMessage> {
   private items: SDKUserMessage[] = [];
   private waiting: ((r: IteratorResult<SDKUserMessage>) => void) | null = null;
@@ -44,23 +44,23 @@ class MessageQueue implements AsyncIterable<SDKUserMessage> {
   }
 }
 
-// Ne zaman devredileceği kullanıcının CLAUDE.md'sinde, araçların nasıl kullanılacağı MCP talimatında yazıyor.
+// When to delegate is written in the user's CLAUDE.md, and how to use the tools is written in the MCP instructions.
 const SYSTEM_APPEND =
-  "Bu oturum Scriptorium arayüzünden açıldı. Kullanıcı yazdıklarını ve işçilerin (mcp__scriptorium__*) çalışmasını 3D ofiste canlı görüyor.";
+  "This session was opened from the Scriptorium interface. The user sees what they write and the workers' (mcp__scriptorium__*) activity live in a 3D office.";
 
 export type ClaudeSessionOptions = {
   cwd?: string;
-  /** Devam ettirilecek oturum id'si */
+  /** Session id to resume */
   resume?: string;
-  /** true ise `resume` edilen oturum kopyalanır, asıl oturum değişmez (yan sohbet için) */
+  /** If true, the `resume`d session is copied and the original session is unchanged (for side chat) */
   fork?: boolean;
-  /** Claude'un erişebileceği ek klasörler */
+  /** Additional folders Claude can access */
   additionalDirectories?: string[];
   model?: string;
   effort?: EffortLevel;
   /**
-   * İşçi araçları nereden gelsin. "http": çalışan Scriptorium sunucusunun /mcp adresi (bütün Claude Code
-   * oturumlarıyla aynı sıralar). "sdk": süreç içi sunucu (sunucusuz çalışan CLI için).
+   * Where the worker tools should come from. "http": the /mcp address of the running Scriptorium server (same as all Claude Code
+   * sessions). "sdk": in-process server (for the CLI running without a server).
    */
   workerTools?: "http" | "sdk";
   onMessage: (msg: SDKMessage) => void;
@@ -68,17 +68,17 @@ export type ClaudeSessionOptions = {
 };
 
 /**
- * İzin sormadan çalışacak işçi araçları. Kullanıcının kendi eklediği (user) ya da bizim verdiğimiz
- * (sdk, dynamic) "scriptorium" sunucusu; bir projenin .mcp.json'ındaki aynı adlı sunucu sayılmaz.
+ * Worker tools that run without asking for permission. The "scriptorium" server added by the user (user) or provided by us
+ * (sdk, dynamic); a server with the same name in a project's .mcp.json does not count.
  */
 const TRUSTED_WORKER_SOURCES = new Set(["sdk", "dynamic", "user"]);
 
-/** Arkada çalışan Claude Code'a bağlı tek bir sohbet oturumu. */
+/** A single chat session connected to Claude Code running in the background. */
 export class ClaudeSession {
   private inbox = new MessageQueue();
   private q: Query;
   sessionId: string | undefined;
-  /** Oturum kapanınca ya da hata verince biter. */
+  /** Ends when the session closes or errors out. */
   readonly done: Promise<void>;
 
   constructor(opts: ClaudeSessionOptions) {
@@ -96,7 +96,7 @@ export class ClaudeSession {
         effort: opts.effort,
         includePartialMessages: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
-        // Kullanıcı sunucuyu genel ayarlarına eklediyse (claude mcp add) o kullanılır; ikisi de aynı adrese gider.
+        // If the user added the server to their global settings (claude mcp add), that one is used; both go to the same address.
         mcpServers: {
           [WORKER_SERVER_NAME]:
             opts.workerTools === "http"
@@ -104,7 +104,7 @@ export class ClaudeSession {
               : createWorkerServer({ cwd, caller: { kind: "claude", label: path.basename(cwd) || "Claude" } }),
         },
         canUseTool: (toolName, input, options) =>
-          // Kendi işçi araçlarımız izin sormadan çalışır. Kaynağı sadece isme göre değil `source`'a göre de kontrol ediyoruz.
+          // Our own worker tools run without asking for permission. We check the source not only by name but also by `source`.
           options.mcpServer?.name === WORKER_SERVER_NAME && TRUSTED_WORKER_SOURCES.has(options.mcpServer.source)
             ? Promise.resolve({ behavior: "allow", updatedInput: input })
             : opts.canUseTool(toolName, input, options),
@@ -129,15 +129,15 @@ export class ClaudeSession {
     });
   }
 
-  /** Bilgi panelinin verileri: bağlam doluluğu, MCP sunucuları, slash komutları */
+  /** Info panel data: context usage, MCP servers, slash commands */
   async info(chatId: string): Promise<ClaudeInfo> {
-    const withTimeout = <T,>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("zaman aşımı")), 15_000))]);
+    const withTimeout = <T,>(p: Promise<T>) => Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timed out")), 15_000))]);
     const [ctx, mcp, cmds, models, usage] = await Promise.allSettled([
       withTimeout(this.q.getContextUsage()),
       withTimeout(this.q.mcpServerStatus()),
       withTimeout(this.q.supportedCommands()),
       withTimeout(this.q.supportedModels()),
-      // Deneysel API: değişirse ya da hata verirse kullanım bilgisi sadece görünmez
+      // Experimental API: if it changes or errors, usage info is simply not shown
       withTimeout(this.q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })),
     ]);
     return {
@@ -213,7 +213,7 @@ export class ClaudeSession {
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
-/** Ek dosyayı Claude'un anlayacağı içerik bloğuna çevirir */
+/** Converts the attachment into a content block Claude can understand */
 function attachmentBlock(a: Attachment) {
   if (IMAGE_TYPES.has(a.mediaType)) {
     return { type: "image" as const, source: { type: "base64" as const, media_type: a.mediaType, data: a.data } };
@@ -222,9 +222,9 @@ function attachmentBlock(a: Attachment) {
     return { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: a.data }, title: a.name };
   }
   const text = Buffer.from(a.data, "base64").toString("utf8");
-  return { type: "text" as const, text: `<ek-dosya ad="${a.name}">
+  return { type: "text" as const, text: `<attachment name="${a.name}">
 ${text}
-</ek-dosya>` };
+</attachment>` };
 }
 
 type RawWindow = { utilization: number | null; resets_at: string | null } | undefined | null;

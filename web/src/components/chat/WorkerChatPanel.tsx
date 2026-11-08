@@ -12,7 +12,7 @@ import { Markdown } from "./Markdown";
 import { Thumbs } from "./Thumbs";
 import { usageText, WorkerFooter, WorkerPlusMenu } from "./WorkerFooter";
 
-/** Bir işçiyle (DeepSeek, local model) doğrudan sohbet */
+/** Direct chat with a worker (DeepSeek, local model) */
 export function WorkerChatPanel({ workerId }: { workerId: string }) {
   const worker = useApp((s) => s.workers.find((w) => w.id === workerId));
   const chatId = useApp((s) => s.activeWorkerChat[workerId]);
@@ -30,16 +30,16 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
         <div className="flex items-center gap-2">
           <AgentSelect />
           <Tooltip delay={300}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="İşçiyi düzenle" onPress={() => actions.openWorkerModal(worker)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Edit worker" onPress={() => actions.openWorkerModal(worker)}>
               <Settings2 size={16} />
             </Button>
-            <Tooltip.Content>İşçiyi düzenle</Tooltip.Content>
+            <Tooltip.Content>Edit worker</Tooltip.Content>
           </Tooltip>
           <Tooltip delay={300}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Yeni sohbet" onPress={() => actions.newWorkerChat(workerId)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="New chat" onPress={() => actions.newWorkerChat(workerId)}>
               <SquarePen size={16} />
             </Button>
-            <Tooltip.Content>Yeni sohbet</Tooltip.Content>
+            <Tooltip.Content>New chat</Tooltip.Content>
           </Tooltip>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -49,7 +49,7 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
           <span className="font-code truncate">{worker.model}</span>
           {worker.local && (
             <Chip size="sm" variant="soft" color="success">
-              veri dışarı çıkmaz
+              Data stays local
             </Chip>
           )}
           {worker.provider === "deepseek" && (
@@ -64,8 +64,8 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
         <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg bg-warning-soft p-2.5 text-xs text-warning-soft-foreground">
           <TriangleAlert size={14} className="mt-0.5 shrink-0" />
           <span>
-            Şu an ulaşılamıyor: <b>{unavailable}</b>.{" "}
-            {worker.provider === "deepseek" ? "DeepSeek anahtarını .env dosyasına ekleyip sunucuyu yeniden başlat." : "Ollama'yı kurup çalıştır."}
+            Currently unavailable: <b>{unavailable}</b>.{" "}
+            {worker.provider === "deepseek" ? "Add the DeepSeek key to the .env file and restart the server." : "Install and run Ollama."}
           </span>
         </div>
       )}
@@ -76,21 +76,21 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
             <div className="mx-auto mt-10 flex max-w-sm flex-col items-center gap-2 text-center">
               <span className="size-10 rounded-full" style={{ background: worker.color }} />
               <p className="font-semibold">{worker.name}</p>
-              <p className="text-sm text-muted">{worker.description || "Bu işçiyle doğrudan sohbet edebilirsin."}</p>
+              <p className="text-sm text-muted">{worker.description || "You can chat directly with this worker."}</p>
             </div>
           )}
           {chat?.messages.map((m, i) => (
             <WorkerMessage key={i} m={m} onReply={(q) => actions.setQuote(quoteKey, q)} />
           ))}
           {chat?.streamReasoning && (
-            <Collapsible icon={<Brain size={13} />} label="Düşünüyor…" defaultOpen>
+            <Collapsible icon={<Brain size={13} />} label="Thinking…" defaultOpen>
               <div className="whitespace-pre-wrap text-xs leading-relaxed text-muted">{chat.streamReasoning}</div>
             </Collapsible>
           )}
           {chat?.stream && <Markdown text={chat.stream} />}
           {chat?.busy && !chat.stream && !chat.streamReasoning && (
             <div className="flex items-center gap-2 text-xs text-muted">
-              <StreamingDots /> {worker.name} yazıyor
+              <StreamingDots /> {worker.name} typing
             </div>
           )}
         </div>
@@ -98,7 +98,7 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
 
       <Composer
         quoteKey={quoteKey}
-        placeholder={`${worker.name}'e yaz…`}
+        placeholder={`Message ${worker.name}…`}
         busy={!!chat?.busy}
         onSend={(text, attachments) => actions.sendWorker(workerId, text, attachments)}
         onStop={() => chatId && actions.stopWorker(chatId)}
@@ -135,7 +135,7 @@ function WorkerMessage({ m, onReply }: { m: WorkerChatMessage; onReply: (q: stri
   return (
     <div className="group flex min-w-0 flex-col gap-1">
       {m.reasoning && (
-        <Collapsible icon={<Brain size={13} />} label="Düşünce">
+        <Collapsible icon={<Brain size={13} />} label="Reasoning">
           <div className="whitespace-pre-wrap text-xs leading-relaxed text-muted">{m.reasoning}</div>
         </Collapsible>
       )}

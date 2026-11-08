@@ -5,9 +5,9 @@ import type { JobInfo, WorkerCaller } from "./protocol.js";
 import { runWorkerTask } from "./workerTasks.js";
 
 /**
- * Arka plan işleri. Uzun işlerde (örneğin local modelle yüzlerce dosya) Claude beklemez:
- * işi başlatır, iş numarası alır, sonucu sonra job_status ile sorar.
- * Aynı işçinin işleri sırayla çalışır (local model aynı anda tek iş kaldırır).
+ * Background jobs. For long tasks (e.g. hundreds of files with a local model) Claude does not wait:
+ * it starts the job, gets a job id, and asks for the result later via job_status.
+ * Jobs of the same worker run sequentially (a local model handles only one job at a time).
  */
 const jobs = new Map<string, JobInfo>();
 const queues = new Map<string, Promise<unknown>>();
@@ -15,7 +15,7 @@ const queues = new Map<string, Promise<unknown>>();
 const MAX_KEPT_JOBS = 50;
 
 function changed() {
-  // Eski bitmiş işleri temizle
+  // Clean up old finished jobs
   const finished = [...jobs.values()].filter((j) => j.finishedAt).sort((a, b) => a.createdAt - b.createdAt);
   while (jobs.size > MAX_KEPT_JOBS && finished.length) jobs.delete(finished.shift()!.id);
   bus.emit("jobs");

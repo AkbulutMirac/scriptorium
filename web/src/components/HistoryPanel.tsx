@@ -18,16 +18,16 @@ export function HistoryPanel() {
     return (
       <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-separator bg-surface py-2">
         <Tooltip delay={300}>
-          <Button isIconOnly size="sm" variant="ghost" aria-label="Geçmişi göster" onPress={() => actions.setUi({ historyOpen: true })}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="Show history" onPress={() => actions.setUi({ historyOpen: true })}>
             <PanelLeftOpen size={18} />
           </Button>
-          <Tooltip.Content placement="right">Geçmişi göster</Tooltip.Content>
+          <Tooltip.Content placement="right">Show history</Tooltip.Content>
         </Tooltip>
         <Tooltip delay={300}>
-          <Button isIconOnly size="sm" variant="ghost" aria-label="Yeni sohbet" onPress={newChat}>
+          <Button isIconOnly size="sm" variant="ghost" aria-label="New chat" onPress={newChat}>
             <SquarePen size={18} />
           </Button>
-          <Tooltip.Content placement="right">Yeni sohbet</Tooltip.Content>
+          <Tooltip.Content placement="right">New chat</Tooltip.Content>
         </Tooltip>
       </nav>
     );
@@ -40,17 +40,17 @@ export function HistoryPanel() {
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{meta.name}</span>
         {selected === CLAUDE_ID && (
           <Tooltip delay={300}>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Yenile" onPress={() => actions.refreshSessions()}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Refresh" onPress={() => actions.refreshSessions()}>
               <RefreshCw size={15} />
             </Button>
-            <Tooltip.Content>Listeyi yenile</Tooltip.Content>
+            <Tooltip.Content>Refresh list</Tooltip.Content>
           </Tooltip>
         )}
       </div>
       <div className="px-2 pb-2">
         <Button fullWidth size="sm" variant="secondary" onPress={newChat}>
           <SquarePen size={15} />
-          Yeni sohbet
+          New chat
         </Button>
       </div>
       <ScrollShadow className="min-h-0 flex-1 px-2 pb-3">
@@ -62,7 +62,7 @@ export function HistoryPanel() {
 
 const keyOf = (p: string) => p.normalize("NFC").replaceAll("\\", "/").toLowerCase().replace(/\/$/, "");
 
-/** Claude oturumları projelere (klasörlere) göre gruplanmış: Claude uygulamasının kenar çubuğu gibi */
+/** Claude sessions grouped by projects (folders): like the Claude app's sidebar */
 function ClaudeHistory() {
   const all = useApp((s) => s.allSessions);
   const projects = useApp((s) => s.projects);
@@ -93,7 +93,7 @@ function ClaudeHistory() {
       map.set(k, g);
     }
     for (const g of map.values()) g.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
-    // Ayırt edilebilir adlar: worktree'leri işaretle, aynı adlı projelerin yanına üst klasörü yaz
+    // Distinguishable names: mark worktrees, append the parent folder next to projects with the same name
     const list = [...map.values()].map((g) => {
       const parts = g.path.replaceAll("\\", "/").split("/").filter(Boolean);
       const wt = parts.indexOf("worktrees");
@@ -110,7 +110,7 @@ function ClaudeHistory() {
       .sort((a, b) => b.last - a.last);
   }, [all, projects]);
 
-  if (!groups.length) return <Empty text="Henüz proje ya da sohbet yok." />;
+  if (!groups.length) return <Empty text="No projects or chats yet." />;
   const activeKey = keyOf(activeCwd);
   const visible = groups.filter((g) => showHidden || !hidden.includes(keyOf(g.path)) || keyOf(g.path) === activeKey);
   const hiddenCount = groups.filter((g) => hidden.includes(keyOf(g.path))).length;
@@ -123,20 +123,20 @@ function ClaudeHistory() {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Bu klasörde yeni sohbet", icon: Plus, onSelect: () => actions.newClaudeChat(g.path) },
-        { label: "Klasör yolunu kopyala", icon: Copy, onSelect: () => navigator.clipboard.writeText(g.path) },
+        { label: "New chat in this folder", icon: Plus, onSelect: () => actions.newClaudeChat(g.path) },
+        { label: "Copy folder path", icon: Copy, onSelect: () => navigator.clipboard.writeText(g.path) },
         isHidden
-          ? { label: "Listede göster", icon: Eye, onSelect: () => hide(k, false) }
-          : { label: "Listeden gizle", icon: EyeOff, onSelect: () => hide(k, true) },
+          ? { label: "Show in list", icon: Eye, onSelect: () => hide(k, false) }
+          : { label: "Hide from list", icon: EyeOff, onSelect: () => hide(k, true) },
         ...(g.sessions.length
           ? (["separator", {
-              label: `Tüm sohbetlerini sil (${g.sessions.length})`,
+              label: `Delete all its chats (${g.sessions.length})`,
               icon: Trash2,
               danger: true,
               onSelect: () =>
                 setConfirm({
-                  title: `"${g.name}" sohbetleri silinsin mi?`,
-                  text: `Bu klasördeki ${g.sessions.length} Claude sohbeti kalıcı olarak silinecek. Geri alınamaz. Diskteki klasöre ve dosyalarına dokunulmaz, sadece sohbet kayıtları silinir. Proje listeden de gizlenir.`,
+                  title: `Delete the chats in "${g.name}"?`,
+                  text: `The ${g.sessions.length} Claude chats in this folder will be permanently deleted. This can't be undone. The folder and files on disk are left untouched; only the chat records are deleted. The project will also be hidden from the list.`,
                   ids: g.sessions.map((s) => s.id),
                   hideKey: k,
                 }),
@@ -152,14 +152,14 @@ function ClaudeHistory() {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Aç", icon: MessageSquare, onSelect: () => actions.openClaudeSession(s.id) },
-        { label: "Yeniden adlandır", icon: Pencil, onSelect: () => setEditReq({ id: s.id, n: Date.now() }) },
+        { label: "Open", icon: MessageSquare, onSelect: () => actions.openClaudeSession(s.id) },
+        { label: "Rename", icon: Pencil, onSelect: () => setEditReq({ id: s.id, n: Date.now() }) },
         "separator",
         {
-          label: "Sil",
+          label: "Delete",
           icon: Trash2,
           danger: true,
-          onSelect: () => setConfirm({ title: "Sohbet silinsin mi?", text: `"${s.title}" kalıcı olarak silinecek. Geri alınamaz.`, ids: [s.id] }),
+          onSelect: () => setConfirm({ title: "Delete chat?", text: `"${s.title}" will be permanently deleted. This can't be undone.`, ids: [s.id] }),
         },
       ],
     });
@@ -179,7 +179,7 @@ function ClaudeHistory() {
             </Modal.Body>
             <Modal.Footer className="flex justify-end gap-2">
               <Button size="sm" variant="secondary" onPress={() => setConfirm(null)}>
-                Vazgeç
+                Cancel
               </Button>
               <Button
                 size="sm"
@@ -187,13 +187,13 @@ function ClaudeHistory() {
                 onPress={() => {
                   if (confirm) {
                     actions.deleteSessions(confirm.ids);
-                    // Diskte duran proje klasörü listede kalmasın
+                    // Keep a project folder that still exists on disk out of the list
                     if (confirm.hideKey) hide(confirm.hideKey, true);
                   }
                   setConfirm(null);
                 }}
               >
-                Kalıcı olarak sil
+                Delete permanently
               </Button>
             </Modal.Footer>
           </Modal.Dialog>
@@ -221,17 +221,17 @@ function ClaudeHistory() {
                   size="sm"
                   variant="ghost"
                   className="h-6 w-6 min-w-6 opacity-0 group-hover:opacity-100"
-                  aria-label={`${g.name} klasöründe yeni sohbet`}
+                  aria-label={`New chat in ${g.name}`}
                   onPress={() => actions.newClaudeChat(g.path)}
                 >
                   <Plus size={13} />
                 </Button>
-                <Tooltip.Content>Bu klasörde yeni sohbet</Tooltip.Content>
+                <Tooltip.Content>New chat in this folder</Tooltip.Content>
               </Tooltip>
             </div>
             {isOpen && (
               <ul className="ml-3 flex flex-col gap-0.5 border-l border-separator pl-1.5">
-                {g.sessions.length === 0 && <li className="px-2 py-1 text-[11px] text-muted">Sohbet yok. + ile başlat.</li>}
+                {g.sessions.length === 0 && <li className="px-2 py-1 text-[11px] text-muted">No chats. Start one with +.</li>}
                 {list.map((s) => (
                   <HistoryRow
                     key={s.id}
@@ -248,7 +248,7 @@ function ClaudeHistory() {
                 {g.sessions.length > 6 && (
                   <li>
                     <button type="button" onClick={() => setExpanded({ ...expanded, [k]: !expanded[k] })} className="px-2 py-1 text-[11px] text-muted hover:text-foreground">
-                      {expanded[k] ? "Daha az göster" : `${g.sessions.length - 6} sohbet daha`}
+                      {expanded[k] ? "Show less" : `${g.sessions.length - 6} more chats`}
                     </button>
                   </li>
                 )}
@@ -259,7 +259,7 @@ function ClaudeHistory() {
       })}
       {hiddenCount > 0 && (
         <button type="button" onClick={() => setShowHidden(!showHidden)} className="mt-1 px-2 py-1 text-left text-[11px] text-muted hover:text-foreground">
-          {showHidden ? "Gizlenenleri sakla" : `Gizlenenleri göster (${hiddenCount})`}
+          {showHidden ? "Keep hidden" : `Show hidden (${hiddenCount})`}
         </button>
       )}
     </div>
@@ -269,7 +269,7 @@ function ClaudeHistory() {
 function WorkerHistory({ workerId }: { workerId: string }) {
   const chats = useApp((s) => s.workerChatLists[workerId]);
   const active = useApp((s) => s.activeWorkerChat[workerId]);
-  if (!chats?.length) return <Empty text="Bu işçiyle henüz sohbet yok." />;
+  if (!chats?.length) return <Empty text="No chats with this worker yet." />;
   return (
     <ul className="flex flex-col gap-0.5">
       {chats.map((c) => (
@@ -294,7 +294,7 @@ function HistoryRow(props: {
   onRename?: (title: string) => void;
   onDelete: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
-  /** Değiştiğinde satır yeniden adlandırma moduna geçer (sağ tık menüsünden) */
+  /** When changed, the row switches to rename mode (from the right-click menu) */
   editRequest?: number;
 }) {
   const [editing, setEditing] = useState(false);
@@ -325,9 +325,9 @@ function HistoryRow(props: {
             if (e.key === "Escape") setEditing(false);
           }}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-          aria-label="Sohbet adı"
+          aria-label="Chat name"
         />
-        <Button isIconOnly size="sm" variant="ghost" aria-label="Kaydet" onPress={commit}>
+        <Button isIconOnly size="sm" variant="ghost" aria-label="Save" onPress={commit}>
           <Check size={14} />
         </Button>
       </li>
@@ -350,10 +350,10 @@ function HistoryRow(props: {
       <div className="hidden shrink-0 items-center group-hover:flex" onClick={(e) => e.stopPropagation()}>
         {confirmDelete ? (
           <>
-            <Button isIconOnly size="sm" variant="danger" aria-label="Silmeyi onayla" onPress={props.onDelete}>
+            <Button isIconOnly size="sm" variant="danger" aria-label="Confirm delete" onPress={props.onDelete}>
               <Check size={14} />
             </Button>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Vazgeç" onPress={() => setConfirmDelete(false)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Cancel" onPress={() => setConfirmDelete(false)}>
               <X size={14} />
             </Button>
           </>
@@ -364,7 +364,7 @@ function HistoryRow(props: {
                 isIconOnly
                 size="sm"
                 variant="ghost"
-                aria-label="Yeniden adlandır"
+                aria-label="Rename"
                 onPress={() => {
                   setDraft(props.title);
                   setEditing(true);
@@ -373,7 +373,7 @@ function HistoryRow(props: {
                 <Pencil size={13} />
               </Button>
             )}
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Sil" onPress={() => setConfirmDelete(true)}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Delete" onPress={() => setConfirmDelete(true)}>
               <Trash2 size={13} />
             </Button>
           </>

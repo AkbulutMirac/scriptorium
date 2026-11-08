@@ -8,7 +8,7 @@ import type { Pose } from "./placement";
 export type { Pose };
 
 type Props = {
-  /** Ajan id'si ("claude" ya da işçi id'si); etiket katmanı bununla eşleşir */
+  /** Agent id ("claude" or worker id); the label layer matches on this */
   id: string;
   name: string;
   color: string;
@@ -17,7 +17,7 @@ type Props = {
   selected: boolean;
   accentHex: string;
   isClaude?: boolean;
-  /** İlk göründüğü yer (verilmezse oturma yeri). Kopyalar odaya buradan yürüyerek girer. */
+  /** Where it first appears (defaults to the seat). Copies walk into the room from here. */
   spawn?: Vec3;
   onSelect: () => void;
 };
@@ -25,7 +25,7 @@ type Props = {
 const SKIN = "#f2d3b8";
 const EYE = "#2a1d17";
 
-/** Tek bir ajan karakteri. Pozu değişince yeni oturma yerine zıplayarak yürür. */
+/** A single agent character. When its pose changes it walks/jumps to the new seat. */
 export function AgentFigure(p: Props) {
   const root = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -37,15 +37,15 @@ export function AgentFigure(p: Props) {
   const hatColor = useMemo(() => new THREE.Color(p.color).multiplyScalar(0.62).getStyle(), [p.color]);
   const anchor = useRef<THREE.Group>(null);
 
-  // Başlangıç yeri sadece bir kez verilir. Konumu prop olarak vermek, poz değişince karakteri
-  // yeni yere ışınlıyor ve yürüme animasyonunu eziyordu.
+  // The spawn position is set only once. Passing position as a prop would, on pose change, teleport the character
+  // to the new spot and override the walking animation.
   useLayoutEffect(() => {
     root.current?.position.set(...(p.spawn ?? p.seat.pos));
     if (root.current) root.current.rotation.y = p.spawn ? Math.PI : p.seat.rot;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Baş üstü noktasını etiket katmanına kaydet
+  // Register the overhead point with the label layer
   useEffect(() => {
     const obj = anchor.current;
     if (!obj) return;
@@ -62,7 +62,7 @@ export function AgentFigure(p: Props) {
     const dist = g.position.distanceTo(target);
     const walking = dist > 0.06;
 
-    // Sabit hızla yürür (uzak yerlere daha uzun sürer), varınca yumuşakça yerine oturur
+    // Walks at constant speed (farther spots take longer), settles smoothly into place on arrival
     if (walking) {
       dir.subVectors(target, g.position);
       const step = Math.min(dist, 2.4 * dt);
@@ -71,7 +71,7 @@ export function AgentFigure(p: Props) {
       g.position.lerp(target, 1 - Math.pow(0.001, dt));
     }
 
-    // Yürürken gittiği yöne, varınca oturma yönüne döner
+    // Faces its direction of travel while walking, the seat rotation on arrival
     const desired = walking ? Math.atan2(target.x - g.position.x, target.z - g.position.z) : p.seat.rot;
     let dr = desired - g.rotation.y;
     dr = Math.atan2(Math.sin(dr), Math.cos(dr));
@@ -81,30 +81,30 @@ export function AgentFigure(p: Props) {
     const h = head.current;
     const swing = Math.sin(t * 13);
     if (footL.current && footR.current) {
-      // Ayaklar: yürürken sırayla öne-arkaya ve yukarı, otururken toplu
+      // Feet: alternate forward-back and up while walking, tucked together when seated
       footL.current.position.set(-0.12, 0.06 + (walking ? Math.max(0, swing) * 0.08 : 0), walking ? swing * 0.14 : 0.08);
       footR.current.position.set(0.12, 0.06 + (walking ? Math.max(0, -swing) * 0.08 : 0), walking ? -swing * 0.14 : 0.08);
     }
     if (walking) {
-      body.current.position.y = Math.abs(swing) * 0.06; // her adımda hafif sekme
-      body.current.rotation.set(0.12, 0, swing * 0.07); // öne eğik, iki yana sallanarak
+      body.current.position.y = Math.abs(swing) * 0.06; // slight bounce on each step
+      body.current.rotation.set(0.12, 0, swing * 0.07); // leaning forward, swaying side to side
       h.rotation.set(-0.05, 0, 0);
     } else if (p.pose === "working") {
       body.current.rotation.set(0, 0, 0);
-      body.current.position.y = Math.abs(Math.sin(t * 8)) * 0.025; // hızlı hızlı yazıyor
+      body.current.position.y = Math.abs(Math.sin(t * 8)) * 0.025; // typing rapidly
       h.rotation.set(0.12 + Math.sin(t * 3) * 0.04, Math.sin(t * 0.8) * 0.15, 0);
     } else if (p.pose === "error") {
       body.current.rotation.set(0, 0, 0);
       body.current.position.y = 0;
-      h.rotation.set(0, 0, Math.sin(t * 16) * 0.08); // kafa sallıyor
+      h.rotation.set(0, 0, Math.sin(t * 16) * 0.08); // shaking its head
     } else if (p.pose === "sleeping") {
       body.current.rotation.set(0, 0, 0);
       body.current.position.y = Math.sin(t * 1.2) * 0.012;
-      h.rotation.set(0.55, 0, 0.15); // masaya kapanmış
+      h.rotation.set(0.55, 0, 0.15); // slumped over the desk
     } else {
       body.current.rotation.set(0, 0, 0);
-      body.current.position.y = Math.sin(t * 1.4) * 0.012; // sakin nefes
-      h.rotation.set(0.32, 0, Math.sin(t * 0.6) * 0.05); // kitaba bakıyor
+      body.current.position.y = Math.sin(t * 1.4) * 0.012; // calm breathing
+      h.rotation.set(0.32, 0, Math.sin(t * 0.6) * 0.05); // looking at the book
     }
   });
 
@@ -132,7 +132,7 @@ export function AgentFigure(p: Props) {
         </mesh>
       )}
 
-      {/* Ayaklar */}
+      {/* Feet */}
       {[footL, footR].map((ref, i) => (
         <mesh key={i} ref={ref} position={[i ? 0.12 : -0.12, 0.06, 0.08]} castShadow>
           <sphereGeometry args={[0.085, 10, 8]} />
@@ -140,7 +140,7 @@ export function AgentFigure(p: Props) {
         </mesh>
       ))}
       <group ref={body}>
-        {/* Gövde */}
+        {/* Body */}
         <mesh castShadow position-y={0.5}>
           <capsuleGeometry args={[0.27, 0.38, 6, 14]} />
           <meshStandardMaterial
@@ -150,7 +150,7 @@ export function AgentFigure(p: Props) {
             emissiveIntensity={p.pose === "error" ? 0.5 : 0}
           />
         </mesh>
-        {/* Kafa */}
+        {/* Head */}
         <group ref={head} position-y={1.02}>
           <mesh castShadow>
             <sphereGeometry args={[0.27, 20, 20]} />
@@ -169,7 +169,7 @@ export function AgentFigure(p: Props) {
             </mesh>
           ))}
           {p.isClaude ? (
-            // Baş yazıcının kepi
+            // Head printer's cap
             <group position-y={0.24}>
               <mesh castShadow>
                 <cylinderGeometry args={[0.2, 0.24, 0.12, 18]} />
@@ -185,7 +185,7 @@ export function AgentFigure(p: Props) {
               </mesh>
             </group>
           ) : (
-            // İşçinin beresi ve ponponu
+            // Worker's beanie and pompom
             <group position-y={0.08}>
               <mesh castShadow>
                 <sphereGeometry args={[0.285, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2.3]} />
@@ -206,7 +206,7 @@ export function AgentFigure(p: Props) {
         )}
       </group>
 
-      {/* Etiket katmanının takip ettiği baş üstü noktası */}
+      {/* Overhead point tracked by the label layer */}
       <group ref={anchor} position={[0, 1.5, 0]} />
     </group>
   );

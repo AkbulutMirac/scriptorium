@@ -1,2 +1,2 @@
-// Arka uçla ortak mesaj tipleri tek yerde tanımlı: server/src/protocol.ts
+// Message types shared with the backend are defined in one place: server/src/protocol.ts
 export type * from "../../server/src/protocol";

@@ -4,9 +4,9 @@ import { bus } from "./events.js";
 import type { WorkerCaller, WorkerRequest } from "./protocol.js";
 
 /**
- * İşçi istekleri. Birden fazla Claude oturumu (Scriptorium, terminal, masaüstü uygulaması) aynı
- * işçiyi aynı anda kullanabilir. Her istek ayrı kaydedilir; arayüz her çalışan isteği ayrı bir
- * işçi kopyası olarak çizer. Local model aynı anda tek iş kaldırır, API işçileri birkaç tane.
+ * Worker requests. Multiple Claude sessions (Scriptorium, terminal, desktop app) can use the same
+ * worker at the same time. Each request is recorded separately; the UI renders each running request as a separate
+ * worker copy. The local model handles only one job at a time, API workers handle several.
  */
 const parallelLimit = (w: Worker) => (w.local ? 1 : 4);
 const ERROR_VISIBLE_MS = 12_000;
@@ -50,7 +50,7 @@ function release(w: Worker) {
   waiting.get(w.id)?.shift()?.();
 }
 
-/** İşi işçinin sırasına koyar, sırası gelince çalıştırır. Hata bir süre 3D ofiste görünür. */
+/** Queues the job in the worker's line and runs it when its turn comes. Errors are shown in the 3D office for a while. */
 export async function withWorkerSlot<T>(
   worker: Worker,
   info: { task: string; caller: WorkerCaller; signal?: AbortSignal },

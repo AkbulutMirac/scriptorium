@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { truncate } from "../lib/format";
 import { actions, agentMeta, CLAUDE_ID, useApp } from "../store";
 
-/** 3D sahnenin üstündeki düğmeler ve ajan durum listesi */
+/** Buttons and agent status list above the 3D scene */
 export function SceneOverlay() {
   const workers = useApp((s) => s.workers);
   const activity = useApp((s) => s.activity);
@@ -15,11 +15,11 @@ export function SceneOverlay() {
     <>
       <div className="absolute right-3 top-3 z-30">
         <Button size="sm" variant="secondary" onPress={() => actions.openWorkerModal()}>
-          <Plus size={15} /> İşçi ekle
+          <Plus size={15} /> Add worker
         </Button>
       </div>
 
-      <ul className="absolute bottom-3 left-3 z-30 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5" aria-label="Ajanların durumu">
+      <ul className="absolute bottom-3 left-3 z-30 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-1.5" aria-label="Agent status">
         {ids.map((id) => {
           const meta = agentMeta(id, workers);
           const worker = workers.find((w) => w.id === id);
@@ -32,12 +32,12 @@ export function SceneOverlay() {
           const error = worker ? !!failed : a?.status === "error";
           const offline = worker?.available && !worker.available.ok;
           const status = working
-            ? `çalışıyor${running.length > 1 ? ` ×${running.length}` : ""}`
+            ? `working${running.length > 1 ? ` ×${running.length}` : ""}`
             : error
-              ? "hata"
+              ? "error"
               : offline
-                ? "ulaşılamıyor"
-                : "boşta";
+                ? "unreachable"
+                : "idle";
           const task = worker ? running[0]?.task : a?.task;
           const title = worker
             ? [...running.map((r) => `• ${truncate(r.task, 80)}`), failed?.error, worker.available?.reason].filter(Boolean).join("\n")
@@ -55,7 +55,7 @@ export function SceneOverlay() {
                 <span className="size-2 rounded-full" style={{ background: meta.color }} />
                 <span className="font-medium">{meta.name}</span>
                 <span className={working ? "text-accent" : error ? "text-danger" : "text-muted"}>{status}</span>
-                {queued > 0 && <span className="text-muted">· {queued} sırada</span>}
+                {queued > 0 && <span className="text-muted">· {queued} queued</span>}
                 {working && task && running.length <= 1 && <span className="hidden max-w-40 truncate text-muted xl:inline">· {truncate(task, 40)}</span>}
               </button>
             </li>

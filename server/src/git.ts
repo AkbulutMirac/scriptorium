@@ -6,7 +6,7 @@ import type { GitInfo } from "./protocol.js";
 
 const run = promisify(execFile);
 
-/** git komutu çalıştırır (kabuk yok, argümanlar ayrı: komut enjeksiyonu olmaz) */
+/** runs the git command (no shell, arguments separate: no command injection) */
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await run("git", args, { cwd, timeout: 10_000, maxBuffer: 20 * 1024 * 1024, windowsHide: true });
   return stdout;
@@ -38,14 +38,14 @@ async function countLines(file: string): Promise<number> {
   try {
     if ((await stat(file)).size > MAX_FILE_BYTES) return 0;
     const text = await readFile(file, "utf8");
-    if (text.includes("\u0000")) return 0; // ikili dosya
+    if (text.includes("\u0000")) return 0; // binary file
     return text.split("\n").length;
   } catch {
     return 0;
   }
 }
 
-/** Dal adı ve HEAD'e göre değişen satırlar (izlenmeyen yeni dosyalar dahil) */
+/** Branch name and lines changed relative to HEAD (including untracked new files) */
 export async function gitInfo(cwd: string): Promise<GitInfo> {
   try {
     await git(cwd, ["rev-parse", "--is-inside-work-tree"]);
@@ -73,13 +73,13 @@ export async function gitInfo(cwd: string): Promise<GitInfo> {
   };
 }
 
-/** Bir dosyanın (ya da tüm çalışma alanının) HEAD'e göre farkı */
+/** Diff of a file (or the entire working tree) relative to HEAD */
 export async function gitDiff(cwd: string, file?: string): Promise<string> {
   const base = (await hasHead(cwd)) ? ["diff", "HEAD"] : ["diff", "--cached"];
   if (file) {
     const out = await git(cwd, [...base, "--", file]);
     if (out.trim()) return out;
-    // İzlenmeyen yeni dosya: tamamını eklenmiş gibi göster
+    // Untracked new file: show it entirely as added
     const abs = path.resolve(cwd, file);
     if (!abs.startsWith(path.resolve(cwd))) return "";
     const text = await readFile(abs, "utf8").catch(() => "");

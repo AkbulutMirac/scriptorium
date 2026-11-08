@@ -1,14 +1,14 @@
 # Scriptorium
 
-Claude baş yazıcı, DeepSeek ve local LLM'ler yazıcı. Tek arayüzden hepsiyle konuşabildiğin, Claude'un işleri diğer modellere kendi kararıyla dağıttığı çok ajanlı bir çalışma alanı. Kimin ne yaptığı izometrik, piksel görünümlü bir ofis-kütüphanede canlı olarak görünüyor.
+Claude is the head scribe; DeepSeek and local LLMs are the scribes. A multi-agent workspace where you can talk to all of them from one interface, and Claude hands work to the other models on its own judgment. Who is doing what shows up live in an isometric, pixel-art office library.
 
-![Scriptorium: ortada 3D ofis, sağda sohbet. Aynı anda üç DeepSeek işi çalışıyor](docs/screenshot.png)
+![Scriptorium: 3D office in the middle, chat on the right. Three DeepSeek tasks running at once](docs/screenshot.png)
 
-**Neden:** Claude kullanım limitini korumak. Net tanımlı kod işlerini, özetleri ve sınıflandırmaları ucuz DeepSeek'e ya da bedava local modellere verir, sonucu kendisi kontrol eder.
+**Why:** to save Claude usage. Claude gives well-defined coding tasks, summaries and classification to cheap DeepSeek or free local models, then checks the result itself.
 
-## Hızlı başlangıç
+## Quick start
 
-Gereken tek şey [Node.js 22.9+](https://nodejs.org) ve bir Claude aboneliği (Pro ya da Max).
+All you need is [Node.js 22.9+](https://nodejs.org) and a Claude subscription (Pro or Max).
 
 ```bash
 git clone https://github.com/AkbulutMirac/scriptorium.git
@@ -17,121 +17,121 @@ npm install
 npm run app
 ```
 
-Tarayıcıda http://localhost:7777 adresini aç. İlk açılışta **Kurulum** penceresi her şeyi adım adım yaptırır:
+Open http://localhost:7777. On first launch a **Setup** window walks you through everything:
 
-1. **Claude hesabı:** "Claude ile giriş yap" tarayıcıda Anthropic'in giriş sayfasını açar. Claude Code'u ayrıca kurman gerekmez, Scriptorium kendi sürümünü kullanır.
-2. **DeepSeek (isteğe bağlı):** [platform.deepseek.com](https://platform.deepseek.com/api_keys) adresinden bir API anahtarı al ve yapıştır. Anahtar denenir, çalışırsa sadece bu bilgisayardaki `.env` dosyasına yazılır.
-3. **Local modeller (isteğe bağlı):** [Ollama](https://ollama.com/download)'yı kur, bir model indir (`ollama pull qwen3.5:9b` gibi). Kurulu modellerini tek tıkla işçi olarak eklersin.
-4. **Bütün Claude Code oturumlarında (isteğe bağlı):** Terminaldeki ve Claude masaüstü uygulamasındaki Claude da işçileri kullanabilsin diye işçi araçlarını ve devretme kurallarını tek tıkla ekler.
+1. **Claude account:** "Sign in with Claude" opens Anthropic's sign-in page in your browser. You don't need to install Claude Code separately; Scriptorium uses its own copy.
+2. **DeepSeek (optional):** create an API key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it. The key is tested first and, if it works, written only to the `.env` file on this computer.
+3. **Local models (optional):** install [Ollama](https://ollama.com/download) and pull a model (for example `ollama pull qwen3.5:9b`). Add any installed model as a worker with one click.
+4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools and the delegation rules.
 
-Kurulum penceresine sonra Ayarlar menüsünden dönebilirsin.
+You can reopen the Setup window from the Settings menu.
 
-**Windows kısayolu:** Masaüstüne pencere açmadan çalışan bir kısayol koymak için:
+**No `.env` needed:** everything has a default. Setup creates `.env` when you save a DeepSeek key. To change other settings, copy `.env.example` to `.env` and edit it.
+
+**Windows shortcut:** to put a desktop shortcut that runs without a console window:
 
 ```bash
-powershell -ExecutionPolicy Bypass -File scripts\Kisayol.ps1
+powershell -ExecutionPolicy Bypass -File scripts\CreateShortcut.ps1
 ```
 
-Kısayol ilk açılışta paketleri kurar, arayüzü derler, sunucuyu arka planda başlatır ve tarayıcıyı açar. Sunucu zaten çalışıyorsa sadece tarayıcıyı açar. Kapatmak için arayüzde Ayarlar → "Scriptorium'u kapat". Çıktılar `server\data\*.log` dosyalarına yazılır.
+On first launch the shortcut installs the packages, builds the UI, starts the server in the background and opens the browser. If the server is already running, it just opens the browser. To stop it, use Settings → "Quit Scriptorium" in the app. Output goes to `server\data\*.log`.
 
-## Özellikler
+## Features
 
-**Claude (baş yazıcı)**
-- Claude Code'a bağlanır. CLAUDE.md, MCP sunucuları, skill'ler ve eklentiler terminaldekiyle aynıdır. Claude Code güncellendikçe yeni özellikler kendiliğinden gelir.
-- Akış halinde cevap, düşünme blokları, araç kartları (Edit ve Write için kırmızı-yeşil fark), izin onayı ve seçenekli soruları cevaplama.
-- **Yan sohbet:** Ana sohbeti bozmadan bir mesaj hakkında ayrı konuşma açılır. Mesaja alıntıyla yanıt verilebilir.
-- **Oturum bilgi paneli:** klasör ve git dalı, ek klasörler, bağlam doluluğu, bağlayıcılar (aç/kapa, yeniden bağlan), yazılan dosyalar, git değişiklikleri (diff), arka plan görevleri.
-- **"+" menüsü:** dosya veya fotoğraf ekleme (yapıştırma ve sürükle-bırak dahil), klasör ekleme, slash komutları (`/` ile öneri), bağlayıcılar ve eklentiler.
-- Yazma kutusunun altında Claude uygulamasındaki gibi bir çubuk: çalışma klasörü seçici, model, efor (Düşük–Maks) ve hızlı mod menüsü, izin modu, kullanım halkası.
-- Üst barda Claude aboneliğinin kullanım limitleri (5 saatlik ve 7 günlük).
-- Geçmiş paneli projelere göre gruplanmıştır ve terminaldeki Claude Code oturumlarıyla ortaktır. Uygulama en son açık olan sohbetle açılır.
+**Claude (head scribe)**
+- Connects to Claude Code. CLAUDE.md, MCP servers, skills and plugins are the same as in your terminal. New Claude Code features arrive as it updates.
+- Streaming answers, thinking blocks, tool cards (red/green diff for Edit and Write), permission prompts and answering multiple-choice questions.
+- **Side chat:** open a separate conversation about a message without disturbing the main one. Reply to a message with a quote.
+- **Session info panel:** folder and git branch, extra folders, context usage, connectors (toggle, reconnect), written files, git changes (diff), background tasks.
+- **"+" menu:** attach files or images (paste and drag-and-drop too), add folders, slash commands (suggested as you type `/`), connectors and plugins.
+- A bar under the input like in the Claude app: working folder picker, model, effort (Low–Max) and fast mode, permission mode, usage ring.
+- Claude subscription usage limits in the top bar (5-hour and weekly).
+- History grouped by project, shared with your terminal Claude Code sessions. The app reopens the chat you had open last.
 
-**İşçiler (DeepSeek, Ollama)**
-- Her işçiyle doğrudan sohbet edilebilir. Görsel ve dosya eklenebilir (DeepSeek PDF de okur).
-- Yazma kutusunun altında model seçimi, düşünme seviyesi, sıcaklık, en fazla token, JSON çıktı, sistem talimatı, token kullanımı ve bağlam doluluğu.
-- Claude işçilere araçlarla iş devreder: `ask_worker` cevabı bekler, `start_job` ve `job_status` arka planda çalışır.
-- Araçlar terminaldeki ve masaüstü uygulamasındaki bütün Claude Code oturumlarında da kullanılabilir.
-- Birden fazla oturum aynı işçiyi aynı anda kullanabilir. 3D ofiste her iş için işçinin bir kopyası odaya girip ek masaya oturur, iş bitince çıkar. Local işçiler aynı anda tek iş yapar, diğerleri sıraya girer.
-- Bir işçinin üzerine gelince hangi işi, hangi proje için ve ne zamandır yaptığı görünür.
-- Gizli veri (`sensitive`) sadece local işçilere gider.
-- İşçiler arayüzden eklenir, düzenlenir, silinir (`server/agents.json`). Varsayılan olarak DeepSeek Flash ve Pro gelir.
-- DeepSeek kalan bakiyesi üst barda görünür.
+**Workers (DeepSeek, Ollama)**
+- Chat with any worker directly. Attach images and files (DeepSeek also reads PDFs).
+- Under the input: model, thinking level, temperature, max tokens, JSON output, system prompt, token usage and context usage.
+- Claude delegates with tools: `ask_worker` waits for the answer, `start_job` and `job_status` run in the background.
+- The tools also work in every Claude Code session in your terminal and the desktop app.
+- Several sessions can use the same worker at once. In the 3D office a copy of the worker walks in for each task, sits at a spare desk and leaves when it's done. Local workers do one task at a time; the rest wait in line.
+- Hover over a worker to see which task it is doing, for which project, and for how long.
+- Sensitive data (`sensitive`) only goes to local workers.
+- Add, edit and delete workers from the UI (`server/agents.json`). DeepSeek Flash and Pro come by default.
+- Remaining DeepSeek balance in the top bar.
 
-**Arayüz:** React, HeroUI v3 ve react-three-fiber. Açık, koyu ya da sistem teması, 6 vurgu rengi, piksel görünüm.
+**Interface:** React, HeroUI v3 and react-three-fiber. Light, dark or system theme, 6 accent colors, pixel mode.
 
-## Nasıl çalışır
+## How it works
 
 ```
-Tarayıcı (React + HeroUI + react-three-fiber)
-   │  WebSocket (sadece 127.0.0.1, sadece izinli arayüz adresleri)
-Arka uç (Node / TypeScript)
-   ├─ Claude Agent SDK → Claude Code (baş yazıcı)
-   ├─ İşçi araçları: list_workers, ask_worker, start_job, job_status
-   │     └─ /mcp adresinde HTTP MCP sunucusu: diğer Claude Code oturumları da bağlanır
-   ├─ DeepSeek API      (işçi, OpenAI uyumlu)
-   └─ Ollama            (local işçiler, OpenAI uyumlu)
+Browser (React + HeroUI + react-three-fiber)
+   │  WebSocket (127.0.0.1 only, allowed UI origins only)
+Backend (Node / TypeScript)
+   ├─ Claude Agent SDK → Claude Code (head scribe)
+   ├─ Worker tools: list_workers, ask_worker, start_job, job_status
+   │     └─ HTTP MCP server at /mcp: other Claude Code sessions connect too
+   ├─ DeepSeek API      (worker, OpenAI-compatible)
+   └─ Ollama            (local workers, OpenAI-compatible)
 ```
 
-## Ayarlar (`.env`, hepsi isteğe bağlı)
+## Settings (`.env`, all optional)
 
-Kurulum penceresi DeepSeek anahtarını kendisi yazar. Diğer ayarlar için `.env.example` dosyasını `.env` olarak kopyala.
-
-| Ayar | Açıklama |
+| Setting | Description |
 |---|---|
-| `DEEPSEEK_API_KEY` | DeepSeek işçileri için |
-| `CLAUDE_CODE_PATH` | Kendi kurduğun `claude` programını kullanmak için yolu. Boşsa Scriptorium'un kendi sürümü. |
-| `CLAUDE_CWD` | Claude'un varsayılan çalışma klasörü (arayüzden de değiştirilebilir) |
-| `PROJECTS_DIR` | Proje klasörlerinin durduğu yer. Klasör seçicide ve geçmişte otomatik listelenir. |
-| `PROJECTS_EXCLUDE` | Listelerde hiç görünmeyecek klasörler (adlar ya da tam yollar, virgülle). Klasörlere dokunulmaz. |
-| `OLLAMA_BASE_URL` | Ollama başka bir adreste çalışıyorsa |
-| `WORKER_MAX_TOKENS` | İşçi çağrısı başına en fazla çıktı (maliyet güvenliği) |
-| `PORT` | Arka uç portu (varsayılan 7777) |
+| `DEEPSEEK_API_KEY` | For DeepSeek workers (Setup writes it for you) |
+| `CLAUDE_CODE_PATH` | Path to your own `claude` install. Empty means Scriptorium's own copy. |
+| `CLAUDE_CWD` | Claude's default working folder (also changeable in the UI) |
+| `PROJECTS_DIR` | Where your project folders live. Listed automatically in the folder picker and history. |
+| `PROJECTS_EXCLUDE` | Folders to hide from the lists entirely (names or full paths, comma-separated). Folders are never touched. |
+| `OLLAMA_BASE_URL` | If Ollama runs at another address |
+| `WORKER_MAX_TOKENS` | Max output per worker call (cost safety) |
+| `PORT` | Backend port (default 7777) |
 
-## Local model seçimi
+## Choosing a local model
 
-Local işçiye kısa ve tek adımlı işler gider (sınıflandırma, kısa özet, gizli veri içeren küçük işler). Model ekran kartının belleğine tamamen sığarsa hızlı çalışır:
+Local workers get short, single-step tasks (classification, short summaries, small tasks with sensitive data). A model runs fast when it fits entirely in your GPU memory:
 
-- **8 GB ekran kartı:** `qwen3.5:9b` (6,6 GB) tamamen sığar ve hızlıdır. Daha güçlü ama yavaş bir seçenek: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9,3 GB). RTX 4060 Laptop'ta saniyede ~3,7 token.
-- **12 GB ve üstü:** 14B–27B modeller.
+- **8 GB GPU:** `qwen3.5:9b` (6.6 GB) fits entirely and is fast. Stronger but slower: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB), about 3.7 tokens/s on an RTX 4060 Laptop.
+- **12 GB and up:** 14B–27B models.
 
-Görsel okumayan bir model için Ollama'nın görsel modülünü çıkarmak hızlandırır ve ek disk yeri harcamaz:
+For a model you won't send images to, removing Ollama's vision module makes it faster and uses no extra disk space:
 
 ```bash
 ollama show --modelfile <model> > model.Modelfile
 ```
 
-`model.Modelfile` içindeki ikinci `FROM` satırını sil, bağlamı büyütmek istersen en sona `PARAMETER num_ctx 16384` ekle, sonra:
+Delete the second `FROM` line in `model.Modelfile`. To use a larger context, add `PARAMETER num_ctx 16384` at the end. Then:
 
 ```bash
-ollama create <yeni-ad> -f model.Modelfile
+ollama create <new-name> -f model.Modelfile
 ```
 
-Local işçilerde düşünme varsayılan olarak kapalıdır (küçük modellerde açıkken dakikalar sürer). İşçi panelinin altındaki menüden açılabilir.
+Thinking is off by default for local workers (on small models it can take minutes). Turn it on from the menu under the worker's input.
 
-## Geliştirme
-
-```bash
-npm run dev        # geliştirme: http://localhost:5173 (sunucu kod değişince yeniden başlar)
-```
+## Development
 
 ```bash
-npm run typecheck  # tip kontrolü
+npm run dev        # development: http://localhost:5173 (server restarts on code changes)
 ```
 
 ```bash
-npm run cli        # terminalden deneme (/yan <mesaj> ile yan sohbet)
+npm run typecheck  # type check
 ```
 
-Ayrıntılı tasarım kararları: [docs/PLAN.md](docs/PLAN.md)
+```bash
+npm run cli        # try it from the terminal (/side <message> opens a side chat)
+```
 
-## Güvenlik
+Design notes: [docs/PLAN.md](docs/PLAN.md)
 
-- Arka uç sadece bu bilgisayardan erişilebilir (`127.0.0.1`).
-- WebSocket ve MCP adresi yalnızca bu bilgisayardan ve kendi arayüzünün adreslerinden istek kabul eder. Tarayıcıda açık başka bir site Claude'u ya da işçileri kontrol edemez.
-- API anahtarları sadece `.env` dosyasında durur, repoya girmez ve arayüze geri gönderilmez.
-- Claude'un komut ve dosya işlemleri, izin modu "Her adımda sor" olduğunda arayüzde onay ister.
-- DeepSeek'e giden veri DeepSeek'in sunucularına gider. Gizli işler için `sensitive: true` ve local işçi kullan.
+## Security
 
-## Lisans
+- The backend is reachable only from this computer (`127.0.0.1`).
+- The WebSocket and the MCP endpoint accept requests only from this computer and from the app's own origins. Other sites open in your browser can't control Claude or the workers.
+- API keys live only in `.env`, never go into the repo and are never sent back to the UI.
+- Claude's commands and file operations ask for approval in the UI when the permission mode is "Ask every time".
+- Data sent to DeepSeek goes to DeepSeek's servers. For sensitive tasks use `sensitive: true` and a local worker.
+
+## License
 
 [MIT](LICENSE)

@@ -32,7 +32,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
   return (
     <div className="group relative my-2 overflow-hidden rounded-lg border border-separator bg-background-secondary">
       <div className="flex items-center justify-between border-b border-separator px-3 py-1 text-[11px] text-muted">
-        <span>{lang ?? "kod"}</span>
+        <span>{lang ?? "code"}</span>
         <div className="flex gap-0.5 opacity-60 transition group-hover:opacity-100">
           <CopyButton text={text} />
           <Tooltip delay={300}>
@@ -40,12 +40,12 @@ function CodeBlock({ children }: { children: ReactNode }) {
               isIconOnly
               size="sm"
               variant="ghost"
-              aria-label="Ortada aç"
-              onPress={() => actions.showOverlay({ title: lang ? `Kod (${lang})` : "Kod", body: text, mono: true })}
+              aria-label="Open centered"
+              onPress={() => actions.showOverlay({ title: lang ? `Code (${lang})` : "Code", body: text, mono: true })}
             >
               <Maximize2 size={13} />
             </Button>
-            <Tooltip.Content>Ortada büyük aç</Tooltip.Content>
+            <Tooltip.Content>Open large centered</Tooltip.Content>
           </Tooltip>
         </div>
       </div>
@@ -54,7 +54,7 @@ function CodeBlock({ children }: { children: ReactNode }) {
   );
 }
 
-export function CopyButton({ text, label = "Kopyala" }: { text: string; label?: string }) {
+export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
   return (
     <Tooltip delay={300}>
@@ -71,7 +71,7 @@ export function CopyButton({ text, label = "Kopyala" }: { text: string; label?: 
       >
         {done ? <Check size={13} /> : <Copy size={13} />}
       </Button>
-      <Tooltip.Content>{done ? "Kopyalandı" : label}</Tooltip.Content>
+      <Tooltip.Content>{done ? "Copied" : label}</Tooltip.Content>
     </Tooltip>
   );
 }

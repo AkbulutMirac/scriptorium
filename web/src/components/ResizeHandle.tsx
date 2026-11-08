@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-/** Sağdaki panelin sol kenarı. Sürükleyince panel genişliği değişir. */
+/** Left edge of the right panel. Dragging changes the panel width. */
 export function ResizeHandle(props: { width: number; min: number; max: number; onChange: (w: number) => void }) {
   const [dragging, setDragging] = useState(false);
   const start = useRef({ x: 0, width: 0 });
@@ -9,7 +9,7 @@ export function ResizeHandle(props: { width: number; min: number; max: number; o
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Panel genişliğini değiştir"
+      aria-label="Resize panel"
       className={`resize-handle ${dragging ? "dragging" : ""}`}
       onPointerDown={(e) => {
         start.current = { x: e.clientX, width: props.width };

@@ -1,10 +1,10 @@
 /**
- * Claude Code'dan (SDK) gelen mesajları sohbet ekranındaki öğelere çevirir.
- * Canlı mesajlar ve geçmişten okunan mesajlar aynı fonksiyondan geçer.
- * Tanınmayan yeni bir mesaj türü gelirse "unknown" kartı olarak görünür; Claude Code güncellenince arayüz bozulmaz.
+ * Converts messages coming from Claude Code (SDK) into items on the chat screen.
+ * Live messages and messages read from history go through the same function.
+ * If an unrecognized new message type arrives, it appears as an "unknown" card; the UI won't break when Claude Code is updated.
  */
 
-/** Mesajdaki görsel: base64 ise data: adresi, değilse doğrudan adres */
+/** Image in the message: a data: address if base64, otherwise the direct address */
 export type ChatImage = { src: string; name?: string };
 
 export type ToolResult = { text: string; isError: boolean; images?: ChatImage[] };
@@ -21,7 +21,7 @@ export type ChatItem =
 type Block = { type: string; [k: string]: unknown };
 type AnyMsg = { type: string; subtype?: string; uuid?: string; message?: unknown; parent_tool_use_id?: string | null; [k: string]: unknown };
 
-/** Sessizce geçilen iç olaylar */
+/** Internal events that are silently skipped */
 const IGNORED_TYPES = new Set([
   "stream_event",
   "tool_progress",
@@ -54,15 +54,15 @@ const IGNORED_SYSTEM = new Set([
   "post_turn_summary",
   "task_summary",
 ]);
-/** Bilgi notu olarak gösterilen sistem olayları */
+/** System events shown as info notices */
 const NOTICE_SYSTEM: Record<string, { text: string; tone: "info" | "danger" }> = {
-  compact_boundary: { text: "Sohbet özetlendi, bağlam sıkıştırıldı.", tone: "info" },
-  api_retry: { text: "API'ye ulaşılamadı, yeniden deneniyor…", tone: "info" },
-  model_refusal_fallback: { text: "Model isteği reddetti, yedek modele geçildi.", tone: "info" },
-  model_refusal_no_fallback: { text: "Model isteği reddetti.", tone: "danger" },
-  permission_denied: { text: "Bir araç izni reddedildi.", tone: "danger" },
-  mirror_error: { text: "Oturum kaydında hata oluştu.", tone: "danger" },
-  session_writes_lost: { text: "Oturumun bir kısmı diske yazılamadı.", tone: "danger" },
+  compact_boundary: { text: "Chat summarized, context compacted.", tone: "info" },
+  api_retry: { text: "Couldn't reach the API, retrying…", tone: "info" },
+  model_refusal_fallback: { text: "Model declined the request, switched to fallback model.", tone: "info" },
+  model_refusal_no_fallback: { text: "Model declined the request.", tone: "danger" },
+  permission_denied: { text: "Tool permission denied.", tone: "danger" },
+  mirror_error: { text: "Session log error.", tone: "danger" },
+  session_writes_lost: { text: "Part of the session couldn't be written to disk.", tone: "danger" },
 };
 
 let seq = 0;
@@ -75,7 +75,7 @@ function contentOf(message: unknown): Block[] | string | undefined {
   return undefined;
 }
 
-/** Anthropic içerik bloğundaki görseli gösterilebilir adrese çevirir */
+/** Converts the image in an Anthropic content block into a displayable address */
 export function imageOf(b: Block): ChatImage | null {
   const src = b.source as { type?: string; media_type?: string; data?: string; url?: string } | undefined;
   if (!src) return null;
@@ -100,7 +100,7 @@ export function toolResultText(content: unknown): string {
   return "";
 }
 
-/** Mesajdaki ilk anlamlı metin alanı (bilgi notları için) */
+/** The first meaningful text field in the message (for info notices) */
 function firstText(msg: AnyMsg): string | undefined {
   for (const key of ["content", "text", "message", "error", "reason", "title"]) {
     const v = msg[key];
@@ -109,7 +109,7 @@ function firstText(msg: AnyMsg): string | undefined {
   return undefined;
 }
 
-/** Claude Code'un kullanıcı mesajlarına eklediği iç etiketleri temizler */
+/** Cleans up the internal tags Claude Code adds to user messages */
 function cleanUserText(text: string): string {
   return text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
@@ -130,16 +130,16 @@ function attachResult(items: ChatItem[], toolUseId: string, result: ToolResult):
 }
 
 function userTextItem(text: string, idSource?: string, images: ChatImage[] = []): ChatItem | null {
-  if (/^\[Request interrupted/i.test(text)) return { kind: "notice", id: idSource ?? uid("n"), text: "Durduruldu.", tone: "info" };
+  if (/^\[Request interrupted/i.test(text)) return { kind: "notice", id: idSource ?? uid("n"), text: "Stopped.", tone: "info" };
   const clean = cleanUserText(text);
   if (!clean && !images.length) return null;
   return { kind: "user", id: idSource ?? uid("u"), text: clean, images: images.length ? images : undefined };
 }
 
 /**
- * Bir SDK mesajını öğe listesine uygular ve yeni liste döndürür.
- * live=true: canlı akış (kullanıcının kendi yazdığı mesaj zaten ekranda olduğu için tekrar eklenmez).
- * live=false: geçmişten yükleme.
+ * Applies an SDK message to the item list and returns the new list.
+ * live=true: live stream (the user's own message is already on screen, so it isn't added again).
+ * live=false: loading from history.
  */
 export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): ChatItem[] {
   const msg = raw as AnyMsg;
@@ -158,13 +158,13 @@ export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): Ch
         } else if (b.type === "thinking") {
           if (String(b.thinking ?? "").trim()) out.push({ kind: "thinking", id, text: String(b.thinking), parent });
         } else if (b.type === "redacted_thinking") {
-          // gösterilecek içerik yok
+          // no content to display
         } else if (b.type === "tool_use" || b.type === "server_tool_use" || b.type === "mcp_tool_use") {
           out.push({ kind: "tool", id: String(b.id), name: String(b.name), input: (b.input ?? {}) as Record<string, unknown>, parent });
         } else if (b.type.endsWith("_tool_result")) {
           out = attachResult(out, String(b.tool_use_id), { text: toolResultText(b.content), isError: !!b.is_error, images: imagesOf(b.content) });
         } else {
-          out.push({ kind: "unknown", id, label: `İçerik bloğu: ${b.type}`, data: b });
+          out.push({ kind: "unknown", id, label: `Content block: ${b.type}`, data: b });
         }
       });
       return out;
@@ -202,7 +202,7 @@ export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): Ch
     case "result": {
       if (msg.is_error) {
         const errors = Array.isArray(msg.errors) ? (msg.errors as string[]).join("\n") : "";
-        const text = (typeof msg.result === "string" && msg.result) || errors || `Tur hatayla bitti (${msg.subtype}).`;
+        const text = (typeof msg.result === "string" && msg.result) || errors || `Turn ended with an error (${msg.subtype}).`;
         return [...items, { kind: "notice", id: uid("r"), text, tone: "danger" }];
       }
       return [
@@ -220,15 +220,15 @@ export function applyMessage(items: ChatItem[], raw: unknown, live: boolean): Ch
         const text = firstText(msg);
         return text ? [...items, { kind: "notice", id: uid("s"), text, tone: "info" }] : items;
       }
-      return [...items, { kind: "unknown", id: uid("s"), label: `Sistem olayı: ${sub || "?"}`, data: msg }];
+      return [...items, { kind: "unknown", id: uid("s"), label: `System event: ${sub || "?"}`, data: msg }];
     }
 
     case "conversation_reset":
-      return [...items, { kind: "notice", id: uid("s"), text: "Sohbet sıfırlandı.", tone: "info" }];
+      return [...items, { kind: "notice", id: uid("s"), text: "Chat reset.", tone: "info" }];
 
     default:
       if (IGNORED_TYPES.has(msg.type)) return items;
-      return [...items, { kind: "unknown", id: uid("x"), label: `Mesaj türü: ${msg.type}`, data: msg }];
+      return [...items, { kind: "unknown", id: uid("x"), label: `Message type: ${msg.type}`, data: msg }];
   }
 }
 
@@ -236,7 +236,7 @@ export function historyToItems(messages: unknown[]): ChatItem[] {
   return messages.reduce<ChatItem[]>((items, m) => applyMessage(items, m, false), []);
 }
 
-/** Akış halindeki metin parçasını döndürür (sadece ana ajan, alt ajanlar değil) */
+/** Returns the streaming text chunk (main agent only, not subagents) */
 export function streamDelta(raw: unknown): { text?: string; thinking?: string } | null {
   const msg = raw as AnyMsg;
   if (msg.type !== "stream_event" || msg.parent_tool_use_id) return null;
@@ -247,7 +247,7 @@ export function streamDelta(raw: unknown): { text?: string; thinking?: string } 
   return null;
 }
 
-/** Bir öğenin düz metin hali (kopyalama ve alıntı için) */
+/** Plain text form of an item (for copying and quoting) */
 export function itemPlainText(item: ChatItem): string {
   switch (item.kind) {
     case "user":

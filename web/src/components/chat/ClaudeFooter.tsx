@@ -6,23 +6,23 @@ import type { EffortLevel, ModelOption, PermissionMode } from "../../protocol";
 import { pct, UsageCard } from "./UsageCard";
 import { actions, useApp, type ClaudeChat } from "../../store";
 
-export const EFFORT_LABEL: Record<EffortLevel, string> = { low: "Düşük", medium: "Orta", high: "Yüksek", xhigh: "Ekstra", max: "Maks" };
+export const EFFORT_LABEL: Record<EffortLevel, string> = { low: "Low", medium: "Medium", high: "High", xhigh: "Extra", max: "Max" };
 const ALL_EFFORTS: EffortLevel[] = ["low", "medium", "high", "xhigh", "max"];
 
 const MODES: { value: PermissionMode; label: string; hint: string }[] = [
-  { value: "default", label: "Her adımda sor", hint: "Komut ve düzenlemelerden önce izin ister" },
-  { value: "acceptEdits", label: "Düzenlemeleri kabul et", hint: "Dosya düzenlemelerini sormadan yapar" },
-  { value: "plan", label: "Plan modu", hint: "Önce plan yapar, bir şey değiştirmez" },
-  { value: "auto", label: "Otomatik", hint: "Güvenli adımları kendisi onaylar" },
+  { value: "default", label: "Ask every step", hint: "Asks permission before commands and edits" },
+  { value: "acceptEdits", label: "Accept edits", hint: "Makes file edits without asking" },
+  { value: "plan", label: "Plan mode", hint: "Plans first, changes nothing" },
+  { value: "auto", label: "Automatic", hint: "Approves safe steps on its own" },
 ];
 
-/** Şu an seçili model (kullanıcının seçimi ya da oturumun bildirdiği model) */
+/** Currently selected model (the user's choice or the model reported by the session) */
 function currentModel(chat: ClaudeChat, models: ModelOption[]): ModelOption | undefined {
   if (chat.wantModel) return models.find((m) => m.value === chat.wantModel);
   return models.find((m) => m.resolvedModel === chat.model || m.value === chat.model) ?? models.find((m) => m.value === "default");
 }
 
-/** "Default (recommended)" yerine arkasındaki gerçek modelin adı (örn. "Opus 5.5") */
+/** The name of the real model behind "Default (recommended)" (e.g. "Opus 5.5") */
 function modelLabel(m: ModelOption | undefined, models: ModelOption[], fallback?: string): string {
   if (!m) return fallback ? fallback.replace(/^claude-/, "") : "Model";
   if (m.value === "default") {
@@ -33,17 +33,17 @@ function modelLabel(m: ModelOption | undefined, models: ModelOption[], fallback?
   return m.displayName;
 }
 
-/** Yazma kutusunun altındaki çubuk (Claude uygulamasındaki gibi) */
+/** The bar below the compose box (like in the Claude app) */
 export function ClaudeFooter({ chatId }: { chatId: string }) {
   const chat = useApp((s) => s.chats[chatId]);
   if (!chat) return null;
   return (
     <div className="mt-1.5 flex items-center gap-1 text-xs">
       <Tooltip delay={300}>
-        <span className="flex items-center px-1.5 text-muted" aria-label="Bu bilgisayar">
+        <span className="flex items-center px-1.5 text-muted" aria-label="This computer">
           <Laptop size={14} />
         </span>
-        <Tooltip.Content>Bu bilgisayarda çalışıyor</Tooltip.Content>
+        <Tooltip.Content>Running on this computer</Tooltip.Content>
       </Tooltip>
       {!chat.isSide && <FolderButton chat={chat} />}
       <span className="flex-1" />
@@ -60,7 +60,7 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const started = !!chat.sessionId || chat.items.length > 0;
-  const folder = chat.cwd.replaceAll("\\", "/").split("/").filter(Boolean).pop() || "Klasör seç";
+  const folder = chat.cwd.replaceAll("\\", "/").split("/").filter(Boolean).pop() || "Select folder";
   const shown = projects.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()) || p.path.toLowerCase().includes(q.toLowerCase()));
 
   const pick = (path: string) => {
@@ -79,7 +79,7 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
         }
       }}
     >
-      <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs" aria-label="Çalışma klasörü">
+      <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs" aria-label="Working folder">
         <Folder size={13} />
         <span className="max-w-36 truncate">{folder}</span>
         {branch && (
@@ -93,11 +93,11 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
       <Popover.Content placement="top start" className="w-96">
         <Popover.Dialog className="flex flex-col gap-2 p-1">
           <p className="px-1 text-xs text-muted">
-            {started ? "Bu sohbet başladı. Seçtiğin klasörde yeni bir sohbet açılır." : "Claude bu sohbette seçtiğin klasörde çalışır."}
+            {started ? "This chat has started. A new chat opens in the folder you select." : "Claude works in the folder you select for this chat."}
           </p>
           <div className="flex items-center gap-2 rounded-lg border border-field-border bg-field px-2">
             <Search size={13} className="text-muted" />
-            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Proje ara" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none" />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects" className="min-w-0 flex-1 bg-transparent py-1.5 text-sm outline-none" />
           </div>
           <ul className="flex max-h-72 flex-col overflow-y-auto">
             {shown.map((p) => {
@@ -116,14 +116,14 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
                       <div className="font-code truncate text-[10px] text-muted">{p.path}</div>
                     </div>
                     <span className="shrink-0 text-[10px] text-muted">
-                      {p.sessionCount > 0 ? `${p.sessionCount} sohbet · ${relativeTime(p.lastUsed)}` : "yeni"}
+                      {p.sessionCount > 0 ? `${p.sessionCount} chats · ${relativeTime(p.lastUsed)}` : "new"}
                     </span>
                     {active && <Check size={14} className="shrink-0 text-accent" />}
                   </button>
                 </li>
               );
             })}
-            {shown.length === 0 && <li className="px-2 py-3 text-center text-xs text-muted">Eşleşen proje yok.</li>}
+            {shown.length === 0 && <li className="px-2 py-3 text-center text-xs text-muted">No matching projects.</li>}
           </ul>
           <Button
             size="sm"
@@ -133,7 +133,7 @@ function FolderButton({ chat }: { chat: ClaudeChat }) {
               actions.openFolderPicker("cwd", chat.chatId);
             }}
           >
-            <FolderOpen size={14} /> Başka klasör seç…
+            <FolderOpen size={14} /> Choose another folder…
           </Button>
         </Popover.Dialog>
       </Popover.Content>
@@ -161,7 +161,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
         if (o) actions.requestInfo(chat.chatId);
       }}
     >
-      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Model ve efor">
+      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Model and effort">
         {chat.fastMode && <Zap size={12} className="text-warning" />}
         <span className="max-w-32 truncate font-medium">{label}</span>
         {effort && <span className="text-muted">{EFFORT_LABEL[effort]}</span>}
@@ -170,7 +170,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
       <Popover.Content placement="top end" className="w-80">
         <Popover.Dialog className="flex flex-col gap-1 p-1">
           {models.length === 0 ? (
-            <p className="px-2 py-3 text-xs text-muted">Modeller yükleniyor…</p>
+            <p className="px-2 py-3 text-xs text-muted">Loading models…</p>
           ) : (
             <ul className="flex max-h-96 flex-col overflow-y-auto">
               {(more ? models : models.filter((m, i) => i < MAIN_MODEL_COUNT || m.value === current?.value)).map((m) => {
@@ -183,7 +183,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
                       className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left ${active ? "bg-accent-soft" : "hover:bg-default-soft"}`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium">{m.value === "default" ? `Varsayılan (${modelLabel(m, models)})` : m.displayName}</div>
+                        <div className="text-sm font-medium">{m.value === "default" ? `Default (${modelLabel(m, models)})` : m.displayName}</div>
                         <div className="line-clamp-1 text-[11px] text-muted">{m.description}</div>
                       </div>
                       {active && <Check size={15} className="shrink-0 text-accent" />}
@@ -195,14 +195,14 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
                 <li>
                   <button type="button" onClick={() => setMore(!more)} className="flex w-full items-center gap-1 rounded-lg px-2.5 py-1.5 text-left text-xs text-muted hover:bg-default-soft">
                     <ChevronDown size={13} className={`transition-transform ${more ? "rotate-180" : ""}`} />
-                    {more ? "Daha az göster" : `Diğer modeller (${models.length - MAIN_MODEL_COUNT})`}
+                    {more ? "Show less" : `Other models (${models.length - MAIN_MODEL_COUNT})`}
                   </button>
                 </li>
               )}
             </ul>
           )}
           <div className="mt-1 border-t border-separator px-2 pt-2">
-            <div className="mb-1.5 text-xs font-medium">Efor</div>
+            <div className="mb-1.5 text-xs font-medium">Effort</div>
             <div className="grid grid-cols-5 gap-1">
               {ALL_EFFORTS.map((e) => {
                 const supported = efforts.includes(e);
@@ -221,7 +221,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
                 );
               })}
             </div>
-            <p className="mt-1 text-[10px] text-muted">Yüksek efor daha dikkatli düşünür ama daha yavaş ve kullanım limitinden daha çok yer.</p>
+            <p className="mt-1 text-[10px] text-muted">Higher effort thinks more carefully but is slower and uses more of your usage limit.</p>
           </div>
           {(current?.fastMode ?? false) && (
             <div className="border-t border-separator px-2 py-2">
@@ -231,7 +231,7 @@ function ModelMenu({ chat }: { chat: ClaudeChat }) {
                     <Switch.Thumb />
                   </Switch.Control>
                   <span className="flex items-center gap-1 text-sm">
-                    <Zap size={13} className="text-warning" /> Hızlı mod
+                    <Zap size={13} className="text-warning" /> Fast mode
                   </span>
                 </Switch.Content>
               </Switch>
@@ -249,7 +249,7 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
   const label = MODES.find((m) => m.value === mode)?.label ?? mode;
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="İzin modu">
+      <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" aria-label="Permission mode">
         <span className="max-w-32 truncate">{label}</span>
         <ChevronDown size={12} className="text-muted" />
       </Button>
@@ -281,7 +281,7 @@ function ModeMenu({ chat }: { chat: ClaudeChat }) {
   );
 }
 
-/** Kullanım halkası: 5 saatlik limit (yoksa bağlam doluluğu). Üzerine gelince kart, tıklayınca ayrıntı. */
+/** Usage ring: 5-hour limit (or context fullness if unavailable). Hover shows a card, click shows details. */
 function UsageRing({ chat }: { chat: ClaudeChat }) {
   const globalUsage = useApp((s) => s.globalInfo?.usage);
   const usage = chat.info?.usage ?? globalUsage;
@@ -299,7 +299,7 @@ function UsageRing({ chat }: { chat: ClaudeChat }) {
         size="sm"
         variant="ghost"
         className="h-7 w-7 min-w-7"
-        aria-label="Kullanım"
+        aria-label="Usage"
         onPress={() => {
           actions.requestInfo(chat.chatId);
           actions.focusInfo("usage");
@@ -324,7 +324,7 @@ function UsageRing({ chat }: { chat: ClaudeChat }) {
       </Button>
       <Tooltip.Content className="p-2">
         <UsageCard usage={usage} context={ctx} />
-        <p className="mt-2 px-1 text-[10px] text-muted">Ayrıntılar için tıkla</p>
+        <p className="mt-2 px-1 text-[10px] text-muted">Click for details</p>
       </Tooltip.Content>
     </Tooltip>
   );

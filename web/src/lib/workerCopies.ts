@@ -1,25 +1,25 @@
 import type { WorkerRequest } from "../protocol";
 
 /**
- * Aynı işçiye aynı anda birden fazla iş gelince (farklı Claude oturumlarından ya da paralel
- * çağrılardan) 3D ofiste her iş için ayrı bir işçi kopyası çizilir. İlk iş asıl işçiye gider,
- * diğerleri ek masalarda oturan kopyalara. Atama kalıcıdır: bir iş bitince diğerleri yer değiştirmez.
+ * When multiple jobs arrive for the same worker at once (from different Claude sessions or parallel
+ * calls), a separate worker copy is drawn in the 3D office for each job. The first job goes to the original worker,
+ * the others to copies sitting at extra desks. Assignment is permanent: when one job finishes, the others don't swap places.
  */
 export type WorkerCopy = {
   workerId: string;
-  /** 2, 3, … (1 asıl işçi) */
+  /** 2, 3, … (1 is the original worker) */
   copy: number;
-  /** Ek masa sırası */
+  /** Extra desk index */
   desk: number;
   requestId?: string;
-  /** İşi bitti, odadan çıkıyor */
+  /** Job finished, leaving the room */
   leavingAt?: number;
 };
 
 export type CopyState = {
-  /** İşçi id'si → asıl işçinin yaptığı iş */
+  /** Worker id → job done by the original worker */
   base: Record<string, string | undefined>;
-  /** "deepseek#2" → kopya */
+  /** "deepseek#2" → copy */
   copies: Record<string, WorkerCopy>;
 };
 

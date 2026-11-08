@@ -15,7 +15,7 @@ export type ChatOptions = {
   signal?: AbortSignal;
   onToken?: (text: string) => void;
   onReasoning?: (text: string) => void;
-  /** Boşsa işçinin modeli */
+  /** If empty, the worker's model */
   model?: string;
   reasoning?: ReasoningLevel;
   temperature?: number;
@@ -24,18 +24,18 @@ export type ChatOptions = {
 
 export type ChatResult = { content: string; reasoning: string; usage?: TokenUsage };
 
-/** DeepSeek ve Ollama ikisi de OpenAI uyumlu API kullanıyor, tek istemci ikisine de yetiyor. */
+/** Both DeepSeek and Ollama use OpenAI-compatible APIs, so a single client suffices for both. */
 function clientFor(worker: Worker): OpenAI {
   if (worker.provider === "deepseek") {
     if (!config.deepseekApiKey) {
-      throw new Error("DEEPSEEK_API_KEY tanımlı değil. .env dosyasına ekle.");
+      throw new Error("DEEPSEEK_API_KEY is not set. Add it to the .env file.");
     }
     return new OpenAI({ apiKey: config.deepseekApiKey, baseURL: config.deepseekBaseUrl });
   }
   return new OpenAI({ apiKey: "ollama", baseURL: config.ollamaBaseUrl });
 }
 
-/** Düşünme ayarını sağlayıcının beklediği alanlara çevirir */
+/** Translates the reasoning setting into the fields the provider expects */
 function reasoningParams(worker: Worker, level?: ReasoningLevel): Record<string, unknown> {
   if (!level) return {};
   if (worker.provider === "deepseek") {
@@ -45,7 +45,7 @@ function reasoningParams(worker: Worker, level?: ReasoningLevel): Record<string,
   return { reasoning_effort: level };
 }
 
-/** İşçiye mesaj gönderir; cevabı ve düşünceyi akış halinde iletir, sonunda tamamını ve token kullanımını döndürür. */
+/** Sends a message to the worker; streams the response and reasoning, then returns the full content and token usage. */
 export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   const body = {
     model: opts.model || worker.model,
@@ -57,7 +57,7 @@ export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOp
     ...(opts.json ? { response_format: { type: "json_object" } } : {}),
     ...reasoningParams(worker, opts.reasoning),
   };
-  // thinking / reasoning_effort gibi alanlar OpenAI tiplerinde yok; istek gövdesine aynen gider
+  // Fields like thinking / reasoning_effort are not in OpenAI types; they go into the request body as-is
   const stream = (await clientFor(worker).chat.completions.create(body as never, { signal: opts.signal })) as unknown as AsyncIterable<{
     choices?: { delta?: { content?: string | null; reasoning_content?: string | null; reasoning?: string | null } }[];
     usage?: {
@@ -97,13 +97,13 @@ export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOp
   return { content, reasoning, usage };
 }
 
-/** DeepSeek'in iki modeli de 1M token bağlam alır (api-docs.deepseek.com, Models & Pricing) */
+/** Both DeepSeek models take a 1M token context (api-docs.deepseek.com, Models & Pricing) */
 const DEEPSEEK_CONTEXT = 1_000_000;
 
-/** Ollama'nın kendi API adresi (OpenAI uyumlu /v1 değil) */
+/** Ollama's own API address (not the OpenAI-compatible /v1) */
 const ollamaRoot = () => config.ollamaBaseUrl.replace(/\/v1\/?$/, "");
 
-/** Modelin şu anki bağlam sınırı. Ollama'da yüklü modelin gerçek ayarı (/api/ps), DeepSeek'te sabit. */
+/** The model's current context limit. On Ollama it's the loaded model's actual setting (/api/ps), on DeepSeek it's fixed. */
 async function contextWindow(worker: Worker, model: string): Promise<number | undefined> {
   if (worker.provider === "deepseek") return DEEPSEEK_CONTEXT;
   try {
@@ -116,10 +116,10 @@ async function contextWindow(worker: Worker, model: string): Promise<number | un
   }
 }
 
-/** İşçinin kullanabileceği modeller: DeepSeek için sabit liste, Ollama için kurulu modeller */
+/** Models the worker can use: a fixed list for DeepSeek, installed models for Ollama */
 export async function listModels(worker: Worker): Promise<WorkerModel[]> {
   if (worker.provider === "deepseek") return [{ id: "deepseek-flash" }, { id: "deepseek-v4-pro" }];
-  // Ollama'nın kendi API'si: boyut ve görsel okuma bilgisi de gelir
+  // Ollama's own API: also returns size and vision capability info
   const root = ollamaRoot();
   try {
     const res = await fetch(`${root}/api/tags`, { signal: AbortSignal.timeout(3000) });
@@ -138,35 +138,35 @@ export async function listModels(worker: Worker): Promise<WorkerModel[]> {
   }
 }
 
-/** İşçiye şu an ulaşılabiliyor mu? DeepSeek için anahtar, Ollama için sunucu kontrol edilir. */
+/** Is the worker reachable right now? For DeepSeek the key is checked, for Ollama the server. */
 export async function isAvailable(worker: Worker): Promise<{ ok: boolean; reason?: string }> {
   if (worker.provider === "deepseek") {
-    return config.deepseekApiKey ? { ok: true } : { ok: false, reason: "DEEPSEEK_API_KEY yok" };
+    return config.deepseekApiKey ? { ok: true } : { ok: false, reason: "DEEPSEEK_API_KEY missing" };
   }
   try {
     const res = await fetch(`${config.ollamaBaseUrl}/models`, { signal: AbortSignal.timeout(1500) });
-    return res.ok ? { ok: true } : { ok: false, reason: `Ollama cevap vermedi (${res.status})` };
+    return res.ok ? { ok: true } : { ok: false, reason: `Ollama did not respond (${res.status})` };
   } catch {
-    return { ok: false, reason: "Ollama çalışmıyor" };
+    return { ok: false, reason: "Ollama is not running" };
   }
 }
 
-/** DeepSeek hesap bakiyesi. Anahtar hiçbir yere yazılmaz, sadece istek başlığında kullanılır. */
+/** DeepSeek account balance. The key is never written anywhere, only used in the request header. */
 export async function deepseekBalance(): Promise<DeepSeekBalance> {
   const checkedAt = Date.now();
-  if (!config.deepseekApiKey) return { ok: false, error: "DEEPSEEK_API_KEY yok", checkedAt };
+  if (!config.deepseekApiKey) return { ok: false, error: "DEEPSEEK_API_KEY missing", checkedAt };
   try {
     const res = await fetch(`${config.deepseekBaseUrl}/user/balance`, {
       headers: { Authorization: `Bearer ${config.deepseekApiKey}`, Accept: "application/json" },
       signal: AbortSignal.timeout(8000),
     });
-    if (res.status === 401) return { ok: false, error: "Anahtar geçersiz (401)", checkedAt };
-    if (!res.ok) return { ok: false, error: `DeepSeek cevap vermedi (${res.status})`, checkedAt };
+    if (res.status === 401) return { ok: false, error: "Invalid key (401)", checkedAt };
+    if (!res.ok) return { ok: false, error: `DeepSeek did not respond (${res.status})`, checkedAt };
     const j = (await res.json()) as {
       is_available?: boolean;
       balance_infos?: { currency?: string; total_balance?: string; granted_balance?: string; topped_up_balance?: string }[];
     };
-    // Birden çok para birimi varsa USD'yi tercih et
+    // If there are multiple currencies, prefer USD
     const info = j.balance_infos?.find((b) => b.currency === "USD") ?? j.balance_infos?.[0];
     return {
       ok: true,

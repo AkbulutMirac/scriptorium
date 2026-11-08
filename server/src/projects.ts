@@ -9,15 +9,15 @@ import type { DirListing, ProjectInfo } from "./protocol.js";
 const norm = (p: string) => path.resolve(p).normalize("NFC").toLowerCase();
 
 /**
- * Proje sayılmayacak klasörler: geçici klasörler, uygulama verileri (Claude uygulamasının scratch çalışma alanları
- * AppData\\Roaming\\Claude altında) ve Windows sistem klasörü.
+ * Folders not considered projects: temp folders, app data (the Claude app's scratch workspaces
+ * under AppData\\Roaming\\Claude) and the Windows system folder.
  */
 const IGNORED_ROOTS = [
   os.tmpdir(),
   process.env.APPDATA,
   process.env.LOCALAPPDATA,
   process.env.SystemRoot ?? "C:\\Windows",
-  // Kullanıcının listeden tamamen çıkardığı klasörler (PROJECTS_EXCLUDE); klasörlere dokunulmaz
+  // Folders the user has fully excluded from the list (PROJECTS_EXCLUDE); the folders themselves are left untouched
   ...config.projectsExclude.map((p) => (path.isAbsolute(p) ? p : path.join(config.projectsDir, p))),
 ]
   .filter((p): p is string => !!p)
@@ -25,8 +25,8 @@ const IGNORED_ROOTS = [
 export const isIgnoredPath = (p: string) => IGNORED_ROOTS.some((root) => norm(p) === root || norm(p).startsWith(root + path.sep));
 
 /**
- * Bilinen proje klasörleri: Claude Code oturumu olan her klasör + PROJECTS_DIR altındaki klasörler.
- * En son kullanılan önce.
+ * Known project folders: every folder with a Claude Code session + folders under PROJECTS_DIR.
+ * Most recently used first.
  */
 export async function listProjects(): Promise<ProjectInfo[]> {
   const byPath = new Map<string, ProjectInfo>();
@@ -59,16 +59,18 @@ export async function listProjects(): Promise<ProjectInfo[]> {
   return [...byPath.values()].sort((a, b) => b.lastUsed - a.lastUsed);
 }
 
-/** Klasör gezgini: bir klasörün alt klasörleri. Yol verilmezse kısayollar (ev, masaüstü, projeler, sürücüler). */
+/** Folder browser: the subfolders of a folder. If no path is given, shortcuts (home, desktop, projects, drives). */
 export async function listDir(dir?: string): Promise<DirListing> {
   if (!dir) {
     const home = os.homedir();
     const shortcuts = [
-      { name: "Projeler", path: config.projectsDir },
-      { name: "Ev klasörü", path: home },
-      { name: "Masaüstü", path: path.join(home, "OneDrive", "Masaüstü") },
-      { name: "Masaüstü", path: path.join(home, "Desktop") },
-      { name: "Belgeler", path: path.join(home, "Documents") },
+      { name: "Projects", path: config.projectsDir },
+      { name: "Home folder", path: home },
+      // OneDrive-backed desktops are localized on non-English Windows (e.g. "Masaüstü" in Turkish)
+      { name: "Desktop", path: path.join(home, "OneDrive", "Desktop") },
+      { name: "Desktop", path: path.join(home, "OneDrive", "Masaüstü") },
+      { name: "Desktop", path: path.join(home, "Desktop") },
+      { name: "Documents", path: path.join(home, "Documents") },
     ].filter((s) => s.path && existsSync(s.path));
     const drives =
       process.platform === "win32"
@@ -84,7 +86,7 @@ export async function listDir(dir?: string): Promise<DirListing> {
   const dirs = entries
     .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("$") && e.name !== "node_modules")
     .map((e) => ({ name: e.name, path: path.join(abs, e.name) }))
-    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
+    .sort((a, b) => a.name.localeCompare(b.name));
   const parent = path.dirname(abs);
   return { path: abs, parent: parent !== abs ? parent : "", dirs };
 }

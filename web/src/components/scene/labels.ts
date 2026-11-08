@@ -2,13 +2,13 @@ import type * as THREE from "three";
 import { create } from "zustand";
 
 /**
- * Etiketler 3D sahnenin içinde değil, üstündeki normal bir HTML katmanında çizilir.
- * (drei <Html> her etiket için ayrı React kökü açıyor ve React 19'da kaybolabiliyordu.)
- * Her karakter baş üstü noktasını buraya kaydeder; sahnedeki izleyici her karede bu noktayı
- * ekran koordinatına çevirip ilgili etiket kutusunu oraya taşır.
+ * Labels are drawn not inside the 3D scene, but on a regular HTML layer above it.
+ * (drei <Html> opened a separate React root for each label and could disappear in React 19.)
+ * Each character registers its overhead point here; the scene observer converts this point every frame
+ * into screen coordinates and moves the corresponding label box there.
  */
 export const anchors = new Map<string, THREE.Object3D>();
 export const labelEls = new Map<string, HTMLDivElement>();
 
-/** Fareyle üzerine gelinen karakter */
+/** Character hovered with the mouse */
 export const useHovered = create<{ id: string | null }>(() => ({ id: null }));

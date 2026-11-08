@@ -23,9 +23,9 @@ export function palette(isDark: boolean): Palette {
 
 const BOOK_COLORS = ["#8c3b2e", "#2f4f6f", "#3e6b48", "#a8792b", "#5b3a6b", "#7a2e3b", "#2b5d5c", "#c2a15a", "#4a4a6a", "#9b5b33", "#d4b483"];
 
-// ─── Oda ───────────────────────────────────────────────────────────────────────
+// ─── Room ──────────────────────────────────────────────────────────────────────
 
-/** Parke zemin dokusu (piksel görünümde de net dursun diye en yakın komşu filtreli) */
+/** Parquet floor texture (nearest-neighbor filtered so it stays crisp in pixel view) */
 function useFloorTexture(a: string, b: string, depth: number) {
   return useMemo(() => {
     const c = document.createElement("canvas");
@@ -63,13 +63,13 @@ export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark
 
   return (
     <group>
-      {/* Zemin (kalın döşeme: izometrik kesitte kenarı görünür) */}
+      {/* Floor (thick slab: edge visible in isometric cutaway) */}
       <mesh position={[0, -0.15, centerZ]} receiveShadow>
         <boxGeometry args={[ROOM_HALF_X * 2, 0.3, depth]} />
         <meshStandardMaterial map={floorTex} roughness={0.85} />
       </mesh>
 
-      {/* Arka ve sol duvar */}
+      {/* Back and left wall */}
       <mesh position={[0, wallH / 2, ROOM_BACK_Z - 0.12]} receiveShadow castShadow>
         <boxGeometry args={[ROOM_HALF_X * 2 + 0.25, wallH, 0.25]} />
         <meshStandardMaterial color={p.wall} roughness={0.95} />
@@ -78,7 +78,7 @@ export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark
         <boxGeometry args={[0.25, wallH, depth]} />
         <meshStandardMaterial color={p.wall} roughness={0.95} />
       </mesh>
-      {/* Süpürgelikler */}
+      {/* Baseboards */}
       <mesh position={[0, 0.1, ROOM_BACK_Z + 0.03]}>
         <boxGeometry args={[ROOM_HALF_X * 2, 0.2, 0.06]} />
         <meshStandardMaterial color={p.wallTrim} />
@@ -88,19 +88,19 @@ export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark
         <meshStandardMaterial color={p.wallTrim} />
       </mesh>
 
-      {/* Sol duvarda pencereler */}
+      {/* Windows on the left wall */}
       <Window position={[-ROOM_HALF_X + 0.02, 2.2, -2.2]} isDark={isDark} />
       <Window position={[-ROOM_HALF_X + 0.02, 2.2, 2.4]} isDark={isDark} />
       <Bookshelf position={[-ROOM_HALF_X + 0.35, 0, 0.1]} rotation={Math.PI / 2} width={2.2} seed={21} wood={p.wood} />
 
-      {/* Arka duvar rafları */}
+      {/* Back wall shelves */}
       {[-6.2, -4.3, -1.7, 0.2].map((x, i) => (
         <Bookshelf key={x} position={[x, 0, ROOM_BACK_Z + 0.35]} width={1.8} seed={i + 1} wood={p.wood} />
       ))}
       <TaskBoard position={[5.3, 2.5, ROOM_BACK_Z + 0.05]} />
       <WallClock position={[2.1, 3.1, ROOM_BACK_Z + 0.05]} />
 
-      {/* Meşaleler: karanlıkta odayı sıcak, titreyen bir ışıkla aydınlatır */}
+      {/* Torches: light the room with a warm, flickering glow in the dark */}
       <Torch position={[-3.0, 2.55, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={1} />
       <Torch position={[1.5, 2.45, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={2} />
       <Torch position={[7.15, 2.45, ROOM_BACK_Z + 0.02]} isDark={isDark} seed={3} />
@@ -116,12 +116,12 @@ export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark
   );
 }
 
-/** Alevin titremesi: birkaç farklı hızda sinüsün toplamı, her meşalede farklı faz */
+/** Flame flicker: sum of sines at several speeds, different phase per torch */
 function flicker(t: number, seed: number) {
   return 0.82 + Math.sin(t * 11.3 + seed * 1.7) * 0.07 + Math.sin(t * 17.9 + seed * 3.1) * 0.06 + Math.sin(t * 5.1 + seed) * 0.05;
 }
 
-/** Duvar meşalesi: braket, kâse, iki katmanlı alev ve turuncu titreyen ışık */
+/** Wall torch: bracket, bowl, two-layer flame and orange flickering light */
 function Torch({ position, rotation = 0, isDark, seed }: { position: Vec3; rotation?: number; isDark: boolean; seed: number }) {
   const light = useRef<THREE.PointLight>(null);
   const flame = useRef<THREE.Group>(null);
@@ -138,7 +138,7 @@ function Torch({ position, rotation = 0, isDark, seed }: { position: Vec3; rotat
 
   return (
     <group position={position} rotation-y={rotation}>
-      {/* Duvar plakası ve kol */}
+      {/* Wall plate and arm */}
       <mesh position={[0, 0, 0.03]}>
         <boxGeometry args={[0.16, 0.3, 0.05]} />
         <meshStandardMaterial color="#3a2a20" roughness={0.6} metalness={0.3} />
@@ -147,12 +147,12 @@ function Torch({ position, rotation = 0, isDark, seed }: { position: Vec3; rotat
         <cylinderGeometry args={[0.025, 0.035, 0.32, 8]} />
         <meshStandardMaterial color="#4a3426" roughness={0.6} metalness={0.4} />
       </mesh>
-      {/* Kâse */}
+      {/* Bowl */}
       <mesh position={[0, 0.17, 0.27]}>
         <cylinderGeometry args={[0.09, 0.05, 0.1, 10]} />
         <meshStandardMaterial color="#2b201a" roughness={0.5} metalness={0.5} />
       </mesh>
-      {/* Alev */}
+      {/* Flame */}
       <group ref={flame} position={[0, 0.24, 0.27]}>
         <mesh position-y={0.1}>
           <coneGeometry args={[0.075, 0.26, 10]} />
@@ -168,7 +168,7 @@ function Torch({ position, rotation = 0, isDark, seed }: { position: Vec3; rotat
   );
 }
 
-/** Köşede ayaklı mangal */
+/** Corner standing brazier */
 function Brazier({ position, isDark }: { position: Vec3; isDark: boolean }) {
   const light = useRef<THREE.PointLight>(null);
   const flame = useRef<THREE.Group>(null);
@@ -307,7 +307,7 @@ export function Bookshelf({ position, rotation = 0, width, seed, wood }: { posit
   );
 }
 
-/** Duvardaki görev panosu: yapışkan notlar ve küçük bir grafik */
+/** Wall task board: sticky notes and a small chart */
 function TaskBoard({ position }: { position: Vec3 }) {
   const notes: [number, number, string][] = [
     [-0.75, 0.35, "#ffe08a"],
@@ -405,9 +405,9 @@ function WaterCooler({ position }: { position: Vec3 }) {
   );
 }
 
-// ─── Mobilya ───────────────────────────────────────────────────────────────────
+// ─── Furniture ────────────────────────────────────────────────────────────────
 
-/** Monitörlü çalışma masası. `screenOn` iken ekran ve önündeki ışık yanar. */
+/** Desk with monitor. When `screenOn`, the screen and the light in front of it turn on. */
 export function ComputerDesk({ position, p, screenOn, accentHex, big = false, isDark }: {
   position: Vec3;
   p: Palette;
@@ -419,11 +419,11 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
   const w = big ? 2.2 : 1.6;
   const d = 0.8;
   const glow = useRef<THREE.PointLight>(null);
-  // Tüm ekranlar aynı malzemeyi paylaşır (Claude'un iki monitörü birlikte yanar)
+  // All screens share the same material (Claude's two monitors light up together)
   const screen = useMemo(() => new THREE.MeshStandardMaterial({ color: "#0d1424", emissive: accentHex, emissiveIntensity: 0.05 }), [accentHex]);
 
   useFrame((state) => {
-    // Çalışırken ekran hafifçe titrer (yazı akıyor)
+    // While working the screen flickers slightly (text is streaming)
     const flicker = screenOn ? 0.9 + Math.sin(state.clock.elapsedTime * 13) * 0.1 : 0;
     screen.emissiveIntensity = screenOn ? 1.2 * flicker : 0.05;
     if (glow.current) glow.current.intensity = screenOn ? (isDark ? 2.2 : 0.8) * flicker : 0;
@@ -441,7 +441,7 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
           <meshStandardMaterial color={p.woodDark} roughness={0.7} />
         </mesh>
       ))}
-      {/* Monitör(ler): ekran çalışana (arkaya, -z) bakar */}
+      {/* Monitor(s): the screen faces the worker (backward, -z) */}
       {(big ? [-0.45, 0.45] : [0]).map((mx) => (
         <group key={mx} position={[mx, 0.8, 0.12]}>
           <mesh position-y={0.08}>
@@ -458,7 +458,7 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
         </group>
       ))}
       <pointLight ref={glow} position={[0, 1.25, -0.35]} color={accentHex} intensity={0} distance={2.4} decay={2} />
-      {/* Klavye ve kupa */}
+      {/* Keyboard and mug */}
       <mesh position={[0, 0.81, -0.18]}>
         <boxGeometry args={[0.55, 0.03, 0.18]} />
         <meshStandardMaterial color="#d9d6cf" />
@@ -469,7 +469,7 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
       </mesh>
       {big && (
         <group position={[-w / 2 + 0.25, 0.8, 0.15]}>
-          {/* Masa lambası */}
+          {/* Desk lamp */}
           <mesh position-y={0.02}>
             <cylinderGeometry args={[0.12, 0.14, 0.04, 14]} />
             <meshStandardMaterial color="#2b2230" />
@@ -512,7 +512,7 @@ export function OfficeChair({ position, color }: { position: Vec3; color: string
   );
 }
 
-/** Dinlenme köşesi: halı, kanepe, iki koltuk, sehpa, puf ve lambader */
+/** Lounge corner: rug, sofa, two armchairs, coffee table, pouf and floor lamp */
 export function Lounge({ p, isDark }: { p: Palette; isDark: boolean }) {
   return (
     <group>
@@ -524,7 +524,7 @@ export function Lounge({ p, isDark }: { p: Palette; isDark: boolean }) {
         <planeGeometry args={[4.2, 3.2]} />
         <meshStandardMaterial color={new THREE.Color(p.rug).multiplyScalar(1.15).getStyle()} roughness={1} />
       </mesh>
-      {/* Kanepe */}
+      {/* Sofa */}
       <group position={[5.3, 0, -5.15]}>
         <mesh position-y={0.25} castShadow receiveShadow>
           <boxGeometry args={[3.3, 0.36, 0.85]} />
@@ -541,7 +541,7 @@ export function Lounge({ p, isDark }: { p: Palette; isDark: boolean }) {
           </mesh>
         ))}
       </group>
-      {/* Koltuklar */}
+      {/* Armchairs */}
       {[
         [3.45, -2.75, Math.PI / 2.4],
         [7.1, -2.75, -Math.PI / 2.4],
@@ -557,12 +557,12 @@ export function Lounge({ p, isDark }: { p: Palette; isDark: boolean }) {
           </mesh>
         </group>
       ))}
-      {/* Puf */}
+      {/* Pouf */}
       <mesh position={[5.3, 0.17, -1.45]} castShadow>
         <cylinderGeometry args={[0.36, 0.38, 0.34, 18]} />
         <meshStandardMaterial color="#e3b04b" roughness={0.95} />
       </mesh>
-      {/* Sehpa, üstünde kitaplar */}
+      {/* Coffee table with books on top */}
       <group position={[5.3, 0, -3.35]}>
         <mesh position-y={0.36} castShadow receiveShadow>
           <boxGeometry args={[1.4, 0.06, 0.75]} />
@@ -585,7 +585,7 @@ export function Lounge({ p, isDark }: { p: Palette; isDark: boolean }) {
           <meshStandardMaterial color="#d97757" />
         </mesh>
       </group>
-      {/* Lambader */}
+      {/* Floor lamp */}
       <group position={[3.2, 0, -5.3]}>
         <mesh position-y={0.85}>
           <cylinderGeometry args={[0.025, 0.025, 1.7, 8]} />

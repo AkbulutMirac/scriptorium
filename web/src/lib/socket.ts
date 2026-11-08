@@ -2,7 +2,7 @@ import type { ClientMsg, ServerMsg } from "../protocol";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
-/** Arka uca tek WebSocket bağlantısı. Kopunca kendiliğinden yeniden bağlanır, bağlantı yokken gönderilenleri sıraya alır. */
+/** Single WebSocket connection to the backend. Reconnects automatically when dropped, queues messages sent while disconnected. */
 class Socket {
   private ws: WebSocket | null = null;
   private queue: ClientMsg[] = [];
@@ -51,7 +51,7 @@ class Socket {
     return () => this.statusListeners.delete(fn);
   }
 
-  /** Her (yeniden) bağlanışta çalışır */
+  /** Runs on every (re)connect */
   onOpen(fn: () => void) {
     this.openListeners.add(fn);
     return () => this.openListeners.delete(fn);

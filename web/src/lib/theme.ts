@@ -3,14 +3,14 @@ import { load, save } from "./storage";
 
 export type ThemeMode = "light" | "dark" | "system";
 
-/** Vurgu renkleri. `css` HeroUI'ın --accent değişkenine yazılır, `hex` 3D sahnede kullanılır. */
+/** Accent colors. `css` is written to HeroUI's --accent variable, `hex` is used in the 3D scene. */
 export const ACCENTS = {
-  clay: { label: "Kil", css: "oklch(0.66 0.13 42)", hex: "#D97757", fg: "var(--snow)" },
-  blue: { label: "Mavi", css: "oklch(0.62 0.195 253.83)", hex: "#3B82F6", fg: "var(--snow)" },
-  violet: { label: "Mor", css: "oklch(0.58 0.2 293)", hex: "#8B5CF6", fg: "var(--snow)" },
-  green: { label: "Yeşil", css: "oklch(0.6 0.15 155)", hex: "#22A06B", fg: "var(--snow)" },
-  rose: { label: "Gül", css: "oklch(0.62 0.2 10)", hex: "#E5487A", fg: "var(--snow)" },
-  amber: { label: "Kehribar", css: "oklch(0.76 0.15 75)", hex: "#E8A23A", fg: "var(--eclipse)" },
+  clay: { label: "Clay", css: "oklch(0.66 0.13 42)", hex: "#D97757", fg: "var(--snow)" },
+  blue: { label: "Blue", css: "oklch(0.62 0.195 253.83)", hex: "#3B82F6", fg: "var(--snow)" },
+  violet: { label: "Purple", css: "oklch(0.58 0.2 293)", hex: "#8B5CF6", fg: "var(--snow)" },
+  green: { label: "Green", css: "oklch(0.6 0.15 155)", hex: "#22A06B", fg: "var(--snow)" },
+  rose: { label: "Rose", css: "oklch(0.62 0.2 10)", hex: "#E5487A", fg: "var(--snow)" },
+  amber: { label: "Amber", css: "oklch(0.76 0.15 75)", hex: "#E8A23A", fg: "var(--eclipse)" },
 } as const;
 
 export type AccentName = keyof typeof ACCENTS;
@@ -18,9 +18,9 @@ export type AccentName = keyof typeof ACCENTS;
 type ThemeState = {
   mode: ThemeMode;
   accent: AccentName;
-  /** Sistem ayarı da hesaba katılmış gerçek mod */
+  /** Actual mode taking the system setting into account */
   isDark: boolean;
-  /** 3D sahne düşük çözünürlükte çizilip piksel sanat görünümü verilir */
+  /** The 3D scene is rendered at low resolution to give a pixel art look */
   pixel: boolean;
   setMode: (m: ThemeMode) => void;
   setAccent: (a: AccentName) => void;

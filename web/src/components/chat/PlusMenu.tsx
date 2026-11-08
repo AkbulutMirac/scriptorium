@@ -7,7 +7,7 @@ import { ConnectorList } from "./InfoPanel";
 
 type View = "main" | "folder" | "commands" | "connectors" | "plugins";
 
-/** Yazma kutusunun solundaki "+" menüsü (Claude uygulamasındaki gibi) */
+/** The "+" menu to the left of the input box (like in the Claude app) */
 export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPickCommand: (c: SlashCommandInfo) => void }) {
   const chat = useApp((s) => s.chats[props.chatId]);
   const globalCommands = useApp((s) => s.globalInfo?.commands);
@@ -36,7 +36,7 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
         }
       }}
     >
-      <Button isIconOnly size="sm" variant="ghost" aria-label="Ekle ve araçlar">
+      <Button isIconOnly size="sm" variant="ghost" aria-label="Add and tools">
         <Plus size={18} />
       </Button>
       <Popover.Content placement="top start" className="w-80">
@@ -45,23 +45,23 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
             <ul className="flex flex-col">
               <MenuItem
                 icon={<Paperclip size={15} />}
-                label="Dosya veya fotoğraf ekle"
-                hint="Görsel, PDF, metin"
+                label="Add file or photo"
+                hint="Image, PDF, text"
                 onPress={() => {
                   close();
                   props.onPickFiles();
                 }}
               />
-              <MenuItem icon={<FolderPlus size={15} />} label="Klasör ekle" onPress={() => setView("folder")} chevron />
-              <MenuItem icon={<SquareSlash size={15} />} label="Slash komutları" onPress={() => setView("commands")} chevron />
-              <MenuItem icon={<Plug size={15} />} label="Bağlayıcılar" onPress={() => setView("connectors")} chevron />
-              <MenuItem icon={<Puzzle size={15} />} label="Eklentiler" onPress={() => setView("plugins")} chevron />
+              <MenuItem icon={<FolderPlus size={15} />} label="Add folder" onPress={() => setView("folder")} chevron />
+              <MenuItem icon={<SquareSlash size={15} />} label="Slash commands" onPress={() => setView("commands")} chevron />
+              <MenuItem icon={<Plug size={15} />} label="Connectors" onPress={() => setView("connectors")} chevron />
+              <MenuItem icon={<Puzzle size={15} />} label="Plugins" onPress={() => setView("plugins")} chevron />
             </ul>
           )}
 
           {view === "folder" && chat && (
-            <SubView title="Klasör ekle" onBack={() => setView("main")}>
-              <p className="text-xs text-muted">Claude bu klasörlerdeki dosyalara da erişebilir.</p>
+            <SubView title="Add folder" onBack={() => setView("main")}>
+              <p className="text-xs text-muted">Claude can also access files in these folders.</p>
               <Button
                 size="sm"
                 variant="secondary"
@@ -70,15 +70,15 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
                   actions.openFolderPicker("dir", props.chatId);
                 }}
               >
-                <FolderPlus size={14} /> Klasöre gözat…
+                <FolderPlus size={14} /> Browse folder…
               </Button>
-              <p className="text-[11px] text-muted">ya da tam yolu yaz:</p>
+              <p className="text-[11px] text-muted">or type the full path:</p>
               {chat.dirs.map((d) => (
                 <div key={d} className="flex items-center gap-1 rounded-md bg-default-soft px-2 py-1">
                   <span className="font-code min-w-0 flex-1 truncate text-xs" title={d}>
                     {d}
                   </span>
-                  <button type="button" aria-label="Çıkar" className="text-muted hover:text-danger" onClick={() => actions.setDirs(props.chatId, chat.dirs.filter((x) => x !== d))}>
+                  <button type="button" aria-label="Remove" className="text-muted hover:text-danger" onClick={() => actions.setDirs(props.chatId, chat.dirs.filter((x) => x !== d))}>
                     <X size={12} />
                   </button>
                 </div>
@@ -106,19 +106,19 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
                     setPath("");
                   }}
                 >
-                  Ekle
+                  Add
                 </Button>
               </div>
             </SubView>
           )}
 
           {view === "commands" && (
-            <SubView title="Slash komutları" onBack={() => setView("main")}>
+            <SubView title="Slash commands" onBack={() => setView("main")}>
               <input
                 autoFocus
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Komut ara"
+                placeholder="Search commands"
                 className="rounded-md border border-field-border bg-field px-2 py-1.5 text-xs outline-none focus:border-accent"
               />
               {!commands.length ? (
@@ -148,7 +148,7 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
           )}
 
           {view === "connectors" && chat && (
-            <SubView title="Bağlayıcılar" onBack={() => setView("main")}>
+            <SubView title="Connectors" onBack={() => setView("main")}>
               <div className="max-h-72 overflow-y-auto">
                 <ConnectorList chat={chat} />
               </div>
@@ -156,11 +156,11 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
           )}
 
           {view === "plugins" && chat && (
-            <SubView title="Eklentiler" onBack={() => setView("main")}>
+            <SubView title="Plugins" onBack={() => setView("main")}>
               {!chat.init ? (
-                <p className="text-xs text-muted">Eklentiler, oturum ilk mesajla başladığında görünür.</p>
+                <p className="text-xs text-muted">Plugins appear once the session starts with the first message.</p>
               ) : chat.init.plugins.length === 0 ? (
-                <p className="text-xs text-muted">Yüklü eklenti yok.</p>
+                <p className="text-xs text-muted">No plugins installed.</p>
               ) : (
                 <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto">
                   {chat.init.plugins.map((p) => (
@@ -172,7 +172,7 @@ export function PlusMenu(props: { chatId: string; onPickFiles: () => void; onPic
                   ))}
                 </ul>
               )}
-              {chat.init && chat.init.skills.length > 0 && <p className="text-xs text-muted">{chat.init.skills.length} skill yüklü.</p>}
+              {chat.init && chat.init.skills.length > 0 && <p className="text-xs text-muted">{chat.init.skills.length} skills loaded.</p>}
             </SubView>
           )}
         </Popover.Dialog>
@@ -198,7 +198,7 @@ function SubView({ title, onBack, children }: { title: string; onBack: () => voi
   return (
     <div className="flex flex-col gap-2 p-1">
       <div className="flex items-center gap-1">
-        <Button isIconOnly size="sm" variant="ghost" aria-label="Geri" onPress={onBack}>
+        <Button isIconOnly size="sm" variant="ghost" aria-label="Back" onPress={onBack}>
           <ArrowLeft size={15} />
         </Button>
         <span className="text-sm font-semibold">{title}</span>
@@ -211,7 +211,7 @@ function SubView({ title, onBack, children }: { title: string; onBack: () => voi
 function Loading() {
   return (
     <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted">
-      <Spinner size="sm" /> Yükleniyor…
+      <Spinner size="sm" /> Loading…
     </div>
   );
 }

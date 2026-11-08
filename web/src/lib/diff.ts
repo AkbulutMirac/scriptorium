@@ -1,4 +1,4 @@
-/** Diff satırının rengi (git'in birleşik diff formatı ve araç kartlarındaki "+ / -" satırları) */
+/** Color of a diff line (git's unified diff format and the "+ / -" lines in tool cards) */
 export function diffLineClass(line: string): string {
   if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff --git") || line.startsWith("index ")) {
     return "font-semibold text-muted";
