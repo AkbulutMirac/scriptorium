@@ -116,7 +116,7 @@ function firstText(msg: AnyMsg): string | undefined {
 function cleanUserText(text: string): string {
   return text
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
-    .replace(/<(command-name|command-message|command-args|local-command-stdout|local-command-caveat)>[\s\S]*?<\/\1>/g, "")
+    .replace(/<(command-name|command-message|command-args|local-command-stdout|local-command-caveat|task-notification)>[\s\S]*?<\/\1>/g, "")
     .trim();
 }
 
