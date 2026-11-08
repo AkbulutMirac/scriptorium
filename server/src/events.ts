@@ -6,6 +6,8 @@ export const bus = new EventEmitter<{
   activity: [AgentActivity];
   jobs: [];
   requests: [];
+  /** A worker's chat list changed (for example Claude delegated a task) */
+  chats: [workerId: string];
 }>();
 
 const ERROR_VISIBLE_MS = 12_000;

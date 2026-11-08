@@ -62,6 +62,7 @@ bus.on("activity", (a) => {
 });
 bus.on("jobs", () => broadcast({ type: "jobs", jobs: listJobs() }));
 bus.on("requests", () => broadcast({ type: "worker.requests", requests: listRequests() }));
+bus.on("chats", async (workerId) => broadcast({ type: "worker.chats", workerId, chats: await listChats(workerId) }));
 
 // ─── DeepSeek balance: on startup, every 5 minutes, and after every DeepSeek job ─────
 let lastBalance: Awaited<ReturnType<typeof deepseekBalance>> | null = null;

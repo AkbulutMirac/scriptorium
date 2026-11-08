@@ -270,19 +270,33 @@ function WorkerHistory({ workerId }: { workerId: string }) {
   const chats = useApp((s) => s.workerChatLists[workerId]);
   const active = useApp((s) => s.activeWorkerChat[workerId]);
   if (!chats?.length) return <Empty text="No chats with this worker yet." />;
+  // Direct chats first, then the tasks Claude delegated (from any Claude Code session)
+  const groups = [
+    { title: "Your chats", items: chats.filter((c) => !c.from) },
+    { title: "From Claude", items: chats.filter((c) => c.from) },
+  ].filter((g) => g.items.length);
   return (
-    <ul className="flex flex-col gap-0.5">
-      {chats.map((c) => (
-        <HistoryRow
-          key={c.id}
-          title={c.title}
-          subtitle={relativeTime(c.updatedAt)}
-          active={c.id === active}
-          onOpen={() => actions.openWorkerChat(workerId, c.id)}
-          onDelete={() => actions.deleteWorkerChat(workerId, c.id)}
-        />
+    <div className="flex flex-col gap-3">
+      {groups.map((g) => (
+        <section key={g.title} className="flex flex-col gap-0.5">
+          <h3 className="px-2 text-[11px] font-medium text-muted">
+            {g.title} <span className="font-normal">{g.items.length}</span>
+          </h3>
+          <ul className="flex flex-col gap-0.5">
+            {g.items.map((c) => (
+              <HistoryRow
+                key={c.id}
+                title={c.title}
+                subtitle={c.from?.label ? `${c.from.label} · ${relativeTime(c.updatedAt)}` : relativeTime(c.updatedAt)}
+                active={c.id === active}
+                onOpen={() => actions.openWorkerChat(workerId, c.id)}
+                onDelete={() => actions.deleteWorkerChat(workerId, c.id)}
+              />
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }
 

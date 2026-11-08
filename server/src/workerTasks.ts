@@ -4,6 +4,7 @@ import type { Worker } from "./agents.js";
 import { chat } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { withWorkerSlot } from "./requests.js";
+import { saveDelegatedTask } from "./workerChats.js";
 
 /** Total character limit for files sent to the worker (cost safety). */
 const MAX_FILE_CHARS = 200_000;
@@ -47,7 +48,7 @@ export async function runWorkerTask(args: {
   return withWorkerSlot(worker, { task, caller: args.caller, signal }, async () => {
     const fileText = files?.length && cwd ? await readProjectFiles(cwd, files) : "";
     const userContent = fileText ? `${task}\n\n## Files\n\n${fileText}` : task;
-    const { content: answer } = await chat(
+    const result = await chat(
       worker,
       [
         { role: "system", content: WORKER_SYSTEM_PROMPT },
@@ -56,8 +57,24 @@ export async function runWorkerTask(args: {
       // Local model is small and slow: reasoning is off for the short tasks Claude assigns (it takes minutes when on)
       { signal, reasoning: worker.local ? "none" : undefined },
     );
-    return answer || "(worker returned an empty response)";
-  }).catch((err) => {
-    throw new Error(`${worker.name} failed: ${err instanceof Error ? err.message : String(err)}`);
+    const answer = result.content || "(worker returned an empty response)";
+    // Keep a copy in the worker's history (the task and the answer, not the file contents)
+    await saveDelegatedTask({
+      workerId: worker.id,
+      task,
+      files,
+      label: args.caller.label,
+      answer,
+      reasoning: result.reasoning,
+      usage: result.usage,
+      model: worker.model,
+    }).catch(() => {});
+    return answer;
+  }).catch(async (err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!signal?.aborted) {
+      await saveDelegatedTask({ workerId: worker.id, task, files, label: args.caller.label, answer: message, model: worker.model, error: true }).catch(() => {});
+    }
+    throw new Error(`${worker.name} failed: ${message}`);
   });
 }

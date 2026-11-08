@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { findWorker } from "./agents.js";
 import { SERVER_ROOT } from "./config.js";
+import { bus } from "./events.js";
 import { withWorkerSlot } from "./requests.js";
 import { chat, type ChatMessage, type ChatPart } from "./llm.js";
 import type { Attachment, WorkerChat, WorkerChatMessage, WorkerChatSummary, WorkerSettings } from "./protocol.js";
@@ -34,12 +35,43 @@ export async function listChats(workerId: string): Promise<WorkerChatSummary[]> 
   const chats = await Promise.all(files.map(async (f) => JSON.parse(await readFile(path.join(CHATS_DIR, f), "utf8")) as WorkerChat));
   return chats
     .filter((c) => c.workerId === workerId)
-    .map(({ id, workerId: w, title, updatedAt }) => ({ id, workerId: w, title, updatedAt }))
+    .map(({ id, workerId: w, title, updatedAt, from }) => ({ id, workerId: w, title, updatedAt, from }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function deleteChat(id: string) {
   await rm(fileOf(id), { force: true });
+}
+
+/**
+ * Saves a task Claude delegated (ask_worker / start_job) into the worker's history, so it can be read later
+ * (and continued as a chat). File contents are not stored, only their names.
+ */
+export async function saveDelegatedTask(args: {
+  workerId: string;
+  task: string;
+  files?: string[];
+  label?: string;
+  answer: string;
+  reasoning?: string;
+  usage?: WorkerChatMessage["usage"];
+  model?: string;
+  error?: boolean;
+}) {
+  const now = Date.now();
+  const fileNote = args.files?.length ? `\n\nFiles: ${args.files.join(", ")}` : "";
+  await saveChat({
+    id: randomUUID(),
+    workerId: args.workerId,
+    title: args.task.split("\n")[0].slice(0, 60),
+    updatedAt: now,
+    from: { label: args.label },
+    messages: [
+      { role: "user", content: args.task + fileNote, at: now },
+      { role: "assistant", content: args.answer, reasoning: args.reasoning || undefined, usage: args.usage, model: args.model, at: Date.now(), error: args.error },
+    ],
+  });
+  bus.emit("chats", args.workerId);
 }
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);

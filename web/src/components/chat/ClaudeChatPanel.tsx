@@ -1,13 +1,15 @@
 import { Button, Spinner, Tooltip } from "@heroui/react";
 import { Brain, FileDiff, GitBranch, PanelRight, SquarePen, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { actions, useApp } from "../../store";
+import { actions, useApp, type ClaudeChat } from "../../store";
 import { AgentSelect } from "./AgentSelect";
 import { ClaudeFooter } from "./ClaudeFooter";
-import { StreamingDots, useAutoScroll } from "./common";
+import { useAutoScroll, WorkingDots } from "./common";
+import { describe } from "./ToolCard";
 import { Composer } from "./Composer";
 import { Collapsible, ItemView } from "./ItemView";
+import { groupSteps, StepGroup } from "./StepGroup";
 import { Markdown } from "./Markdown";
 import { PermissionCard } from "./PermissionCard";
 
@@ -16,6 +18,9 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
   const infoOpen = useApp((s) => s.ui.infoOpen);
   const permissions = useApp(useShallow((s) => s.permissions.filter((p) => p.chatId === chatId)));
   const { ref, onScroll } = useAutoScroll<HTMLDivElement>([chat?.items.length, chat?.streamText, chat?.streamThinking, permissions.length]);
+
+  // Runs of tool calls fold into one row, like in the Claude app
+  const blocks = useMemo(() => groupSteps(chat?.items ?? []), [chat?.items]);
 
   // When the panel opens, request model, effort, context and usage info (without waiting for the first message)
   useEffect(() => {
@@ -84,23 +89,23 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
             </div>
           )}
           {!chat.loadingHistory && chat.items.length === 0 && !isSide && <EmptyState />}
-          {chat.items.map((item) => (
-            <ItemView key={item.id} item={item} onReply={onReply} onSideChat={onSideChat} />
-          ))}
+          {blocks.map((b, i) =>
+            b.kind === "group" ? (
+              <StepGroup key={b.id} items={b.items} live={chat.busy && i === blocks.length - 1} onReply={onReply} onSideChat={onSideChat} />
+            ) : (
+              <ItemView key={b.item.id} item={b.item} onReply={onReply} onSideChat={onSideChat} />
+            ),
+          )}
           {chat.streamThinking && (
             <Collapsible icon={<Brain size={13} />} label="Thinking…" defaultOpen>
               <div className="whitespace-pre-wrap text-xs leading-relaxed text-muted">{chat.streamThinking}</div>
             </Collapsible>
           )}
           {chat.streamText && <Markdown text={chat.streamText} />}
-          {chat.busy && !chat.streamText && permissions.length === 0 && (
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <StreamingDots /> Claude working
-            </div>
-          )}
           {permissions.map((p) => (
             <PermissionCard key={p.requestId} req={p} />
           ))}
+          {chat.busy && <WorkingStatus chat={chat} waiting={permissions.length > 0} />}
         </div>
       </div>
 
@@ -125,6 +130,41 @@ function EmptyState() {
       <p className="text-sm text-muted">
         Tell Claude what you want. If it sees fit, it delegates the work to DeepSeek or local models; you can see who is working in the library in the middle.
       </p>
+    </div>
+  );
+}
+
+/** Elapsed time that ticks every second: "8s", "1m 12s" */
+function Elapsed({ since }: { since?: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  if (!since) return null;
+  const s = Math.max(0, Math.floor((now - since) / 1000));
+  return <span className="shrink-0 tabular-nums">{s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`}</span>;
+}
+
+/** Status line at the bottom while Claude works: turning dots, what it is doing right now, and for how long */
+function WorkingStatus({ chat, waiting }: { chat: ClaudeChat; waiting: boolean }) {
+  const pending = chat.items.findLast((i) => i.kind === "tool" && !i.result);
+  const d = pending?.kind === "tool" ? describe(pending.name, pending.input) : null;
+  const label = waiting
+    ? "Waiting for your approval"
+    : d
+      ? d.title
+      : chat.streamThinking
+        ? "Thinking"
+        : chat.streamText
+          ? "Writing"
+          : "Working";
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+      <WorkingDots />
+      <span className="min-w-0 truncate text-foreground">{label}</span>
+      {d?.detail && !waiting && <span className="font-code min-w-0 truncate">{d.detail}</span>}
+      <Elapsed since={chat.busySince} />
     </div>
   );
 }

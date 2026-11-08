@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ROOM_BACK_Z, ROOM_HALF_X, seeded, type Vec3 } from "./layout";
 
@@ -27,7 +27,7 @@ const BOOK_COLORS = ["#8c3b2e", "#2f4f6f", "#3e6b48", "#a8792b", "#5b3a6b", "#7a
 
 /** Parquet floor texture (nearest-neighbor filtered so it stays crisp in pixel view) */
 function useFloorTexture(a: string, b: string, depth: number) {
-  return useMemo(() => {
+  const tex = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 128;
     c.height = 128;
@@ -46,13 +46,15 @@ function useFloorTexture(a: string, b: string, depth: number) {
       ctx.fillStyle = "rgba(0,0,0,0.22)";
       ctx.fillRect(0, row * 16 + 15, 128, 1);
     }
-    const tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set((ROOM_HALF_X * 2) / 4, (depth - ROOM_BACK_Z) / 4);
-    tex.magFilter = THREE.NearestFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
-  }, [a, b, depth]);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = THREE.NearestFilter;
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [a, b]);
+  useEffect(() => () => tex.dispose(), [tex]);
+  tex.repeat.set((ROOM_HALF_X * 2) / 4, (depth - ROOM_BACK_Z) / 4);
+  return tex;
 }
 
 export function Room({ p, frontZ, isDark }: { p: Palette; frontZ: number; isDark: boolean }) {
@@ -407,6 +409,27 @@ function WaterCooler({ position }: { position: Vec3 }) {
 
 // ─── Furniture ────────────────────────────────────────────────────────────────
 
+/**
+ * Soft round glow texture for fake screen light. Desks used to carry a real point light each, but adding or
+ * removing a light makes three.js recompile every lit material, which froze the scene whenever desks came and went.
+ */
+let glowTexture: THREE.Texture | null = null;
+function getGlowTexture() {
+  if (glowTexture) return glowTexture;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.5, "rgba(255,255,255,0.35)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  glowTexture = new THREE.CanvasTexture(c);
+  glowTexture.colorSpace = THREE.SRGBColorSpace;
+  return glowTexture;
+}
+
 /** Desk with monitor. When `screenOn`, the screen and the light in front of it turn on. */
 export function ComputerDesk({ position, p, screenOn, accentHex, big = false, isDark }: {
   position: Vec3;
@@ -418,15 +441,21 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
 }) {
   const w = big ? 2.2 : 1.6;
   const d = 0.8;
-  const glow = useRef<THREE.PointLight>(null);
   // All screens share the same material (Claude's two monitors light up together)
   const screen = useMemo(() => new THREE.MeshStandardMaterial({ color: "#0d1424", emissive: accentHex, emissiveIntensity: 0.05 }), [accentHex]);
+  // Fake screen light: an unlit, additive glow on the desk and the floor (no real light, see getGlowTexture)
+  const glow = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({ map: getGlowTexture(), color: accentHex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }),
+    [accentHex],
+  );
+  useEffect(() => () => (screen.dispose(), glow.dispose()), [screen, glow]);
 
   useFrame((state) => {
     // While working the screen flickers slightly (text is streaming)
     const flicker = screenOn ? 0.9 + Math.sin(state.clock.elapsedTime * 13) * 0.1 : 0;
     screen.emissiveIntensity = screenOn ? 1.2 * flicker : 0.05;
-    if (glow.current) glow.current.intensity = screenOn ? (isDark ? 2.2 : 0.8) * flicker : 0;
+    glow.opacity = screenOn ? (isDark ? 0.5 : 0.22) * flicker : 0;
   });
 
   return (
@@ -457,7 +486,12 @@ export function ComputerDesk({ position, p, screenOn, accentHex, big = false, is
           </mesh>
         </group>
       ))}
-      <pointLight ref={glow} position={[0, 1.25, -0.35]} color={accentHex} intensity={0} distance={2.4} decay={2} />
+      <mesh position={[0, 0.8, -0.2]} rotation-x={-Math.PI / 2} material={glow}>
+        <planeGeometry args={[w * 0.95, 0.75]} />
+      </mesh>
+      <mesh position={[0, 0.015, -0.75]} rotation-x={-Math.PI / 2} material={glow}>
+        <planeGeometry args={[w + 0.6, 1.6]} />
+      </mesh>
       {/* Keyboard and mug */}
       <mesh position={[0, 0.81, -0.18]}>
         <boxGeometry args={[0.55, 0.03, 0.18]} />

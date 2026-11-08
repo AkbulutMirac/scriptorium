@@ -66,6 +66,15 @@ body {
   color: var(--foreground);
   border: 1px solid var(--border);
 }
+/* Claude working indicator: four dots turning in a square */
+.working-dots { position: relative; display: inline-block; width: 12px; height: 12px; flex-shrink: 0; animation: wd-spin 1.2s linear infinite; }
+.working-dots i { position: absolute; width: 4px; height: 4px; border-radius: 999px; background: #d97757; }
+.working-dots i:nth-child(1) { left: 0; top: 0; }
+.working-dots i:nth-child(2) { right: 0; top: 0; opacity: 0.75; }
+.working-dots i:nth-child(3) { right: 0; bottom: 0; opacity: 0.5; }
+.working-dots i:nth-child(4) { left: 0; bottom: 0; opacity: 0.3; }
+@keyframes wd-spin { to { transform: rotate(360deg); } }
+
 .agent-label.working { border-color: color-mix(in oklab, var(--accent) 70%, var(--border)); }
 .agent-label.working::before {
   content: "";

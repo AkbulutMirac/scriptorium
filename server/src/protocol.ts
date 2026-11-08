@@ -114,7 +114,14 @@ export type WorkerChatMessage = {
   model?: string;
 };
 
-export type WorkerChatSummary = { id: string; workerId: string; title: string; updatedAt: number };
+export type WorkerChatSummary = {
+  id: string;
+  workerId: string;
+  title: string;
+  updatedAt: number;
+  /** Set when a Claude session delegated this task (label: its project folder); absent for direct chats */
+  from?: { label?: string };
+};
 
 export type WorkerChat = WorkerChatSummary & { messages: WorkerChatMessage[] };
 

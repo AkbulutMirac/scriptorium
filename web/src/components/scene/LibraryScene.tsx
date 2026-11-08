@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { ACCENTS, useTheme } from "../../lib/theme";
 import type { WorkerRequest } from "../../protocol";
@@ -11,21 +11,42 @@ import { claudePose, computeFigures, hotDeskCount, type Pose } from "./placement
 import { CLAUDE_STATION, ROOM_BACK_Z, ROOM_HALF_X, roomFrontZ, workstations } from "./layout";
 import { ComputerDesk, Lounge, OfficeChair, palette, Room } from "./Office";
 
-/** Zooms the orthographic camera so the whole room is visible */
+/** Zooms the orthographic camera so the whole room is visible. When the room grows or shrinks it eases over ~0.6 s instead of jumping. */
 function CameraFit({ frontZ }: { frontZ: number }) {
   const camera = useThree((s) => s.camera);
   const width = useThree((s) => s.size.width);
   const height = useThree((s) => s.size.height);
+  const anim = useRef<{ from: number; to: number; t: number } | null>(null);
+  const first = useRef(true);
   useEffect(() => {
     const cam = camera as THREE.OrthographicCamera;
     const span = ROOM_HALF_X * 2 + (frontZ - ROOM_BACK_Z);
     const worldW = span * 0.72;
     const worldH = span * 0.42 + 4.2 * 0.82;
-    cam.zoom = Math.min(width / worldW, height / worldH) * 0.98;
-    cam.updateProjectionMatrix();
+    const to = Math.min(width / worldW, height / worldH) * 0.98;
+    if (first.current) {
+      first.current = false;
+      cam.zoom = to;
+      cam.updateProjectionMatrix();
+    } else {
+      anim.current = { from: cam.zoom, to, t: 0 };
+    }
   }, [camera, width, height, frontZ]);
+  useFrame((_, dt) => {
+    const a = anim.current;
+    if (!a) return;
+    a.t = Math.min(1, a.t + dt / 0.6);
+    const e = 1 - Math.pow(1 - a.t, 3); // ease-out
+    const cam = camera as THREE.OrthographicCamera;
+    cam.zoom = a.from + (a.to - a.from) * e;
+    cam.updateProjectionMatrix();
+    if (a.t >= 1) anim.current = null;
+  });
   return null;
 }
+
+/** How long a grown room waits before shrinking back, so back-to-back tasks don't make it pulse */
+const SHRINK_DELAY_MS = 20_000;
 
 /**
  * The central isometric office-library: Claude at the head desk in the back, workers in rows, idle ones
@@ -42,8 +63,18 @@ export function LibraryScene() {
   const pixel = useTheme((s) => s.pixel);
   const accentHex = useTheme((s) => ACCENTS[s.accent].hex);
 
-  const hot = hotDeskCount(workers.length, copies);
-  const deskCount = workers.length + hot;
+  // Desks grow at once when copies need them, and shrink back only after a quiet spell
+  const needed = workers.length + hotDeskCount(workers.length, copies);
+  const [kept, setKept] = useState(needed);
+  useEffect(() => {
+    if (needed >= kept) {
+      if (needed > kept) setKept(needed);
+      return;
+    }
+    const t = setTimeout(() => setKept(needed), SHRINK_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [needed, kept]);
+  const deskCount = Math.max(needed, kept);
   const stations = useMemo(() => workstations(deskCount), [deskCount]);
   const frontZ = roomFrontZ(deskCount);
   const centerZ = (frontZ + ROOM_BACK_Z) / 2;
@@ -206,12 +237,12 @@ function Elapsed({ since }: { since: number }) {
     return () => clearInterval(t);
   }, []);
   const s = Math.max(0, Math.round((now - since) / 1000));
-  return <>{s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`}</>;
+  return <>{s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`}</>;
 }
 
 function callerText(r: WorkerRequest) {
   if (r.caller.kind === "user") return "For you (direct chat)";
-  return r.caller.label ? `Claude · ${r.caller.label} for` : "For Claude";
+  return r.caller.label ? `For Claude · ${r.caller.label}` : "For Claude";
 }
 
 /** Card that opens on hover: which job, for whom, and for how long it has been running */
@@ -230,8 +261,7 @@ function AgentCard({ it }: { it: LabelItem }) {
           ) : (
             working && r.startedAt && (
               <div className="agent-card-meta">
-                <Elapsed since={r.startedAt} />
-                {" working"}
+                Working for <Elapsed since={r.startedAt} />
               </div>
             )
           )}

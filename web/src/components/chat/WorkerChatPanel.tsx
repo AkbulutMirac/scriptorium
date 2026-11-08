@@ -79,6 +79,12 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
               <p className="text-sm text-muted">{worker.description || "You can chat directly with this worker."}</p>
             </div>
           )}
+          {chat?.from && (
+            <p className="rounded-lg bg-default-soft px-3 py-2 text-xs text-muted">
+              Claude gave this task{chat.from.label ? ` from ${chat.from.label}` : ""}. Attached file contents aren't kept, only their names. You can
+              continue the chat here.
+            </p>
+          )}
           {chat?.messages.map((m, i) => (
             <WorkerMessage key={i} m={m} onReply={(q) => actions.setQuote(quoteKey, q)} />
           ))}

@@ -28,9 +28,18 @@ type Props = { name: string; input: Record<string, unknown>; result?: ToolResult
 const str = (v: unknown) => (typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v));
 const shortPath = (p: unknown) => str(p).replaceAll("\\", "/").split("/").slice(-3).join("/");
 
+/** Worker tools, whatever the MCP server is called (older sessions used "workers") */
+const workerTool = (name: string) => name.replace(/^mcp__(workers|scriptorium)__/, "worker:");
+
+/** Tools that stay visible on their own instead of being folded into a step group */
+export function isProminentTool(name: string) {
+  const w = workerTool(name);
+  return w === "worker:ask_worker" || w === "worker:start_job" || name === "TodoWrite";
+}
+
 /** Title and icon for known tools */
-function describe(name: string, input: Record<string, unknown>): { icon: LucideIcon; title: string; detail?: string } {
-  switch (name) {
+export function describe(name: string, input: Record<string, unknown>): { icon: LucideIcon; title: string; detail?: string } {
+  switch (workerTool(name).startsWith("worker:") ? workerTool(name) : name) {
     case "Read":
       return { icon: FileText, title: "Read", detail: shortPath(input.file_path) };
     case "Write":
@@ -56,9 +65,9 @@ function describe(name: string, input: Record<string, unknown>): { icon: LucideI
     case "Task":
     case "Agent":
       return { icon: Bot, title: "Subagent", detail: str(input.description) };
-    case "mcp__workers__list_workers":
+    case "worker:list_workers":
       return { icon: Users, title: "Checked workers" };
-    case "mcp__workers__job_status":
+    case "worker:job_status":
       return { icon: Users, title: "Checked background job", detail: str(input.job_id) };
     default:
       return { icon: Wrench, title: name.replace(/^mcp__/, "").replaceAll("__", " · ") };
@@ -66,7 +75,7 @@ function describe(name: string, input: Record<string, unknown>): { icon: LucideI
 }
 
 export function ToolCard({ name, input, result }: Props) {
-  if (name === "mcp__workers__ask_worker" || name === "mcp__workers__start_job") {
+  if (workerTool(name) === "worker:ask_worker" || workerTool(name) === "worker:start_job") {
     return <DelegationCard background={name.endsWith("start_job")} input={input} result={result} />;
   }
   if (name === "TodoWrite") return <TodoCard input={input} />;

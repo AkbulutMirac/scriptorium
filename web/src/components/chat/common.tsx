@@ -47,6 +47,18 @@ export function MiniSelect(props: { label: string; value: string; options: Optio
   );
 }
 
+/** Four orange dots turning in a square, like the Claude app's "working" indicator */
+export function WorkingDots() {
+  return (
+    <span className="working-dots" aria-hidden>
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 export function StreamingDots() {
   return (
     <span className="inline-flex gap-1">

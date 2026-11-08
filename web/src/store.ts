@@ -50,6 +50,8 @@ export type ClaudeChat = {
   /** Whether the Claude Code process is open on the server */
   opened: boolean;
   busy: boolean;
+  /** When the current turn started (for the elapsed time in the status line) */
+  busySince?: number;
   items: ChatItem[];
   streamText: string;
   streamThinking: string;
@@ -364,7 +366,7 @@ function onServer(msg: ServerMsg) {
       return;
 
     case "claude.busy":
-      updateChat(msg.chatId, (c) => ({ ...c, busy: msg.busy }));
+      updateChat(msg.chatId, (c) => ({ ...c, busy: msg.busy, busySince: msg.busy ? (c.busySince ?? Date.now()) : undefined }));
       return;
 
     case "claude.closed":
@@ -609,6 +611,7 @@ export const actions = {
     updateChat(chatId, (c) => ({
       ...c,
       busy: true,
+      busySince: Date.now(),
       items: [...c.items, { kind: "user", id: uuid(), text: shown, images: images.length ? images : undefined }],
     }));
     socket.send({ type: "claude.send", chatId, text, attachments: attachments.length ? attachments : undefined });

@@ -41,6 +41,7 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 **Claude (head scribe)**
 - Connects to Claude Code. CLAUDE.md, MCP servers, skills and plugins are the same as in your terminal. New Claude Code features arrive as it updates.
 - Streaming answers, thinking blocks, tool cards (red/green diff for Edit and Write), permission prompts and answering multiple-choice questions.
+- Consecutive tool calls fold into one row ("Read 3 files, ran 2 commands") that expands on click. While Claude works, a status line shows what it is doing right now and for how long.
 - **Side chat:** open a separate conversation about a message without disturbing the main one. Reply to a message with a quote.
 - **Session info panel:** folder and git branch, extra folders, context usage, connectors (toggle, reconnect), written files, git changes (diff), background tasks.
 - **"+" menu:** attach files or images (paste and drag-and-drop too), add folders, slash commands (suggested as you type `/`), connectors and plugins.
@@ -55,6 +56,7 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 - The tools also work in every Claude Code session in your terminal and the desktop app.
 - Several sessions can use the same worker at once. In the 3D office a copy of the worker walks in for each task, sits at a spare desk and leaves when it's done. Local workers do one task at a time; the rest wait in line.
 - Hover over a worker to see which task it is doing, for which project, and for how long.
+- Every task Claude delegates (from any session) lands in that worker's history under "From Claude", with the answer and token usage. You can continue it as a chat.
 - Sensitive data (`sensitive`) only goes to local workers.
 - Add, edit and delete workers from the UI (`server/agents.json`). DeepSeek Flash and Pro come by default.
 - Remaining DeepSeek balance in the top bar.
