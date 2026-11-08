@@ -2,6 +2,8 @@ import { Button, Modal, ScrollShadow, Tooltip } from "@heroui/react";
 import { Check, ChevronRight, Copy, Eye, EyeOff, Folder, FolderOpen, MessageSquare, PanelLeftOpen, Pencil, Plus, RefreshCw, SquarePen, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { load, save } from "../lib/storage";
+import { COMPACT_QUERY, isCompactNow, MOBILE_QUERY, useMedia } from "../lib/useMedia";
+import { Drawer } from "./Drawer";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import type { SessionSummary } from "../protocol";
 import { relativeTime } from "../lib/format";
@@ -12,9 +14,17 @@ export function HistoryPanel() {
   const selected = useApp((s) => s.selected);
   const workers = useApp((s) => s.workers);
   const meta = agentMeta(selected, workers);
-  const newChat = () => (selected === CLAUDE_ID ? actions.newClaudeChat() : actions.newWorkerChat(selected));
+  const compact = useMedia(COMPACT_QUERY);
+  const mobile = useMedia(MOBILE_QUERY);
+  const newChat = () => {
+    if (selected === CLAUDE_ID) actions.newClaudeChat();
+    else actions.newWorkerChat(selected);
+    if (compact) actions.setUi({ historyOpen: false });
+  };
 
   if (!open) {
+    // On phones the top bar button opens the drawer, so the rail is not needed.
+    if (mobile) return null;
     return (
       <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-separator bg-surface py-2">
         <Tooltip delay={300}>
@@ -33,8 +43,8 @@ export function HistoryPanel() {
     );
   }
 
-  return (
-    <nav className="flex w-64 shrink-0 flex-col border-r border-separator bg-surface">
+  const panel = (
+    <nav className={`flex flex-col bg-surface ${compact ? "h-full" : "w-64 shrink-0 border-r border-separator"}`}>
       <div className="flex items-center gap-2 px-3 pb-2 pt-3">
         <span className="size-2.5 shrink-0 rounded-full" style={{ background: meta.color }} />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{meta.name}</span>
@@ -57,6 +67,13 @@ export function HistoryPanel() {
         {selected === CLAUDE_ID ? <ClaudeHistory /> : <WorkerHistory workerId={selected} />}
       </ScrollShadow>
     </nav>
+  );
+  return compact ? (
+    <Drawer side="left" width="min(18rem, 85%)" onClose={() => actions.setUi({ historyOpen: false })}>
+      {panel}
+    </Drawer>
+  ) : (
+    panel
   );
 }
 
@@ -220,7 +237,7 @@ function ClaudeHistory() {
                   isIconOnly
                   size="sm"
                   variant="ghost"
-                  className="h-6 w-6 min-w-6 opacity-0 group-hover:opacity-100"
+                  className="h-6 w-6 min-w-6 opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
                   aria-label={`New chat in ${g.name}`}
                   onPress={() => actions.newClaudeChat(g.path)}
                 >
@@ -353,7 +370,10 @@ function HistoryRow(props: {
       className={`group flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
         props.active ? "bg-accent-soft" : "hover:bg-default-soft"
       }`}
-      onClick={props.onOpen}
+      onClick={() => {
+        props.onOpen();
+        if (isCompactNow()) actions.setUi({ historyOpen: false });
+      }}
       onContextMenu={props.onContextMenu}
       onMouseLeave={() => setConfirmDelete(false)}
     >
@@ -361,7 +381,7 @@ function HistoryRow(props: {
         <div className={`truncate text-sm ${props.active ? "font-medium text-accent-soft-foreground" : ""}`}>{props.title}</div>
         <div className="text-[11px] text-muted">{props.subtitle}</div>
       </div>
-      <div className="hidden shrink-0 items-center group-hover:flex" onClick={(e) => e.stopPropagation()}>
+      <div className="hidden shrink-0 items-center group-hover:flex [@media(pointer:coarse)]:flex" onClick={(e) => e.stopPropagation()}>
         {confirmDelete ? (
           <>
             <Button isIconOnly size="sm" variant="danger" aria-label="Confirm delete" onPress={props.onDelete}>

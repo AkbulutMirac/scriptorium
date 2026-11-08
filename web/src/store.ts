@@ -1,4 +1,5 @@
 import { toast } from "@heroui/react";
+import { isMobileNow } from "./lib/useMedia";
 import { create } from "zustand";
 import { applyMessage, historyToItems, streamDelta, type ChatItem } from "./lib/claudeItems";
 import { socket, type ConnectionStatus } from "./lib/socket";
@@ -76,7 +77,7 @@ export type ClaudeChat = {
 export type PermissionReq = Extract<ServerMsg, { type: "claude.permissionRequest" }>;
 export type LiveWorkerChat = WorkerChat & { stream: string; streamReasoning: string; busy: boolean };
 export type Overlay = { title: string; body: string; mono?: boolean; diff?: boolean; image?: string };
-export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: number; infoOpen: boolean };
+export type UiPrefs = { historyOpen: boolean; chatWidth: number; sideWidth: number; infoOpen: boolean; mobileView: "scene" | "chat" };
 
 type State = {
   connection: ConnectionStatus;
@@ -154,7 +155,7 @@ export const useApp = create<State>(() => ({
   overlay: null,
   workerModal: { open: false },
   setup: { open: false },
-  ui: { historyOpen: true, chatWidth: 520, sideWidth: 440, infoOpen: false, ...load<Partial<UiPrefs>>("ui", {}) },
+  ui: { historyOpen: true, chatWidth: 520, sideWidth: 440, infoOpen: false, mobileView: "chat", ...load<Partial<UiPrefs>>("ui", {}) },
   git: {},
   projects: [],
   allSessions: [],
@@ -505,6 +506,7 @@ export const actions = {
   selectAgent(id: string) {
     set({ selected: id });
     save("selected", id);
+    if (isMobileNow()) actions.setUi({ mobileView: "chat", historyOpen: false });
     if (id !== CLAUDE_ID) loadWorker(id);
   },
 

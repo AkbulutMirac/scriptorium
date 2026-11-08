@@ -12,7 +12,7 @@ export function TopBar() {
   const runningJobs = useApp((s) => s.jobs.filter((j) => j.status === "running" || j.status === "queued").length);
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-separator bg-surface px-2">
+    <header className="flex h-11 shrink-0 items-center gap-1 sm:gap-2 border-b border-separator bg-surface px-2">
       <Tooltip delay={400}>
         <Button
           isIconOnly
@@ -28,17 +28,19 @@ export function TopBar() {
 
       <div className="flex items-center gap-2 font-semibold tracking-tight">
         <BookOpen size={18} className="text-accent" />
-        Scriptorium
+        <span className="hidden min-[400px]:inline">Scriptorium</span>
       </div>
 
       <div className="flex-1" />
 
       {runningJobs > 0 && (
         <Chip size="sm" variant="soft" color="accent">
-          {runningJobs} background jobs
+          {runningJobs}<span className="hidden sm:inline"> background jobs</span>
         </Chip>
       )}
-      <DeepSeekBalanceChip />
+      <span className="hidden sm:contents">
+        <DeepSeekBalanceChip />
+      </span>
       <UsageChip />
       <ConnectionDot status={connection} />
       <SettingsPopover />
@@ -54,9 +56,9 @@ function ConnectionDot({ status }: { status: string }) {
   } as const;
   const m = map[status as keyof typeof map] ?? map.closed;
   return (
-    <span className="flex items-center gap-1.5 px-2 text-xs text-muted">
+    <span className="flex items-center gap-1.5 px-2 text-xs text-muted" title={m.text}>
       <span className={`size-2 rounded-full ${m.color}`} />
-      {m.text}
+      <span className="hidden md:inline">{m.text}</span>
     </span>
   );
 }
@@ -78,7 +80,7 @@ function SettingsPopover() {
       <Button isIconOnly size="sm" variant="ghost" aria-label="Settings">
         <Settings size={18} />
       </Button>
-      <Popover.Content placement="bottom end" className="w-80">
+      <Popover.Content placement="bottom end" className="w-80 max-w-[calc(100vw-1rem)]">
         <Popover.Dialog className="flex flex-col gap-4 p-1">
           <Popover.Heading className="text-sm font-semibold">Appearance</Popover.Heading>
 
@@ -166,7 +168,7 @@ function UsageChip() {
       >
         <Gauge size={14} />
         {five != null && <span>5h {five}%</span>}
-        {week != null && <span>· Weekly {week}%</span>}
+        {week != null && <span className="hidden sm:inline">· Weekly {week}%</span>}
       </button>
       <Tooltip.Content placement="bottom end" className="p-2">
         <UsageCard usage={usage} />

@@ -23,7 +23,7 @@ export function quoteFrom(el: HTMLElement | null, fallback: string): string {
 
 export function MessageActions({ text, elRef, onReply, onSideChat }: Handlers & { text: string; elRef: React.RefObject<HTMLElement | null> }) {
   return (
-    <div className="flex gap-0.5 opacity-0 transition group-hover:opacity-100">
+    <div className="flex gap-0.5 opacity-0 transition group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100">
       <CopyButton text={text} />
       <Tooltip delay={300}>
         <Button isIconOnly size="sm" variant="ghost" aria-label="Quote" onPress={() => onReply(quoteFrom(elRef.current, text))}>

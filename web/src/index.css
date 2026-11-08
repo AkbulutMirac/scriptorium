@@ -132,3 +132,11 @@ body {
 .resize-handle { width: 6px; cursor: col-resize; flex-shrink: 0; position: relative; }
 .resize-handle::after { content: ""; position: absolute; inset: 0 2px; border-radius: 2px; transition: background 0.15s; }
 .resize-handle:hover::after, .resize-handle.dragging::after { background: var(--accent); }
+
+/* ─── Drawers (phone and tablet) ─── */
+@keyframes drawer-in-left { from { transform: translateX(-100%); } }
+@keyframes drawer-in-right { from { transform: translateX(100%); } }
+.drawer-left { animation: drawer-in-left 0.18s ease-out; }
+.drawer-right { animation: drawer-in-right 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .drawer-left, .drawer-right { animation: none; } }
+@media (pointer: coarse) { .resize-handle { touch-action: none; } }
