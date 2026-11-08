@@ -1,5 +1,5 @@
 import { Button, Modal, ScrollShadow, Tooltip } from "@heroui/react";
-import { Check, ChevronRight, Copy, Eye, EyeOff, Folder, FolderOpen, MessageSquare, PanelLeftOpen, Pencil, Plus, RefreshCw, SquarePen, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye, EyeOff, Folder, FolderOpen, FolderPlus, MessageSquare, PanelLeftOpen, Pencil, Plus, RefreshCw, SquarePen, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { load, save } from "../lib/storage";
 import { COMPACT_QUERY, isCompactNow, MOBILE_QUERY, useMedia } from "../lib/useMedia";
@@ -55,6 +55,14 @@ export function HistoryPanel() {
               <RefreshCw size={15} />
             </Button>
             <Tooltip.Content>Refresh list</Tooltip.Content>
+          </Tooltip>
+        )}
+        {selected === CLAUDE_ID && (
+          <Tooltip delay={300}>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="New chat in another folder" onPress={() => actions.openFolderPicker("cwd")}>
+              <FolderPlus size={15} />
+            </Button>
+            <Tooltip.Content>New chat in another folder</Tooltip.Content>
           </Tooltip>
         )}
       </div>

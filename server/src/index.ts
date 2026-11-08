@@ -26,7 +26,7 @@ import { listRequests } from "./requests.js";
 import { claudeLogin, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
-import { isIgnoredPath, listDir, listProjects } from "./projects.js";
+import { isIgnoredPath, listDir, listProjects, makeDir } from "./projects.js";
 import { deepseekBalance, isAvailable, listModels } from "./llm.js";
 import type { AgentActivity, ClientMsg, EffortLevel, ServerMsg, SessionSummary, WorkerInfo } from "./protocol.js";
 import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
@@ -383,6 +383,9 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "fs.list":
       return reply(ws, { type: "fs.list", ...(await listDir(msg.path)) });
+
+    case "fs.mkdir":
+      return reply(ws, { type: "fs.list", ...(await listDir(await makeDir(msg.parent, msg.name))) });
 
     case "claude.history": {
       const [messages, info] = await Promise.all([getSessionMessages(msg.sessionId), getSessionInfo(msg.sessionId).catch(() => undefined)]);

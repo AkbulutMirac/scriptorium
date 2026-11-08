@@ -243,6 +243,7 @@ export type ClientMsg =
   | { type: "projects.list" }
   | { type: "deepseek.balance" }
   | { type: "fs.list"; path?: string }
+  | { type: "fs.mkdir"; parent: string; name: string }
   | { type: "claude.send"; chatId: string; text: string; attachments?: Attachment[] }
   | { type: "claude.info"; chatId: string }
   /** Chat-independent info (models, usage, commands): from the server's empty helper session */

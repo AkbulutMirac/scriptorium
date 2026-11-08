@@ -1,5 +1,5 @@
 import { Button, Modal, Spinner } from "@heroui/react";
-import { ArrowUp, Folder, Home } from "lucide-react";
+import { ArrowUp, Folder, FolderPlus, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import { actions, useApp } from "../store";
 
@@ -11,10 +11,14 @@ export function FolderPicker() {
   const picker = useApp((s) => s.folderPicker);
   const chat = useApp((s) => (picker.chatId ? s.chats[picker.chatId] : undefined));
   const [manual, setManual] = useState("");
+  const [newName, setNewName] = useState("");
+  const [showNew, setShowNew] = useState(false);
   const listing = picker.listing;
 
   useEffect(() => {
     setManual(listing?.path ?? "");
+    setNewName("");
+    setShowNew(false);
   }, [listing?.path]);
 
   const choose = (path: string) => {
@@ -23,6 +27,19 @@ export function FolderPicker() {
     else if (picker.chatId) actions.setChatCwd(picker.chatId, path);
     else actions.newClaudeChat(path);
     actions.closeFolderPicker();
+  };
+
+  const createFolder = () => {
+    const name = newName.trim();
+    if (!name || !listing?.path) return;
+    actions.makeDir(listing.path, name);
+    setNewName("");
+    setShowNew(false);
+  };
+
+  const cancelNew = () => {
+    setNewName("");
+    setShowNew(false);
   };
 
   return (
@@ -40,6 +57,9 @@ export function FolderPicker() {
               <Button isIconOnly size="sm" variant="ghost" aria-label="Parent folder" isDisabled={!listing?.parent} onPress={() => actions.browse(listing?.parent)}>
                 <ArrowUp size={15} />
               </Button>
+              <Button isIconOnly size="sm" variant="ghost" aria-label="New folder" isDisabled={!listing?.path} onPress={() => setShowNew(true)}>
+                <FolderPlus size={15} />
+              </Button>
               <input
                 value={manual}
                 onChange={(e) => setManual(e.target.value)}
@@ -49,6 +69,33 @@ export function FolderPicker() {
                 aria-label="Folder path"
               />
             </div>
+
+            {showNew && listing?.path && (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") createFolder();
+                    else if (e.key === "Escape") {
+                      e.stopPropagation();
+                      cancelNew();
+                    }
+                  }}
+                  placeholder="Folder name"
+                  className="font-code min-w-0 flex-1 rounded-md border border-field-border bg-field px-2 py-1.5 text-xs outline-none focus:border-accent"
+                  aria-label="New folder name"
+                />
+                <Button size="sm" variant="primary" isDisabled={!newName.trim()} onPress={createFolder}>
+                  Create
+                </Button>
+                <Button size="sm" variant="ghost" onPress={cancelNew}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+
             <div className="h-72 overflow-y-auto rounded-lg border border-separator">
               {!listing ? (
                 <div className="flex h-full items-center justify-center">

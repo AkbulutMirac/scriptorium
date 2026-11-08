@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { listSessions } from "@anthropic-ai/claude-agent-sdk";
@@ -89,4 +89,17 @@ export async function listDir(dir?: string): Promise<DirListing> {
     .sort((a, b) => a.name.localeCompare(b.name));
   const parent = path.dirname(abs);
   return { path: abs, parent: parent !== abs ? parent : "", dirs };
+}
+
+/** Creates a subfolder (folder picker's "New folder") and returns its path */
+export async function makeDir(parent: string, name: string): Promise<string> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Folder name cannot be empty.");
+  if (trimmed.includes("/") || trimmed.includes("\\")) throw new Error("Folder name cannot contain slashes.");
+  if (trimmed === "." || trimmed === "..") throw new Error("Folder name is not allowed.");
+  if (/[<>:"|?*\u0000-\u001F\u007F]/.test(trimmed)) throw new Error("Folder name contains invalid characters.");
+  const full = path.join(path.resolve(parent), trimmed);
+  if (existsSync(full)) throw new Error("A folder with this name already exists.");
+  await mkdir(full);
+  return full;
 }
