@@ -324,7 +324,7 @@ function SettingsMenu({ worker, thinkingOff }: { worker: WorkerInfo; thinkingOff
               min={1}
               step={500}
               value={settings.maxTokens ?? ""}
-              placeholder="4000"
+              placeholder="auto"
               onChange={(e) => actions.setWorkerSettings(worker.id, { maxTokens: e.target.value ? Number(e.target.value) : undefined })}
               className="w-24 rounded-md border border-field-border bg-field px-2 py-1 text-right text-xs outline-none focus:border-accent"
             />

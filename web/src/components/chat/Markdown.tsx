@@ -4,6 +4,7 @@ import { isValidElement, memo, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { actions } from "../../store";
+import { copyText } from "../../lib/clipboard";
 
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
   return (
@@ -64,7 +65,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
         variant="ghost"
         aria-label={label}
         onPress={async () => {
-          await navigator.clipboard.writeText(text);
+          await copyText(text);
           setDone(true);
           setTimeout(() => setDone(false), 1200);
         }}

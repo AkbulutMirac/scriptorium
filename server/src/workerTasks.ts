@@ -82,7 +82,15 @@ export async function runWorkerTask(args: {
       // Local model is small and slow: reasoning is off for the short tasks Claude assigns (it takes minutes when on)
       { signal, reasoning: worker.local ? "none" : undefined },
     );
-    const answer = result.content || "(worker returned an empty response)";
+    if (!result.content.trim()) {
+      // Say why instead of handing back an empty answer that looks like a result
+      throw new Error(
+        result.reasoning
+          ? "ran out of output tokens while thinking and gave no answer. Split the task into smaller parts or raise WORKER_MAX_TOKENS."
+          : "returned an empty answer. Try again or use another worker.",
+      );
+    }
+    const answer = result.content;
     // Keep a copy in the worker's history (the task and the answer, not the file contents)
     await saveDelegatedTask({
       workerId: worker.id,

@@ -50,7 +50,8 @@ export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOp
   const body = {
     model: opts.model || worker.model,
     messages,
-    max_tokens: opts.maxTokens ?? config.workerMaxTokens,
+    // Only sent when set: otherwise the provider's default applies (see config.workerMaxTokens)
+    ...((opts.maxTokens ?? config.workerMaxTokens) ? { max_tokens: opts.maxTokens ?? config.workerMaxTokens } : {}),
     stream: true,
     stream_options: { include_usage: true },
     ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),

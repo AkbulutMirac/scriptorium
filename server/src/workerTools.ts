@@ -18,11 +18,13 @@ const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }],
 /** Usage summary the MCP server gives Claude (Claude Code adds this to the system prompt) */
 export const WORKER_INSTRUCTIONS = [
   "Scriptorium workers: DeepSeek (API, cheap and fast) and local LLMs (Ollama, data never leaves the computer).",
-  "Default is deepseek-pro; easy jobs go to deepseek (Flash). Local workers are small models: first check their model with list_workers, and only give short, single-step jobs.",
-  "Check who is ready with list_workers. ask_worker waits for the answer; for jobs longer than a few minutes use start_job, then job_status.",
-  "The worker cannot read files, write files, or run commands: provide the needed files via files and set project_dir to the full path of the working folder.",
-  "Writing the returned code to a file and testing it is your job. For confidential data use sensitive: true (only local workers accept it).",
-  "You can dispatch independent jobs in parallel with multiple ask_worker calls at once; local workers run in order.",
+  "RULE: writing code is the workers' job by default. Before writing code ask: could a worker write this? If yes, delegate it.",
+  "New code over 15 lines or several changes in one file goes to a worker. You plan, split the work, apply and test what comes back.",
+  "Write code yourself only for fixes of a few lines, glue code, or when workers are unreachable. At the end, say which worker wrote what.",
+  "Default deepseek-pro; easy jobs and anything with images go to deepseek (Flash, the only DeepSeek model with vision). Local workers are small models: first check their model with list_workers, give only short, single-step jobs.",
+  "ask_worker waits for the answer; for jobs longer than a few minutes use start_job, then job_status. Send independent parts in parallel.",
+  "Workers can't read files, write files or run commands: pass the files with files and set project_dir to the full path of the working folder.",
+  "For confidential data use sensitive: true (only local workers accept it).",
 ].join(" ");
 
 /** Finds the worker and enforces the confidentiality rule. Returns an error text if there is a problem. */

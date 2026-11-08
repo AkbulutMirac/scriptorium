@@ -86,7 +86,7 @@ Backend (Node / TypeScript)
 | `PROJECTS_DIR` | Where your project folders live. Listed automatically in the folder picker and history. |
 | `PROJECTS_EXCLUDE` | Folders to hide from the lists entirely (names or full paths, comma-separated). Folders are never touched. |
 | `OLLAMA_BASE_URL` | If Ollama runs at another address |
-| `WORKER_MAX_TOKENS` | Max output per worker call (cost safety) |
+| `WORKER_MAX_TOKENS` | Optional cap on output tokens per worker call. Empty: the provider's default (DeepSeek: 64K with thinking). Thinking tokens count too. |
 | `PORT` | Backend port (default 7777) |
 
 ## Choosing a local model

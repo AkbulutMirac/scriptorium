@@ -21,7 +21,11 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
-  workerMaxTokens: Number(process.env.WORKER_MAX_TOKENS) || 4000,
+  /**
+   * Optional cap on a worker reply, in tokens. Empty means the provider's own default (DeepSeek: 64K with
+   * thinking, 8K without; thinking tokens count too, so a small cap can leave no room for the answer).
+   */
+  workerMaxTokens: Number(process.env.WORKER_MAX_TOKENS) || undefined,
   port: Number(process.env.PORT) || 7777,
   /**
    * Optional remote access through `tailscale serve` (off unless set). Addresses the UI is opened from,

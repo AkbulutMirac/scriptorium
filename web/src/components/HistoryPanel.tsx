@@ -8,6 +8,7 @@ import { ContextMenu, type MenuItem } from "./ContextMenu";
 import type { SessionSummary } from "../protocol";
 import { relativeTime } from "../lib/format";
 import { actions, agentMeta, CLAUDE_ID, useApp } from "../store";
+import { copyText } from "../lib/clipboard";
 
 export function HistoryPanel() {
   const open = useApp((s) => s.ui.historyOpen);
@@ -141,7 +142,7 @@ function ClaudeHistory() {
       y: e.clientY,
       items: [
         { label: "New chat in this folder", icon: Plus, onSelect: () => actions.newClaudeChat(g.path) },
-        { label: "Copy folder path", icon: Copy, onSelect: () => navigator.clipboard.writeText(g.path) },
+        { label: "Copy folder path", icon: Copy, onSelect: () => copyText(g.path) },
         isHidden
           ? { label: "Show in list", icon: Eye, onSelect: () => hide(k, false) }
           : { label: "Hide from list", icon: EyeOff, onSelect: () => hide(k, true) },
