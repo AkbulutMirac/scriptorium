@@ -1,5 +1,5 @@
 import { Button, Tooltip } from "@heroui/react";
-import { Brain, ChevronRight, GitBranch, Puzzle, Quote } from "lucide-react";
+import { Brain, Check, CheckCheck, ChevronRight, GitBranch, Puzzle, Quote } from "lucide-react";
 import { memo, useRef, useState, type ReactNode } from "react";
 import { itemPlainText, type ChatItem } from "../../lib/claudeItems";
 import { seconds } from "../../lib/format";
@@ -55,6 +55,12 @@ export const ItemView = memo(function ItemView({ item, ...handlers }: Handlers &
             <div ref={ref} className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-[0.9375rem] [overflow-wrap:anywhere]">
               {item.text}
             </div>
+          )}
+          {item.receipt && (
+            <span className={`inline-flex items-center gap-1 text-[11px] ${item.receipt === "read" ? "text-accent" : "text-muted"}`}>
+              {item.receipt === "read" ? <CheckCheck size={12} /> : <Check size={12} />}
+              {item.receipt === "read" ? "Read" : "Sent"}
+            </span>
           )}
           <MessageActions text={item.text} elRef={ref} onReply={handlers.onReply} />
         </div>

@@ -69,6 +69,8 @@ export function Composer(props: {
   workerPlus?: (pickFiles: () => void) => React.ReactNode;
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
+  /** If provided, sending while busy queues the message instead of being blocked */
+  onQueue?: (text: string, attachments: Attachment[]) => void;
 }) {
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -122,8 +124,9 @@ export function Composer(props: {
 
   const send = () => {
     const t = text.trim();
-    if ((!t && !attachments.length) || props.busy || props.disabledReason) return;
-    props.onSend(withQuote(t || "Look at the attached files.", quote), attachments);
+    if ((!t && !attachments.length) || props.disabledReason) return;
+    if (props.busy && !props.onQueue) return;
+    (props.busy ? props.onQueue! : props.onSend)(withQuote(t || "Look at the attached files.", quote), attachments);
     setText("");
     setAttachments([]);
     actions.setQuote(props.quoteKey, undefined);
@@ -242,12 +245,22 @@ export function Composer(props: {
           className="max-h-60 min-h-6 flex-1 resize-none bg-transparent px-1 py-1 text-[0.9375rem] outline-none placeholder:text-field-placeholder"
         />
         {props.busy ? (
-          <Tooltip delay={300}>
-            <Button isIconOnly size="sm" variant="danger" aria-label="Stop" onPress={props.onStop}>
-              <Square size={14} fill="currentColor" />
-            </Button>
-            <Tooltip.Content>Stop</Tooltip.Content>
-          </Tooltip>
+          <>
+            {props.onQueue && (text.trim() || attachments.length > 0) && (
+              <Tooltip delay={300}>
+                <Button isIconOnly size="sm" variant="primary" aria-label="Queue message" isDisabled={!!props.disabledReason} onPress={send}>
+                  <ArrowUp size={16} />
+                </Button>
+                <Tooltip.Content>Queue message</Tooltip.Content>
+              </Tooltip>
+            )}
+            <Tooltip delay={300}>
+              <Button isIconOnly size="sm" variant="danger" aria-label="Stop" onPress={props.onStop}>
+                <Square size={14} fill="currentColor" />
+              </Button>
+              <Tooltip.Content>Stop</Tooltip.Content>
+            </Tooltip>
+          </>
         ) : (
           <Button
             isIconOnly

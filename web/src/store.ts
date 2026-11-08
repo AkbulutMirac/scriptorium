@@ -42,6 +42,9 @@ export type ClaudeInit = {
   mcpServers: { name: string; status: string }[];
 };
 
+/** A message typed while Claude is busy; sent when the turn ends (or right away with "Send now") */
+export type QueuedMessage = { id: string; text: string; attachments: Attachment[] };
+
 export type ClaudeChat = {
   chatId: string;
   sessionId?: string;
@@ -54,6 +57,8 @@ export type ClaudeChat = {
   /** When the current turn started (for the elapsed time in the status line) */
   busySince?: number;
   items: ChatItem[];
+  /** Messages typed while Claude is busy; flushed when the current turn finishes */
+  queue: QueuedMessage[];
   streamText: string;
   streamThinking: string;
   model?: string;
@@ -205,6 +210,7 @@ function emptyChat(chatId: string, cwd: string, extra: Partial<ClaudeChat> = {})
     opened: false,
     busy: false,
     items: [],
+    queue: [],
     streamText: "",
     streamThinking: "",
     cwd,
@@ -292,6 +298,12 @@ function onServer(msg: ServerMsg) {
         }
         const next: ClaudeChat = { ...c, items: applyMessage(c.items, m, true) };
         const sys = m as unknown as Record<string, unknown>;
+        // Read receipt: a sent message is in Claude's hands once its next API request starts (or it answers)
+        if (m.type === "assistant" || (m.type === "system" && m.subtype === "status" && sys.status === "requesting")) {
+          if (next.items.some((it) => it.kind === "user" && it.receipt === "sent")) {
+            next.items = next.items.map((it) => (it.kind === "user" && it.receipt === "sent" ? { ...it, receipt: "read" as const } : it));
+          }
+        }
         if (m.type === "system" && typeof sys.task_id === "string") next.tasks = updateTasks(c.tasks, sys);
         if (m.type === "assistant") {
           const blocks = m.message?.content ?? [];
@@ -318,6 +330,14 @@ function onServer(msg: ServerMsg) {
         return next;
       });
       if (m.type === "result") {
+        // Turn over: queued messages go out together as the next message
+        const done = get().chats[msg.chatId];
+        if (done?.queue.length) {
+          const texts = done.queue.map((q) => q.text);
+          const attachments = done.queue.flatMap((q) => q.attachments);
+          updateChat(msg.chatId, (c) => ({ ...c, queue: [] }));
+          actions.sendClaude(msg.chatId, texts.join("\n\n"), attachments);
+        }
         if (msg.chatId === s.mainChatId) refreshSessions();
         socket.send({ type: "claude.info", chatId: msg.chatId });
         socket.send({ type: "claude.globalInfo" });
@@ -603,6 +623,11 @@ export const actions = {
     socket.send({ type: "fs.list", path });
   },
 
+  /** Creates a subfolder; the server answers with the new folder's listing, so the picker opens it */
+  makeDir(parent: string, name: string) {
+    socket.send({ type: "fs.mkdir", parent, name });
+  },
+
   closeFolderPicker() {
     set({ folderPicker: { open: false, purpose: "cwd" } });
   },
@@ -629,9 +654,26 @@ export const actions = {
       ...c,
       busy: true,
       busySince: Date.now(),
-      items: [...c.items, { kind: "user", id: uuid(), text: shown, images: images.length ? images : undefined }],
+      items: [...c.items, { kind: "user", id: uuid(), text: shown, images: images.length ? images : undefined, receipt: "sent" }],
     }));
     socket.send({ type: "claude.send", chatId, text, attachments: attachments.length ? attachments : undefined });
+  },
+
+  /** Queues a message typed while Claude is busy; it is sent automatically when the turn ends */
+  queueClaude(chatId: string, text: string, attachments: Attachment[] = []) {
+    updateChat(chatId, (c) => ({ ...c, queue: [...c.queue, { id: uuid(), text, attachments }] }));
+  },
+
+  unqueueClaude(chatId: string, id: string) {
+    updateChat(chatId, (c) => ({ ...c, queue: c.queue.filter((q) => q.id !== id) }));
+  },
+
+  /** Sends a queued message right away: Claude reads it at its next step of the running turn */
+  sendQueuedNow(chatId: string, id: string) {
+    const q = get().chats[chatId]?.queue.find((x) => x.id === id);
+    if (!q) return;
+    actions.unqueueClaude(chatId, id);
+    actions.sendClaude(chatId, q.text, q.attachments);
   },
 
   /**

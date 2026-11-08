@@ -10,7 +10,7 @@ export type ChatImage = { src: string; name?: string };
 export type ToolResult = { text: string; isError: boolean; images?: ChatImage[] };
 
 export type ChatItem =
-  | { kind: "user"; id: string; text: string; images?: ChatImage[] }
+  | { kind: "user"; id: string; text: string; images?: ChatImage[]; receipt?: "sent" | "read" }
   | { kind: "text"; id: string; text: string; parent: string | null }
   | { kind: "thinking"; id: string; text: string; parent: string | null }
   | { kind: "tool"; id: string; name: string; input: Record<string, unknown>; result?: ToolResult; parent: string | null }

@@ -1,8 +1,8 @@
 import { Button, Spinner, Tooltip } from "@heroui/react";
-import { Brain, FileDiff, GitBranch, PanelRight, SquarePen, X } from "lucide-react";
+import { Brain, Clock, FileDiff, GitBranch, PanelRight, SendHorizontal, SquarePen, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { actions, useApp, type ClaudeChat } from "../../store";
+import { actions, useApp, type ClaudeChat, type QueuedMessage } from "../../store";
 import { AgentSelect } from "./AgentSelect";
 import { ClaudeFooter } from "./ClaudeFooter";
 import { useAutoScroll, WorkingDots } from "./common";
@@ -109,6 +109,7 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
         </div>
       </div>
 
+      {chat.queue.length > 0 && <QueuedMessages chatId={chatId} queue={chat.queue} />}
       <Composer
         quoteKey={chatId}
         placeholder={isSide ? "Ask in side chat…" : "Message Claude… (you can also ask it to assign work to workers)"}
@@ -116,8 +117,39 @@ export function ClaudeChatPanel({ chatId }: { chatId: string }) {
         claudeChatId={chatId}
         footer={<ClaudeFooter chatId={chatId} />}
         onSend={(text, attachments) => actions.sendClaude(chatId, text, attachments)}
+        onQueue={(text, attachments) => actions.queueClaude(chatId, text, attachments)}
         onStop={() => actions.interruptClaude(chatId)}
       />
+    </div>
+  );
+}
+
+/** Messages waiting for the current turn to end, each can be sent right away */
+function QueuedMessages({ chatId, queue }: { chatId: string; queue: QueuedMessage[] }) {
+  return (
+    <div className="flex max-h-40 flex-col gap-1.5 overflow-y-auto px-3 pt-2">
+      {queue.map((q) => (
+        <div key={q.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-separator bg-surface-secondary/60 px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <span className="flex items-center gap-1 text-[11px] text-muted">
+              <Clock size={12} />
+              Queued
+              {q.attachments.length > 0 && <span className="ml-1">📎 {q.attachments.length}</span>}
+            </span>
+            <p className="line-clamp-2 text-sm [overflow-wrap:anywhere]">{q.text}</p>
+          </div>
+          <Button size="sm" variant="secondary" className="shrink-0" onPress={() => actions.sendQueuedNow(chatId, q.id)}>
+            <SendHorizontal size={13} />
+            Send now
+          </Button>
+          <Tooltip delay={300}>
+            <Button isIconOnly size="sm" variant="ghost" className="shrink-0" aria-label="Remove from queue" onPress={() => actions.unqueueClaude(chatId, q.id)}>
+              <X size={13} />
+            </Button>
+            <Tooltip.Content>Remove from queue</Tooltip.Content>
+          </Tooltip>
+        </div>
+      ))}
     </div>
   );
 }
