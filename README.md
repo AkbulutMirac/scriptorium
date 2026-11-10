@@ -22,7 +22,7 @@ Open http://localhost:7777. On first launch a **Setup** window walks you through
 1. **Claude account:** "Sign in with Claude" opens Anthropic's sign-in page in your browser. You don't need to install Claude Code separately; Scriptorium uses its own copy.
 2. **DeepSeek (optional):** create an API key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it. The key is tested first and, if it works, written only to the `.env` file on this computer.
 3. **Local models (optional):** install [Ollama](https://ollama.com/download) and pull a model (for example `ollama pull qwen3.5:9b`). Add any installed model as a worker with one click.
-4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools and the delegation rules.
+4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools. Sessions opened in Scriptorium always follow the delegation rules; adding them to `~/.claude/CLAUDE.md` as well is a separate, optional click.
 
 You can reopen the Setup window from the Settings menu.
 

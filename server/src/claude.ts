@@ -6,8 +6,9 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-import { config } from "./config.js";
+import { config, SERVER_ROOT } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
 import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
 
@@ -44,10 +45,12 @@ class MessageQueue implements AsyncIterable<SDKUserMessage> {
   }
 }
 
-// When to delegate is written in the user's CLAUDE.md, and how to use the tools is written in the MCP instructions.
+// When to delegate comes from docs/CLAUDE-workers.md (only in sessions opened here), and how to use the tools is written in the MCP instructions.
+const WORKER_RULES = readFileSync(path.join(SERVER_ROOT, "..", "docs", "CLAUDE-workers.md"), "utf8");
 const SYSTEM_APPEND =
   "This session was opened from the Scriptorium interface. The user sees what they write and the workers' (mcp__scriptorium__*) activity live in a 3D office. " +
-  "Writing code is the workers' job by default: plan, delegate the code to workers, then apply and test it (see the Scriptorium workers rules).";
+  "Writing code is the workers' job by default: plan, delegate the code to workers, then apply and test it (see the Scriptorium workers rules).\n\n" +
+  WORKER_RULES;
 
 export type ClaudeSessionOptions = {
   cwd?: string;

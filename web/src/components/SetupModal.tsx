@@ -171,7 +171,7 @@ export function SetupModal() {
                   )}
                 </Step>
 
-                <Step n={4} title="In all Claude Code sessions" optional done={status.mcp && status.rules}>
+                <Step n={4} title="In all Claude Code sessions" optional done={status.mcp}>
                   <p className="text-sm text-muted">Let Claude in the terminal and in the Claude desktop app use the workers too.</p>
                   <div className="flex flex-col gap-1.5 text-sm">
                     <div className="flex items-center gap-2">
@@ -187,7 +187,7 @@ export function SetupModal() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="flex-1">Add rules for when to use them (~/.claude/CLAUDE.md)</span>
+                      <span className="flex-1">Optional: delegate by default outside Scriptorium too (~/.claude/CLAUDE.md)</span>
                       {status.rules ? (
                         <Chip size="sm" variant="soft" color="success">
                           added
