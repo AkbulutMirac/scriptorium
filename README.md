@@ -2,7 +2,7 @@
 
 Claude is the head scribe; DeepSeek and local LLMs are the scribes. A multi-agent workspace where you can talk to all of them from one interface, and Claude hands work to the other models on its own judgment. Who is doing what shows up live in an isometric, pixel-art office library.
 
-![Scriptorium: 3D office in the middle, chat on the right. Three DeepSeek tasks running at once](docs/screenshot.png)
+![Scriptorium: project history on the left, 3D office library in the middle, chat with Claude on the right, workers along the bottom](docs/screenshot.png)
 
 **Why:** to save Claude usage. Claude gives well-defined coding tasks, summaries and classification to cheap DeepSeek or free local models, then checks the result itself.
 
