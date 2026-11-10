@@ -75,32 +75,23 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 
 ```mermaid
 flowchart LR
-  subgraph PC["Your computer"]
-    UI["Web UI<br/>(React, 3D office)"]
-    OTHER["Other Claude Code sessions<br/>(terminal, desktop app)"]
-    subgraph SRV["Scriptorium server (Node, :7777)"]
-      CC["Claude Code, head scribe<br/>(Agent SDK)"]
-      MCP["Worker tools<br/>(HTTP MCP at /mcp)"]
-      HOOKS["Subagent tracker<br/>(hooks at /hooks)"]
-    end
-    SUB["Haiku / Sonnet<br/>subagents"]
-    OLLAMA["Ollama<br/>(local models)"]
-    EDGE["Headless Edge / Chrome<br/>(QA tools)"]
-  end
-  ANT(("Claude<br/>subscription"))
-  DS(("DeepSeek API"))
+  YOU["You<br/>(web UI)"] --> CLAUDE["Claude<br/>head scribe"]
+  CLAUDE -- "worker tools" --> WORKERS
+  CLAUDE -- "Agent tool" --> SUBAGENTS
 
-  UI -- "WebSocket, 127.0.0.1 only" --> CC
-  OTHER -- "HTTP MCP" --> MCP
-  OTHER -. "hooks" .-> HOOKS
-  CC --> MCP
-  CC -- "Agent tool" --> SUB
-  SUB -. "start, report" .-> HOOKS
-  CC --> ANT
-  MCP -- "job queue" --> OLLAMA
-  MCP --> DS
-  MCP --> EDGE
+  subgraph WORKERS["Workers"]
+    DS["DeepSeek"]
+    OL["Ollama (local)"]
+    QA["QA browser"]
+  end
+
+  subgraph SUBAGENTS["Subagents"]
+    HA["Haiku"]
+    SO["Sonnet"]
+  end
 ```
+
+Everything runs on your computer through one Scriptorium server. The 3D office shows every worker and subagent while it works.
 
 **Scriptorium has to be running for the worker tools to work.** Other Claude Code sessions reach the workers through `http://127.0.0.1:7777/mcp`, so when Scriptorium is closed the tools are simply missing there. Keeping one server means the DeepSeek key stays in one place, all sessions share the local model queue, and the 3D office sees every task.
 
@@ -108,27 +99,20 @@ flowchart LR
 
 ### How a subagent works
 
-Haiku and Sonnet subagents run inside Claude Code, not in Scriptorium. Scriptorium follows them through Claude Code hooks: it adds the report request to the task, shows the worker in the office and saves the report to its history.
-
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant C as Claude (head scribe)
-  participant CC as Claude Code
+  participant C as Claude
   participant S as Scriptorium
-  participant H as Haiku / Sonnet subagent
+  participant H as Haiku / Sonnet
 
-  C->>CC: Agent tool (model: "haiku", task)
-  CC->>S: PreToolUse hook
-  S-->>CC: task + "end with a report"
-  Note over S: Worker sits down at a desk in the office
-  CC->>H: start with the task
-  H->>H: read files, run commands, edit
-  H-->>CC: Report (Done, Files, Checks, Open)
-  CC->>S: PostToolUse or SubagentStop hook
-  Note over S: Worker leaves, report saved under "From Claude"
-  CC-->>C: the report is the subagent's answer
+  C->>H: Task
+  Note over S: Adds "end with a report"<br/>Worker sits down in the office
+  H->>H: Reads files, runs tests
+  H-->>C: Report
+  Note over S: Saves the report to history<br/>Worker leaves the office
 ```
+
+Subagents run inside Claude Code. Scriptorium only watches them through Claude Code hooks.
 
 Only subagents started with an explicit `model` of `haiku` or `sonnet` appear in the office. Every subagent gets the report request, whatever its model.
 
