@@ -66,15 +66,28 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 
 ## How it works
 
-```
-Browser (React + HeroUI + react-three-fiber)
-   │  WebSocket (127.0.0.1 only, allowed UI origins only)
-Backend (Node / TypeScript)
-   ├─ Claude Agent SDK → Claude Code (head scribe)
-   ├─ Worker tools: list_workers, ask_worker, start_job, job_status
-   │     └─ HTTP MCP server at /mcp: other Claude Code sessions connect too
-   ├─ DeepSeek API      (worker, OpenAI-compatible)
-   └─ Ollama            (local workers, OpenAI-compatible)
+```mermaid
+flowchart LR
+  subgraph PC["Your computer"]
+    UI["Web UI<br/>(React, 3D office)"]
+    OTHER["Other Claude Code sessions<br/>(terminal, desktop app)"]
+    subgraph SRV["Scriptorium server (Node, :7777)"]
+      CC["Claude Code, head scribe<br/>(Agent SDK)"]
+      MCP["Worker tools<br/>(HTTP MCP at /mcp)"]
+    end
+    OLLAMA["Ollama<br/>(local models)"]
+    EDGE["Headless Edge / Chrome<br/>(QA tools)"]
+  end
+  ANT(("Claude<br/>subscription"))
+  DS(("DeepSeek API"))
+
+  UI -- "WebSocket, 127.0.0.1 only" --> CC
+  OTHER -- "HTTP MCP" --> MCP
+  CC --> MCP
+  CC --> ANT
+  MCP -- "job queue" --> OLLAMA
+  MCP --> DS
+  MCP --> EDGE
 ```
 
 **Scriptorium has to be running for the worker tools to work.** Other Claude Code sessions reach the workers through `http://127.0.0.1:7777/mcp`, so when Scriptorium is closed the tools are simply missing there. Keeping one server means the DeepSeek key stays in one place, all sessions share the local model queue, and the 3D office sees every task.
