@@ -77,6 +77,18 @@ Backend (Node / TypeScript)
    └─ Ollama            (local workers, OpenAI-compatible)
 ```
 
+**Scriptorium has to be running for the worker tools to work.** Other Claude Code sessions reach the workers through `http://127.0.0.1:7777/mcp`, so when Scriptorium is closed the tools are simply missing there. Keeping one server means the DeepSeek key stays in one place, all sessions share the local model queue, and the 3D office sees every task.
+
+**Delegation rules** (`docs/CLAUDE-workers.md`) are always applied in sessions opened from Scriptorium. Other sessions only get the tools and decide on their own when to use them, unless you also add the rules to `~/.claude/CLAUDE.md` from Setup.
+
+**Claude desktop app:** to see the workers under Settings → Desktop app → Local MCP servers, add this to `claude_desktop_config.json` and restart the app:
+
+```json
+"mcpServers": {
+  "scriptorium": { "command": "npx", "args": ["-y", "mcp-remote", "http://127.0.0.1:7777/mcp"] }
+}
+```
+
 ## Settings (`.env`, all optional)
 
 | Setting | Description |
