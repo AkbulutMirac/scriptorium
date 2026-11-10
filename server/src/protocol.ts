@@ -6,7 +6,8 @@ import type { PermissionMode, PermissionUpdate, SDKMessage } from "@anthropic-ai
 
 export type { PermissionMode, SDKMessage };
 
-export type Provider = "deepseek" | "ollama";
+/** claude: a Claude Code subagent (Haiku, Sonnet) on the user's subscription */
+export type Provider = "deepseek" | "ollama" | "claude";
 
 export type WorkerInfo = {
   id: string;
@@ -189,9 +190,11 @@ export type SetupStatus = {
   mcp: boolean;
   /** Whether delegation rules exist in ~/.claude/CLAUDE.md */
   rules: boolean;
+  /** Whether the subagent hooks exist in ~/.claude/settings.json (Haiku/Sonnet subagents of other sessions show in the office) */
+  hooks: boolean;
 };
 
-export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules";
+export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules" | "hooks";
 
 export type DeepSeekBalance = {
   ok: boolean;
@@ -291,6 +294,7 @@ export type ClientMsg =
   | { type: "setup.deepseekKey"; key: string }
   | { type: "setup.mcp" }
   | { type: "setup.rules" }
+  | { type: "setup.hooks" }
   | { type: "workers.list" }
   | { type: "workers.save"; worker: WorkerInfo }
   | { type: "workers.delete"; workerId: string }

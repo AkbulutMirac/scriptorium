@@ -18,21 +18,23 @@ const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }],
 
 /** Usage summary the MCP server gives Claude (Claude Code adds this to the system prompt) */
 export const WORKER_INSTRUCTIONS = [
-  "Scriptorium workers: DeepSeek (API, cheap and fast) and local LLMs (Ollama, data never leaves the computer).",
-  "RULE: writing code is the workers' job by default. Before writing code ask: could a worker write this? If yes, delegate it.",
-  "New code over 15 lines or several changes in one file goes to a worker. You plan, split the work, apply and test what comes back.",
-  "Write code yourself only for fixes of a few lines, glue code, or when workers are unreachable. At the end, say which worker wrote what.",
-  "Default deepseek-pro; easy jobs and anything with images go to deepseek (Flash, the only DeepSeek model with vision). Local workers are small models: first check their model with list_workers, give only short, single-step jobs.",
+  "Scriptorium helpers. Workers: DeepSeek (API, cheap) and local LLMs (Ollama, data never leaves the computer).",
+  'Claude subagents: start them with the Agent tool and model "haiku" or "sonnet"; they appear in the Scriptorium office as well.',
+  "Use helpers when they save time or Claude usage. Doing the work yourself is fine when that is simpler: you decide.",
+  "DeepSeek suits self-contained code (a function, a script, tests), summaries of long input and classification. It costs nothing from the Claude subscription,",
+  "but it can't read files, write files or run commands: pass the files with files, set project_dir to the full path of the working folder, and check what comes back.",
+  "deepseek-pro for harder code; deepseek (Flash) for easy jobs and anything with images (the only DeepSeek model with vision).",
+  "Local workers are small models: check their model with list_workers first and give only short, single-step jobs. For confidential data use sensitive: true (only local workers accept it).",
   "ask_worker waits for the answer; for jobs longer than a few minutes use start_job, then job_status. Send independent parts in parallel.",
-  "Workers can't read files, write files or run commands: pass the files with files and set project_dir to the full path of the working folder.",
-  "For confidential data use sensitive: true (only local workers accept it).",
-  "UI testing: qa_sweep clicks every visible control in a real browser and measures layout problems; qa_explore is an agent that explores flows on its own. Run one after UI changes.",
+  "UI testing: qa_sweep clicks every visible control in a real browser and measures layout problems; qa_explore is an agent that explores flows on its own.",
+  "When you used helpers, say at the end which one did what.",
 ].join(" ");
 
 /** Finds the worker and enforces the confidentiality rule. Returns an error text if there is a problem. */
 async function pickWorker(workerId: string, sensitive?: boolean): Promise<Worker | string> {
   const worker = await findWorker(workerId);
   if (!worker) return `No such worker: ${workerId}. Check with list_workers.`;
+  if (worker.provider === "claude") return `${worker.name} is a Claude subagent: start it with the Agent tool and model "${worker.model}" instead.`;
   if (sensitive && !worker.local) {
     return `Sensitive data can only be sent to local workers. ${worker.name} is not local; pick a worker with local: true.`;
   }
@@ -74,7 +76,8 @@ export const WORKER_TOOLS = [
       "Lists worker models (DeepSeek, local LLMs) with descriptions: whether they are currently reachable, how many jobs they are running, how many are queued.",
     schema: {},
     handler: async (): Promise<ToolResult> => {
-      const [workers, requests] = [await loadWorkers(), listRequests()];
+      // Claude subagents (Haiku, Sonnet) run through the Agent tool, not these tools
+      const [workers, requests] = [(await loadWorkers()).filter((w) => w.provider !== "claude"), listRequests()];
       const rows = await Promise.all(
         workers.map(async (w) => ({
           id: w.id,

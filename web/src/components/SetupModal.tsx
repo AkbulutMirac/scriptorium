@@ -187,7 +187,19 @@ export function SetupModal() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="flex-1">Optional: delegate by default outside Scriptorium too (~/.claude/CLAUDE.md)</span>
+                      <span className="flex-1">Show their Haiku and Sonnet subagents in the office and ask every subagent for a report (hooks in ~/.claude/settings.json)</span>
+                      {status.hooks ? (
+                        <Chip size="sm" variant="soft" color="success">
+                          added
+                        </Chip>
+                      ) : (
+                        <Button size="sm" variant="secondary" isPending={busy === "hooks"} onPress={() => actions.setupAction("hooks")}>
+                          Add
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1">Optional: add the helper notes outside Scriptorium too (~/.claude/CLAUDE.md)</span>
                       {status.rules ? (
                         <Chip size="sm" variant="soft" color="success">
                           added

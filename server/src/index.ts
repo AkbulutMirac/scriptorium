@@ -21,9 +21,10 @@ import { loadWorkers, saveWorkers } from "./agents.js";
 import { ClaudeSession } from "./claude.js";
 import { config, SERVER_ROOT } from "./config.js";
 import { bus, reportActivity } from "./events.js";
-import { createMcpHandler } from "./mcpHttp.js";
+import { createMcpHandler, readJson } from "./mcpHttp.js";
 import { listRequests } from "./requests.js";
-import { claudeLogin, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
+import { claudeLogin, installHooks, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
+import { handleSubagentHook } from "./subagents.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { appControlSupported, getAutostart, restartApp, setAutostart } from "./app.js";
@@ -497,10 +498,11 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       return reply(ws, { type: "setup.status", status: await setupStatus() });
 
     case "setup.mcp":
-    case "setup.rules": {
-      const action = msg.type === "setup.mcp" ? "mcp" : "rules";
+    case "setup.rules":
+    case "setup.hooks": {
+      const action = msg.type === "setup.mcp" ? "mcp" : msg.type === "setup.rules" ? "rules" : "hooks";
       try {
-        await (action === "mcp" ? registerMcp() : installRules());
+        await (action === "mcp" ? registerMcp() : action === "rules" ? installRules() : installHooks());
       } catch (err) {
         return reply(ws, { type: "setup.result", action, ok: false, message: err instanceof Error ? err.message : String(err) });
       }
@@ -562,6 +564,18 @@ const server = createServer((req, res) => {
   }
   if (req.url === "/mcp" || req.url?.startsWith("/mcp?")) {
     handleMcp(req, res);
+    return;
+  }
+  // Claude Code hooks from other sessions (subagents for the office). Only from this computer, never from a browser.
+  if (req.url === "/hooks" && req.method === "POST") {
+    if (!LOCAL_HOSTS.has(req.headers.host ?? "") || req.headers.origin) {
+      res.writeHead(403).end();
+      return;
+    }
+    readJson(req)
+      .then((body) => handleSubagentHook((body ?? {}) as Parameters<typeof handleSubagentHook>[0]))
+      .catch(() => ({}))
+      .then((out) => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out)));
     return;
   }
   if (req.url === "/api/health") {

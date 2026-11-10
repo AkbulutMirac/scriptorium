@@ -1020,6 +1020,7 @@ export const actions = {
     if (action === "claudeLogin") socket.send({ type: "setup.claudeLogin" });
     else if (action === "deepseekKey") socket.send({ type: "setup.deepseekKey", key: key ?? "" });
     else if (action === "mcp") socket.send({ type: "setup.mcp" });
+    else if (action === "hooks") socket.send({ type: "setup.hooks" });
     else socket.send({ type: "setup.rules" });
   },
 

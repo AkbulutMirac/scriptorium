@@ -44,7 +44,7 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <Chip size="sm" variant="soft">
-            {worker.provider === "deepseek" ? "DeepSeek API" : "Ollama"}
+            {worker.provider === "deepseek" ? "DeepSeek API" : worker.provider === "claude" ? "Claude subscription" : "Ollama"}
           </Chip>
           <span className="font-code truncate">{worker.model}</span>
           {worker.local && (

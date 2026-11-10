@@ -84,7 +84,7 @@ function userContent(worker: Worker, m: WorkerChatMessage): string | ChatPart[] 
     if (IMAGE_TYPES.has(a.mediaType)) {
       parts.push({ type: "image_url", image_url: { url: `data:${a.mediaType};base64,${a.data}` } });
     } else if (a.mediaType === "application/pdf") {
-      if (worker.provider === "deepseek") parts.push({ type: "file", file: { file_data: `data:application/pdf;base64,${a.data}`, filename: a.name } });
+      if (worker.provider !== "ollama") parts.push({ type: "file", file: { file_data: `data:application/pdf;base64,${a.data}`, filename: a.name } });
       else parts.push({ type: "text", text: `[${a.name}: This model can't read PDFs]` });
     } else {
       parts.push({ type: "text", text: `<attachment name="${a.name}">\n${Buffer.from(a.data, "base64").toString("utf8")}\n</attachment>` });

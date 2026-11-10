@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import type { Worker } from "./agents.js";
+import { claudeChat } from "./claudeWorker.js";
 import type { DeepSeekBalance, ReasoningLevel, TokenUsage, WorkerModel } from "./protocol.js";
 
 export type ChatPart =
@@ -47,6 +48,7 @@ function reasoningParams(worker: Worker, level?: ReasoningLevel): Record<string,
 
 /** Sends a message to the worker; streams the response and reasoning, then returns the full content and token usage. */
 export async function chat(worker: Worker, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+  if (worker.provider === "claude") return claudeChat(worker, messages, opts);
   const body = {
     model: opts.model || worker.model,
     messages,
@@ -123,6 +125,7 @@ async function contextWindow(worker: Worker, model: string): Promise<number | un
  */
 const visionCache = new Map<string, boolean>();
 export async function supportsVision(worker: Worker, model = worker.model): Promise<boolean> {
+  if (worker.provider === "claude") return true;
   if (worker.provider === "deepseek") return model === "deepseek-flash" || model.startsWith("deepseek-v4-flash");
   const key = model.replace(/:latest$/, "");
   if (visionCache.has(key)) return visionCache.get(key)!;
@@ -139,6 +142,7 @@ export async function supportsVision(worker: Worker, model = worker.model): Prom
 
 /** Models the worker can use: a fixed list for DeepSeek, installed models for Ollama */
 export async function listModels(worker: Worker): Promise<WorkerModel[]> {
+  if (worker.provider === "claude") return [{ id: worker.model, vision: true }];
   if (worker.provider === "deepseek") return [{ id: "deepseek-flash", vision: true }, { id: "deepseek-v4-pro", vision: false }];
   // Ollama's own API: also returns size and vision capability info
   const root = ollamaRoot();
@@ -161,6 +165,7 @@ export async function listModels(worker: Worker): Promise<WorkerModel[]> {
 
 /** Is the worker reachable right now? For DeepSeek the key is checked, for Ollama the server. */
 export async function isAvailable(worker: Worker): Promise<{ ok: boolean; reason?: string }> {
+  if (worker.provider === "claude") return { ok: true };
   if (worker.provider === "deepseek") {
     return config.deepseekApiKey ? { ok: true } : { ok: false, reason: "DEEPSEEK_API_KEY missing" };
   }

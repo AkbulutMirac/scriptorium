@@ -1,5 +1,7 @@
 import {
   query,
+  type HookCallbackMatcher,
+  type HookEvent,
   type CanUseTool,
   type PermissionMode,
   type Query,
@@ -10,6 +12,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { config, SERVER_ROOT } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
+import { handleSubagentHook } from "./subagents.js";
 import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
 
 /** Simple queue that streams user messages to the SDK. As long as the session stays open, it waits for new messages. */
@@ -48,8 +51,8 @@ class MessageQueue implements AsyncIterable<SDKUserMessage> {
 // When to delegate comes from docs/CLAUDE-workers.md (only in sessions opened here), and how to use the tools is written in the MCP instructions.
 const WORKER_RULES = readFileSync(path.join(SERVER_ROOT, "..", "docs", "CLAUDE-workers.md"), "utf8");
 const SYSTEM_APPEND =
-  "This session was opened from the Scriptorium interface. The user sees what they write and the workers' (mcp__scriptorium__*) activity live in a 3D office. " +
-  "Writing code is the workers' job by default: plan, delegate the code to workers, then apply and test it (see the Scriptorium workers rules).\n\n" +
+  "This session was opened from the Scriptorium interface. The user sees the workers (mcp__scriptorium__*) and your Haiku and Sonnet subagents at work in a 3D office. " +
+  "When to hand work to them is up to you (see the Scriptorium helpers notes below).\n\n" +
   WORKER_RULES;
 
 export type ClaudeSessionOptions = {
@@ -77,6 +80,20 @@ export type ClaudeSessionOptions = {
  */
 const TRUSTED_WORKER_SOURCES = new Set(["sdk", "dynamic", "user"]);
 
+/**
+ * Subagents of this session are asked for a report at the end, and Haiku and Sonnet ones appear in the office
+ * (other sessions do the same over HTTP hooks).
+ */
+const subagentHook: HookCallbackMatcher = {
+  hooks: [async (input) => (await handleSubagentHook(input)) as never],
+};
+const SUBAGENT_HOOKS: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
+  PreToolUse: [{ matcher: "Agent|Task", ...subagentHook }],
+  PostToolUse: [{ matcher: "Agent|Task", ...subagentHook }],
+  PostToolUseFailure: [{ matcher: "Agent|Task", ...subagentHook }],
+  SubagentStop: [subagentHook],
+};
+
 /** A single chat session connected to Claude Code running in the background. */
 export class ClaudeSession {
   private inbox = new MessageQueue();
@@ -102,6 +119,7 @@ export class ClaudeSession {
         // Lets the user pick "Bypass permissions" from the mode menu; sessions don't start in it
         allowDangerouslySkipPermissions: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
+        hooks: SUBAGENT_HOOKS,
         // If the user added the server to their global settings (claude mcp add), that one is used; both go to the same address.
         mcpServers: {
           [WORKER_SERVER_NAME]:

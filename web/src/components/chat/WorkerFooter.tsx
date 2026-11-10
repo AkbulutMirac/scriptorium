@@ -52,7 +52,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
               <MenuButton
                 icon={<Paperclip size={15} />}
                 label="Add file or photo"
-                hint={worker.provider === "ollama" ? "Image, text" : (settings.model || worker.model) === "deepseek-flash" ? "Image, PDF, text" : "PDF, text (no images)"}
+                hint={worker.provider === "ollama" ? "Image, text" : worker.provider === "claude" || (settings.model || worker.model) === "deepseek-flash" ? "Image, PDF, text" : "PDF, text (no images)"}
                 onPress={() => {
                   setOpen(false);
                   onPickFiles();
@@ -64,6 +64,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
                 hint={settings.system ? "on" : undefined}
                 onPress={() => setView("system")}
               />
+              {worker.provider !== "claude" && (
               <li className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
                 <FileJson size={15} className="text-muted" />
                 <span className="flex-1">JSON output</span>
@@ -73,6 +74,7 @@ export function WorkerPlusMenu({ worker, onPickFiles }: { worker: WorkerInfo; on
                   </Switch.Control>
                 </Switch>
               </li>
+              )}
             </ul>
           ) : (
             <div className="flex flex-col gap-2 p-1">
@@ -222,7 +224,8 @@ export function WorkerFooter({ worker, lastUsage }: { worker: WorkerInfo; lastUs
       </Popover>
 
       {/* Other settings */}
-      <SettingsMenu worker={worker} thinkingOff={thinkingOff} />
+      {/* Temperature, max tokens and JSON don't apply to Claude subagents */}
+      {worker.provider !== "claude" && <SettingsMenu worker={worker} thinkingOff={thinkingOff} />}
 
       <span className="flex-1" />
       <ContextRing usage={lastUsage} />

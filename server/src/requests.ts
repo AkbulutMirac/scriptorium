@@ -56,6 +56,30 @@ export function setRequestTask(req: WorkerRequest, task: string) {
   changed();
 }
 
+/**
+ * Shows work that runs somewhere else (a Claude subagent) as a running request: no queue, no limit.
+ * Returns the function that ends it; with an error text it stays visible for a while like other errors.
+ */
+export function trackRequest(workerId: string, info: { task: string; caller: WorkerCaller }): (error?: string) => void {
+  const now = Date.now();
+  const req: WorkerRequest = { id: randomUUID().slice(0, 8), workerId, status: "running", task: info.task.slice(0, 300), caller: info.caller, createdAt: now, startedAt: now };
+  requests.set(req.id, req);
+  changed();
+  return (error) => {
+    if (!error) {
+      requests.delete(req.id);
+      return changed();
+    }
+    req.status = "error";
+    req.error = error;
+    changed();
+    setTimeout(() => {
+      requests.delete(req.id);
+      changed();
+    }, ERROR_VISIBLE_MS);
+  };
+}
+
 /** Queues the job in the worker's line and runs it when its turn comes. Errors are shown in the 3D office for a while. */
 export async function withWorkerSlot<T>(
   worker: Worker,

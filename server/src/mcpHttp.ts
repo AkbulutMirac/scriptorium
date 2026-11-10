@@ -21,7 +21,7 @@ const LOCAL_HOST = /^(localhost|127\.0\.0\.1)(:\d+)?$/;
 type Session = { transport: StreamableHTTPServerTransport; ctx: ToolCtx; rootsTried: boolean; server: McpServer };
 const sessions = new Map<string, Session>();
 
-function readJson(req: IncomingMessage): Promise<unknown> {
+export function readJson(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];

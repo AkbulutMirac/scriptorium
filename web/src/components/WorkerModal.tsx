@@ -28,7 +28,7 @@ export function WorkerModal() {
   // Selector must return a stable reference (a new array each time causes infinite re-renders)
   const ollamaList = useApp((s) => s.setup.status?.ollama.models);
   const ollamaModels = (ollamaList ?? []).map((m) => m.id);
-  const hints: Record<Provider, string[]> = { deepseek: DEEPSEEK_MODELS, ollama: ollamaModels };
+  const hints: Record<Provider, string[]> = { deepseek: DEEPSEEK_MODELS, ollama: ollamaModels, claude: [] };
   const editing = !!worker;
   const [form, setForm] = useState<WorkerInfo>(empty);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -45,6 +45,8 @@ export function WorkerModal() {
   const idTaken = !editing && workers.some((w) => w.id === id);
   const valid = !!form.name.trim() && !!form.model.trim() && !!id && !idTaken;
   const update = (patch: Partial<WorkerInfo>) => setForm((f) => ({ ...f, ...patch }));
+  // Haiku and Sonnet are Claude's own subagents: only their look and description can change
+  const isClaude = form.provider === "claude";
 
   const setProvider = (provider: Provider) =>
     update({ provider, local: provider === "ollama", model: hints[form.provider].includes(form.model) || !form.model ? (hints[provider][0] ?? "") : form.model });
@@ -70,6 +72,12 @@ export function WorkerModal() {
             </TextField>
             {!editing && id && <p className={`-mt-2 text-xs ${idTaken ? "text-danger" : "text-muted"}`}>id: {id}{idTaken && " (this id already exists)"}</p>}
 
+            {isClaude ? (
+              <p className="text-xs text-muted">
+                Claude subagent on your subscription (model <span className="font-code">{form.model}</span>). Claude starts it itself when it decides to.
+              </p>
+            ) : (
+            <>
             <div className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">Provider</span>
               <div className="grid grid-cols-2 gap-2">
@@ -98,6 +106,8 @@ export function WorkerModal() {
                 ))}
               </div>
             </div>
+            </>
+            )}
 
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">Description (Claude decides when to use this worker based on this)</span>
@@ -137,6 +147,7 @@ export function WorkerModal() {
               </div>
             </div>
 
+            {!isClaude && (
             <Switch isSelected={form.local} onChange={(local) => update({ local })}>
               <Switch.Content>
                 <Switch.Control>
@@ -145,9 +156,11 @@ export function WorkerModal() {
                 <span className="text-sm">Local: data never leaves this computer (sensitive work only goes to these)</span>
               </Switch.Content>
             </Switch>
+            )}
           </Modal.Body>
           <Modal.Footer className="flex items-center gap-2">
             {editing &&
+              !isClaude &&
               (confirmDelete ? (
                 <Button
                   size="sm"

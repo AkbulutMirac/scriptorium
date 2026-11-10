@@ -20,8 +20,9 @@ const REPO_ROOT = path.resolve(SERVER_ROOT, "..");
 const ENV_PATH = path.join(REPO_ROOT, ".env");
 const RULES_PATH = path.join(REPO_ROOT, "docs", "CLAUDE-workers.md");
 // Older installs added a Turkish section; either heading means the rules are already there
-const RULES_MARKERS = ["## Scriptorium workers", "## Scriptorium işçileri"];
+const RULES_MARKERS = ["## Scriptorium helpers", "## Scriptorium workers", "## Scriptorium işçileri"];
 const GLOBAL_CLAUDE_MD = path.join(os.homedir(), ".claude", "CLAUDE.md");
+const GLOBAL_SETTINGS = path.join(os.homedir(), ".claude", "settings.json");
 
 /**
  * The Claude Code program to use: CLAUDE_CODE_PATH from .env, otherwise the bundled version shipped with the SDK.
@@ -98,6 +99,45 @@ export async function installRules() {
   await appendFile(GLOBAL_CLAUDE_MD, `${existing && !existing.endsWith("\n") ? "\n" : ""}\n${rules}`, "utf8");
 }
 
+const hookUrl = () => `http://127.0.0.1:${config.port}/hooks`;
+/** The events that ask subagents of other Claude Code sessions for a report and show Haiku and Sonnet ones in the office */
+const HOOK_EVENTS: [event: string, matcher?: string][] = [
+  ["PreToolUse", "Agent|Task"],
+  ["PostToolUse", "Agent|Task"],
+  ["PostToolUseFailure", "Agent|Task"],
+  ["SubagentStop"],
+];
+
+type HookEntry = { matcher?: string; hooks?: { type?: string; url?: string }[] };
+type SettingsFile = { hooks?: Record<string, HookEntry[]> } & Record<string, unknown>;
+
+async function readSettings(): Promise<SettingsFile> {
+  const text = await readFile(GLOBAL_SETTINGS, "utf8").catch(() => "");
+  return text.trim() ? JSON.parse(text) : {};
+}
+
+const hasOurHook = (settings: SettingsFile, event: string) => !!settings.hooks?.[event]?.some((e) => e.hooks?.some((h) => h.url === hookUrl()));
+
+async function hooksInstalled(): Promise<boolean> {
+  const settings = await readSettings().catch(() => ({}) as SettingsFile);
+  return HOOK_EVENTS.every(([event]) => hasOurHook(settings, event));
+}
+
+/**
+ * Adds HTTP hooks to ~/.claude/settings.json so other Claude Code sessions report their Haiku/Sonnet subagents.
+ * While Scriptorium is closed the request fails at once and Claude Code carries on.
+ */
+export async function installHooks() {
+  if (await hooksInstalled()) return;
+  const settings = await readSettings();
+  settings.hooks ??= {};
+  for (const [event, matcher] of HOOK_EVENTS) {
+    if (hasOurHook(settings, event)) continue;
+    (settings.hooks[event] ??= []).push({ ...(matcher ? { matcher } : {}), hooks: [{ type: "http", url: hookUrl(), timeout: 5 } as never] });
+  }
+  await writeFile(GLOBAL_SETTINGS, JSON.stringify(settings, null, 2) + "\n", "utf8");
+}
+
 /** Updates or adds a value in the .env file. Creates .env from the example file if it doesn't exist. */
 async function setEnv(key: string, value: string) {
   let text = existsSync(ENV_PATH)
@@ -133,6 +173,6 @@ async function ollamaStatus(): Promise<SetupStatus["ollama"]> {
 }
 
 export async function setupStatus(): Promise<SetupStatus> {
-  const [claude, ollama, mcp, rules] = await Promise.all([claudeStatus(), ollamaStatus(), mcpRegistered(), rulesInstalled()]);
-  return { claude, deepseek: { configured: !!config.deepseekApiKey }, ollama, mcp, rules };
+  const [claude, ollama, mcp, rules, hooks] = await Promise.all([claudeStatus(), ollamaStatus(), mcpRegistered(), rulesInstalled(), hooksInstalled()]);
+  return { claude, deepseek: { configured: !!config.deepseekApiKey }, ollama, mcp, rules, hooks };
 }

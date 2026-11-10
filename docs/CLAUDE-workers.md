@@ -1,49 +1,32 @@
-## Scriptorium workers (DeepSeek and local LLMs)
+## Scriptorium helpers (DeepSeek, local LLMs, Haiku and Sonnet subagents)
 
-If the `mcp__scriptorium__*` tools are available (they are in every Claude Code session while Scriptorium is running), **writing code is the workers' job by default. This is a rule, not a suggestion.** Your job: plan, split the work, hand the parts to workers, check and apply what comes back, and test it. You don't need to ask the user before using workers.
+While Scriptorium is running you have a team you can hand work to. Use it when it saves time or Claude usage, the way a lead hands work to the right person. Nothing here is mandatory: when doing it yourself is quicker or clearer, just do it. You don't need to ask the user before using a helper.
 
-**Every time before you write code:** ask "could a worker write this?" If yes, give it to a worker. New code longer than 15 lines, or several changes in one file, is a worker's job.
+**Who is on the team**
 
-**The only exceptions where you write code yourself:**
-- Fixes of a few lines, and glue code that wires worker output together
-- Reading code to find a problem (diagnosis), planning and architecture decisions, security reviews
-- Sensitive-data tasks too hard for a local worker
-- Workers are unreachable (`list_workers` shows `available.ok` false)
+| Helper | How to reach it | Good at | Keep in mind |
+|---|---|---|---|
+| `deepseek-pro` | `ask_worker` / `start_job` | Self-contained code: a function, a script, tests, a conversion | Costs nothing from the Claude subscription. Can't read files or run commands: pass the files with `files` and `project_dir` |
+| `deepseek` (Flash) | `ask_worker` / `start_job` | Easy jobs, summaries of long input, classification, anything with images | The only DeepSeek model that reads images |
+| Local workers | `ask_worker` / `start_job` | Short, single-step jobs; anything confidential (`sensitive: true`) | Small models: check their model with `list_workers` first and check their answers closely |
+| Haiku subagent | `Agent` tool, `model: "haiku"` | Searching and reading the codebase, answering "where is this, how does it work", small edits | Uses the Claude subscription, lightly. Can read files and run commands |
+| Sonnet subagent | `Agent` tool, `model: "sonnet"` | Changes across several files, running and fixing tests | Uses the Claude subscription. Can read files and run commands |
 
-**Big tasks (features that touch several files):**
-- Make the plan yourself and split the work per file or component. Don't write everything yourself because "it needs the whole project in view": the overview is yours, the code is the workers'.
-- For each part, pass the relevant files with `files`, say what should change and how to tell it's done. Send parts that don't depend on each other in parallel, in the same message.
-- Apply what comes back yourself, wire it together, run the type check and the tests.
+Always pass `model` explicitly when you start a Haiku or Sonnet subagent: that is how it shows up in the office.
 
-**What to delegate:**
-- Code: functions, components, scripts, tests, types/schemas, code conversion, regex, SQL, changes within a file
-- Big input, small output: summarizing long logs or documents, classification, data extraction, translation
-- UI review: screenshot checks (QA below)
+**Some ways to combine them**
+- Cheap code first: a self-contained piece goes to DeepSeek; you write it to the file and test it.
+- Exploration: a Haiku subagent reads around the codebase and reports back, so your own context stays small.
+- Bigger changes that need files and tests: a Sonnet subagent does the change and runs the tests.
+- Planning, splitting the work, reviewing the result and decisions that need the whole picture stay with you.
+- Independent parts can run in parallel.
 
-**Which worker:**
-- Default `deepseek-pro`: writing code, conversions, tests, anything with several steps.
-- Easy tasks go to `deepseek` (Flash): a short single function, regex, simple format conversion, short summary, classification. Flash is the only DeepSeek model that reads images.
-- Local workers are small models. Before using one, check its model name and description with `list_workers` (parameter count, quantization) and pick the task accordingly. Usually give them only short, single-step tasks with a clear output: classification, short summaries, simple text or data conversion. Don't give them long code or multi-step reasoning. Check their answers more strictly than DeepSeek's.
-- If the data is sensitive (passwords, keys, `.env`, personal or customer data), pass `sensitive: true` and pick a local worker.
+**Reports.** Every subagent's task automatically ends with a request for a short report (Done, Files, Checks, Open), and that report is its answer to you. Read it before you continue. For DeepSeek, say which output format you want.
 
-**How:**
-1. If unsure, check with `list_workers` who is available and idle.
-2. Write the task so it stands on its own: language, expected output format, constraints. Pass the needed files with `files` and set `project_dir` to the full path of the working directory.
-3. For tasks longer than a few minutes (especially with local models) use `start_job`, then `job_status`.
-4. Don't use an answer unchecked: write the code to the file yourself and run or test it. If it's wrong, fix it or send it back to the worker with the error.
-5. At the end of every task, tell the user which part each worker wrote. If you wrote a part yourself, say why in one line (which exception).
+**Check before you trust.** Don't use an answer unchecked: run the code or the tests. If something is wrong, fix it or send it back with the error.
 
-**Tests:**
-- For coding tasks, have the worker write the test file too (in the same task or as a separate, parallel one). Workers can't run tests: you run them. If they fail, send the error output back to the worker with the code and have it fixed; test the fix yourself again.
-- Use the project's own test command and library. If there is no test setup, ask the user before adding one.
+**UI checks.** After a UI change, `qa_sweep` clicks every visible control in a real browser and measures layout problems; `qa_explore` explores menus, dialogs and flows on its own (say what to look at in `goal`). Both run in the background: poll `job_status`. For Scriptorium itself pass `local_storage: {"scriptorium.setupDone":"true"}`.
 
-**UI and design review (QA):**
-- Test after every UI change. The app has to be running (dev server up).
-  - `qa_sweep`: systematic sweep. Clicks every visible control in a real browser (desktop, tablet, phone), measures overflow, cut-off text, overlaps, small tap targets and console errors, and has the QA worker review the screens that changed. Run it after every UI change.
-  - `qa_explore`: an autonomous QA agent. It looks at the screen and decides what to click next; good for menus, dialogs and multi-step flows. Say what to look at in `goal`.
-  - Both run in the background: poll `job_status` with the job id. Reports and screenshots go to `server/data/qa/`.
-  - When testing Scriptorium itself, pass `local_storage: {"scriptorium.setupDone":"true"}`, otherwise the setup dialog covers the screen.
-- For a quick look at a single screen you can also send a screenshot to the `qa` worker with `files`. If there is no `qa` worker, use a worker that can read images (`deepseek`, i.e. Flash). `deepseek-pro` can't read images.
-- Check the findings against the report's screenshots yourself and fix the real ones (have a worker write the fix too). After fixing, run QA again.
+**At the end**, if you used helpers, tell the user in a line which one did what.
 
-If the user names a worker, use that one. If they say "don't use workers", don't delegate in that session.
+If the user names a helper, use that one. If they say not to use helpers, don't.
