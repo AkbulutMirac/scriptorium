@@ -101,12 +101,16 @@ export async function installRules() {
 }
 
 const hookUrl = () => `http://127.0.0.1:${config.port}/hooks`;
-/** The events that ask subagents of other Claude Code sessions for a report and show Haiku and Sonnet ones in the office */
+/**
+ * The events that ask subagents of other Claude Code sessions for a report and show Haiku and Sonnet ones in the
+ * office, and pass the user's latest message on to the builder
+ */
 const HOOK_EVENTS: [event: string, matcher?: string][] = [
-  ["PreToolUse", "Agent|Task"],
+  ["PreToolUse", "Agent|Task|mcp__scriptorium__build"],
   ["PostToolUse", "Agent|Task"],
   ["PostToolUseFailure", "Agent|Task"],
   ["SubagentStop"],
+  ["UserPromptSubmit"],
 ];
 
 type HookEntry = { matcher?: string; hooks?: { type?: string; url?: string }[] };
@@ -117,11 +121,12 @@ async function readSettings(): Promise<SettingsFile> {
   return text.trim() ? JSON.parse(text) : {};
 }
 
-const hasOurHook = (settings: SettingsFile, event: string) => !!settings.hooks?.[event]?.some((e) => e.hooks?.some((h) => h.url === hookUrl()));
+const ours = (e: HookEntry) => !!e.hooks?.some((h) => h.url === hookUrl());
+const hasOurHook = (settings: SettingsFile, event: string, matcher?: string) => !!settings.hooks?.[event]?.some((e) => ours(e) && e.matcher === matcher);
 
 async function hooksInstalled(): Promise<boolean> {
   const settings = await readSettings().catch(() => ({}) as SettingsFile);
-  return HOOK_EVENTS.every(([event]) => hasOurHook(settings, event));
+  return HOOK_EVENTS.every(([event, matcher]) => hasOurHook(settings, event, matcher));
 }
 
 /**
@@ -133,8 +138,10 @@ export async function installHooks() {
   const settings = await readSettings();
   settings.hooks ??= {};
   for (const [event, matcher] of HOOK_EVENTS) {
-    if (hasOurHook(settings, event)) continue;
-    (settings.hooks[event] ??= []).push({ ...(matcher ? { matcher } : {}), hooks: [{ type: "http", url: hookUrl(), timeout: 5 } as never] });
+    if (hasOurHook(settings, event, matcher)) continue;
+    // An entry from an older Scriptorium with another matcher is replaced
+    settings.hooks[event] = (settings.hooks[event] ?? []).filter((e) => !ours(e));
+    settings.hooks[event].push({ ...(matcher ? { matcher } : {}), hooks: [{ type: "http", url: hookUrl(), timeout: 5 } as never] });
   }
   await writeFile(GLOBAL_SETTINGS, JSON.stringify(settings, null, 2) + "\n", "utf8");
 }

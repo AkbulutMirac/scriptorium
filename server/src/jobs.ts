@@ -28,6 +28,9 @@ export function startJob(args: {
   files?: string[];
   cwd?: string;
   caller: WorkerCaller;
+  /** Write the answer to this file instead of returning it (see runWorkerTask) */
+  outputFile?: string;
+  thinking?: "low" | "high" | "max";
   /** Custom work instead of a worker task (e.g. a QA run); returns the result text */
   run?: () => Promise<string>;
 }): JobInfo {
@@ -61,6 +64,24 @@ export function startJob(args: {
 
 export function getJob(id: string): JobInfo | undefined {
   return jobs.get(id);
+}
+
+/** Resolves when the job has finished, or after `ms` if it is still running */
+export function waitForJob(id: string, ms: number): Promise<JobInfo | undefined> {
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      bus.off("jobs", check);
+      resolve(jobs.get(id));
+    };
+    const check = () => {
+      const job = jobs.get(id);
+      if (!job || job.finishedAt) finish();
+    };
+    const timer = setTimeout(finish, ms);
+    bus.on("jobs", check);
+    check();
+  });
 }
 
 export function listJobs(): JobInfo[] {

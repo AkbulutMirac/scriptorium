@@ -1,0 +1,10 @@
+{
+  "name": "stockroom",
+  "version": "1.0.0",
+  "description": "A tiny inventory tool: reads a CSV of items and prints a stock report.",
+  "type": "module",
+  "bin": { "stockroom": "src/cli.js" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  }
+}

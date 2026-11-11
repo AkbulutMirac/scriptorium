@@ -6,7 +6,35 @@ import remarkGfm from "remark-gfm";
 import { actions } from "../../store";
 import { copyText } from "../../lib/clipboard";
 
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+/** A line that starts a block of its own: blank, a list item, a table row, a heading or a quote */
+const BLOCK_LINE = /^\s*([-*+] |\d+[.)] |\||#|>|$)/;
+/** Blocks that would swallow a plain line after them (a list item, a table row, a quote) */
+const CONTINUED = /^\s*([-*+] |\d+[.)] |\||>)/;
+
+/**
+ * Keeps single line breaks, which Markdown would join into one paragraph. Worker answers and reports are often
+ * plain lines ("Result: Done" / "Tests: ..."). Code blocks are left alone.
+ */
+function keepLineBreaks(text: string): string {
+  return text
+    .split(/(^```[\s\S]*?^```)/m)
+    .map((part, i) => {
+      if (i % 2) return part;
+      const lines = part.split("\n");
+      return lines
+        .map((line, j) => {
+          const next = lines[j + 1];
+          if (next === undefined || BLOCK_LINE.test(next)) return line;
+          // A plain line after a list item or table row would become part of it: end that block first
+          if (CONTINUED.test(line)) return /^\s/.test(next) ? line : `${line}\n`;
+          return BLOCK_LINE.test(line) ? line : `${line}  `;
+        })
+        .join("\n");
+    })
+    .join("");
+}
+
+export const Markdown = memo(function Markdown({ text, breaks }: { text: string; breaks?: boolean }) {
   return (
     <div className="md">
       <ReactMarkdown
@@ -20,7 +48,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
           ),
         }}
       >
-        {text}
+        {breaks ? keepLineBreaks(text) : text}
       </ReactMarkdown>
     </div>
   );

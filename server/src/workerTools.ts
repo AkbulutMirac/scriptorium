@@ -2,11 +2,12 @@ import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import path from "node:path";
 import { z } from "zod";
 import { findWorker, loadWorkers, type Worker } from "./agents.js";
-import { getJob, listJobs, startJob } from "./jobs.js";
+import { getJob, listJobs, startJob, waitForJob } from "./jobs.js";
 import { isAvailable, supportsVision } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { listRequests } from "./requests.js";
 import { runWorkerTask } from "./workerTasks.js";
+import { claimFolder, runBuild } from "./builder.js";
 import { checkQaUrl, pickQaWorker, runQaExplore, runQaSweep } from "./qa/run.js";
 
 /** The Claude session calling the tool: the folder file paths are relative to, and the name shown in the 3D office */
@@ -16,18 +17,16 @@ type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean
 const ok = (text: string): ToolResult => ({ content: [{ type: "text", text }] });
 const fail = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
 
+/** How long job_status waits for a job that is still running before it answers */
+const JOB_WAIT_MS = 4 * 60_000;
+
 /** Usage summary the MCP server gives Claude (Claude Code adds this to the system prompt) */
 export const WORKER_INSTRUCTIONS = [
-  "Scriptorium helpers. Workers: DeepSeek (API, cheap) and local LLMs (Ollama, data never leaves the computer).",
-  'Claude subagents: start them with the Agent tool and model "haiku" or "sonnet"; they appear in the Scriptorium office as well.',
-  "Use helpers when they save time or Claude usage. Doing the work yourself is fine when that is simpler: you decide.",
-  "DeepSeek suits self-contained code (a function, a script, tests), summaries of long input and classification. It costs nothing from the Claude subscription,",
-  "but it can't read files, write files or run commands: pass the files with files, set project_dir to the full path of the working folder, and check what comes back.",
-  "deepseek-pro for harder code; deepseek (Flash) for easy jobs and anything with images (the only DeepSeek model with vision).",
-  "Local workers are small models: check their model with list_workers first and give only short, single-step jobs. For confidential data use sensitive: true (only local workers accept it).",
-  "ask_worker waits for the answer; for jobs longer than a few minutes use start_job, then job_status. Send independent parts in parallel.",
-  "UI testing: qa_sweep clicks every visible control in a real browser and measures layout problems; qa_explore is an agent that explores flows on its own.",
-  "When you used helpers, say at the end which one did what.",
+  "build hands a whole coding job (write, test, fix) to a builder that runs on DeepSeek inside the project folder and returns a short report.",
+  "Scriptorium workers: DeepSeek (cheap API) and local LLMs (Ollama, data stays on the computer). They can't read files or run commands:",
+  "pass the files with files and project_dir. For code, pass output_file so the answer is written straight to the file and you only review it.",
+  "deepseek-pro for code, deepseek (Flash) for easy jobs and images. Local workers are small: short jobs only, and the only ones that take sensitive: true.",
+  "ask_worker waits; start_job + job_status for long jobs. qa_sweep / qa_explore test a running UI in a real browser.",
 ].join(" ");
 
 /** Finds the worker and enforces the confidentiality rule. Returns an error text if there is a problem. */
@@ -53,8 +52,20 @@ const taskArgs = {
     .boolean()
     .optional()
     .describe("true if the task or files contain confidential/personal data. If true, only local workers are accepted."),
+  output_file: z
+    .string()
+    .optional()
+    .describe(
+      "Path (relative to project_dir) of one file the worker's answer is written to as its complete content, new or replacing an existing one. " +
+        "You get a short confirmation instead of the code, so you don't spend output writing it out again: review it with Read or git diff, then test it. " +
+        "To change an existing file, also pass it in files. For several files, send one call per file in parallel.",
+    ),
+  thinking: z
+    .enum(["low", "high", "max"])
+    .optional()
+    .describe('How hard a DeepSeek worker thinks. Default "low": fast, right for a clear spec. Use "high" only for a genuinely hard problem; it takes minutes.'),
 };
-type TaskArgs = { worker_id: string; task: string; files?: string[]; project_dir?: string; sensitive?: boolean };
+type TaskArgs = { worker_id: string; task: string; files?: string[]; project_dir?: string; sensitive?: boolean; output_file?: string; thinking?: "low" | "high" | "max" };
 
 /** Uses project_dir if given and sets the 3D office name to the folder name */
 function withProjectDir(ctx: ToolCtx, projectDir?: string): ToolCtx {
@@ -110,7 +121,7 @@ export const WORKER_TOOLS = [
       if (typeof worker === "string") return fail(worker);
       const c = withProjectDir(ctx, args.project_dir);
       try {
-        return ok(await runWorkerTask({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller }));
+        return ok(await runWorkerTask({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller, outputFile: args.output_file, thinking: args.thinking }));
       } catch (err) {
         return fail(err instanceof Error ? err.message : String(err));
       }
@@ -125,18 +136,80 @@ export const WORKER_TOOLS = [
       const worker = await pickWorker(args.worker_id, args.sensitive);
       if (typeof worker === "string") return fail(worker);
       const c = withProjectDir(ctx, args.project_dir);
-      const job = startJob({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller });
+      const job = startJob({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller, outputFile: args.output_file, thinking: args.thinking });
       return ok(`Job started. Job number: ${job.id}. Ask for the result with job_status.`);
     },
   },
   {
+    name: "build",
+    description: [
+      "Hands a coding job to the builder: a headless Claude Code session in project_dir that runs on DeepSeek.",
+      "It reads the code, writes the change (and tests, if the task asks), runs the test commands and fixes until they pass, then returns a short report: Result, Changed, Tests, Failures, Look at, Open.",
+      "Scriptorium then reruns the test commands itself and adds their real outcome and the list of files the builder wrote, so you don't need to rerun or reread what passed.",
+      "The builder starts with no context but can read the project, and in sessions with Scriptorium's hooks it also gets the user's latest message word for word.",
+      "In task, give it what that message doesn't say: your plan and decisions, the spec if it came earlier in the conversation (exact names, messages, formats, edge cases), and whether to add tests.",
+      "It can only read and write inside project_dir and run exactly the test_commands: no network, no other commands, no commits. Not for confidential code: it goes to DeepSeek.",
+      "One build per folder at a time: a second one in the same folder is refused until the first has finished.",
+      "Waits until the job is done (usually a few minutes), which is the cheapest way to wait: just call it and read the report.",
+      "Use background: true only when you have other work to do meanwhile; it returns a job id, and job_status gives the report.",
+    ].join(" "),
+    schema: {
+      task: z.string().describe("The job, understandable on its own: goal, spec, and whether to add tests"),
+      project_dir: z.string().describe("Full path of the project folder. The builder can only read and write inside it."),
+      test_commands: z
+        .array(z.string())
+        .min(1)
+        .max(5)
+        .describe('Exact shell commands the builder may run, e.g. ["npm test"]. It can run nothing else. Scriptorium reruns them at the end to check the result.'),
+      files: z.array(z.string()).optional().describe("Files to read first, relative to project_dir"),
+      worker_id: z.string().optional().describe('"deepseek-pro" (default, stronger) or "deepseek" (Flash: cheaper, for easy jobs)'),
+      thinking: z.enum(["low", "high", "max"]).optional().describe('How hard the builder thinks. Default "low"; "high" for a genuinely hard problem.'),
+      background: z.boolean().optional().describe("true: return a job id right away instead of waiting"),
+      user_request: z.string().optional().describe("Filled in by Scriptorium with the user's latest message. Leave it out."),
+    },
+    handler: async (
+      args: {
+        task: string;
+        project_dir: string;
+        test_commands: string[];
+        files?: string[];
+        worker_id?: string;
+        thinking?: "low" | "high" | "max";
+        background?: boolean;
+        user_request?: string;
+      },
+      ctx: ToolCtx,
+    ): Promise<ToolResult> => {
+      const worker = await findWorker(args.worker_id ?? "deepseek-pro");
+      if (!worker || worker.provider !== "deepseek") return fail(`The builder runs on a DeepSeek worker; ${args.worker_id} isn't one. Use "deepseek-pro" or "deepseek".`);
+      const c = withProjectDir(ctx, args.project_dir);
+      // Claimed right here, so even two calls sent at the same moment can't both start
+      const release = claimFolder(args.project_dir);
+      if (typeof release === "string") return fail(release);
+      const run = () =>
+        runBuild({ worker, task: args.task, userRequest: args.user_request, projectDir: args.project_dir, testCommands: args.test_commands, files: args.files, thinking: args.thinking, caller: c.caller }).finally(release);
+      if (args.background) {
+        const job = startJob({ worker, task: `Build: ${args.task.split("\n")[0].slice(0, 80)}`, caller: c.caller, run });
+        return ok(`Build started (job ${job.id}). Ask job_status with job_id "${job.id}" for the report.`);
+      }
+      try {
+        return ok(await run());
+      } catch (err) {
+        return fail(err instanceof Error ? err.message : String(err));
+      }
+    },
+  },
+  {
     name: "job_status",
-    description: "Returns the status of a background job and its result if finished. If job_id is not given, lists recent jobs.",
-    schema: { job_id: z.string().optional().describe("Job number returned by start_job") },
+    description:
+      "Returns a background job's result. If the job is still running, it first waits up to 4 minutes for it to finish, so there's no need to sleep or poll in between: just call it again if it is still running. If job_id is not given, lists recent jobs.",
+    schema: { job_id: z.string().optional().describe("Job number returned by start_job, build or a QA tool") },
     handler: async ({ job_id }: { job_id?: string }): Promise<ToolResult> => {
       if (job_id) {
-        const job = getJob(job_id);
-        return job ? ok(JSON.stringify(job, null, 2)) : fail(`No such job: ${job_id}`);
+        const job = getJob(job_id) && (await waitForJob(job_id, JOB_WAIT_MS));
+        if (!job) return fail(`No such job: ${job_id}`);
+        const note = job.finishedAt ? "" : "\n\nStill running after 4 minutes of waiting. Call job_status again to keep waiting.";
+        return ok(JSON.stringify(job, null, 2) + note);
       }
       const summary = listJobs()
         .slice(0, 20)
@@ -149,7 +222,7 @@ export const WORKER_TOOLS = [
     description: [
       "Systematic UI test. Opens the app in a real headless browser on this computer and clicks every visible control on the start screen, in each viewport (desktop, tablet, phone) and theme.",
       "Measures layout problems itself (sideways overflow, cut-off text, overlapping controls, tap targets under 32px, console errors) and sends every screen that changed to the QA worker for a visual review.",
-      "Thorough and predictable: use it after UI changes. Runs in the background (a few minutes): returns a job id, then poll job_status for the report.",
+      "Thorough and predictable: use it after UI changes. Runs in the background (a few minutes): returns a job id, then job_status waits for the report.",
       "Only local or private URLs. It never clicks controls named like send, delete, rename, sign in/out, quit, stop. Screenshots are sent to DeepSeek for review, so don't run it on pages that show secrets.",
     ].join(" "),
     schema: {
@@ -201,7 +274,7 @@ export const WORKER_TOOLS = [
     description: [
       "Exploratory UI test. A vision model drives a real headless browser like a human tester: it looks at the screen, decides what to click, type or hover next, works through controls it hasn't tried yet, and reports the problems it sees with steps to reproduce.",
       "Goes deeper than qa_sweep (menus, dialogs, multi-step flows, hover cards) but may skip things: use it for flows and hard-to-reach states, or after qa_sweep.",
-      "Runs in the background: returns a job id, then poll job_status. Same safety rules as qa_sweep (local URLs only; never sends messages, deletes, renames, signs in/out or quits; never presses Enter in a text box).",
+      "Runs in the background: returns a job id, then job_status waits for the report. Same safety rules as qa_sweep (local URLs only; never sends messages, deletes, renames, signs in/out or quits; never presses Enter in a text box).",
     ].join(" "),
     schema: {
       url: z.string().describe("Address of the running app"),

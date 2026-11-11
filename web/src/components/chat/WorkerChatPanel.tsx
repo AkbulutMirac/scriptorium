@@ -1,6 +1,6 @@
 import { Button, Chip, Tooltip } from "@heroui/react";
-import { Brain, Settings2, SquarePen, TriangleAlert } from "lucide-react";
-import { useRef } from "react";
+import { Brain, ChevronDown, ClipboardList, Settings2, SquarePen, TriangleAlert } from "lucide-react";
+import { useRef, useState } from "react";
 import { actions, useApp } from "../../store";
 import type { WorkerChatMessage } from "../../protocol";
 import { DeepSeekBalanceChip } from "../DeepSeekBalance";
@@ -79,15 +79,13 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
               <p className="text-sm text-muted">{worker.description || "You can chat directly with this worker."}</p>
             </div>
           )}
-          {chat?.from && (
-            <p className="rounded-lg bg-default-soft px-3 py-2 text-xs text-muted">
-              Claude gave this task{chat.from.label ? ` from ${chat.from.label}` : ""}. Attached file contents aren't kept, only their names. You can
-              continue the chat here.
-            </p>
+          {chat?.messages.map((m, i) =>
+            chat.from && i === 0 && m.role === "user" ? (
+              <DelegatedTask key={i} text={m.content} from={chat.from.label} />
+            ) : (
+              <WorkerMessage key={i} m={m} onReply={(q) => actions.setQuote(quoteKey, q)} />
+            ),
           )}
-          {chat?.messages.map((m, i) => (
-            <WorkerMessage key={i} m={m} onReply={(q) => actions.setQuote(quoteKey, q)} />
-          ))}
           {chat?.streamReasoning && (
             <Collapsible icon={<Brain size={13} />} label="Thinking…" defaultOpen>
               <div className="whitespace-pre-wrap text-xs leading-relaxed text-muted">{chat.streamReasoning}</div>
@@ -111,6 +109,32 @@ export function WorkerChatPanel({ workerId }: { workerId: string }) {
         workerPlus={(pickFiles) => <WorkerPlusMenu worker={worker} onPickFiles={pickFiles} />}
         footer={<WorkerFooter worker={worker} lastUsage={lastUsage} />}
       />
+    </div>
+  );
+}
+
+/** The task Claude handed over, folded to its first lines: it can be long (a whole spec) */
+function DelegatedTask({ text, from }: { text: string; from?: string }) {
+  const [open, setOpen] = useState(false);
+  const lines = text.split("\n");
+  const long = lines.length > 8 || text.length > 600;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-separator bg-default-soft/50 p-3">
+      <div className="flex items-center gap-1.5 text-xs text-muted">
+        <ClipboardList size={13} />
+        <span className="font-medium text-foreground">Task from Claude</span>
+        {from && <span className="truncate">· {from}</span>}
+      </div>
+      <div className={`whitespace-pre-wrap text-sm [overflow-wrap:anywhere] ${open || !long ? "" : "line-clamp-6"}`}>{text}</div>
+      <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
+        <span>Attached files aren't kept, only their names. You can continue the chat below.</span>
+        {long && (
+          <Button size="sm" variant="ghost" className="h-6 shrink-0 gap-1 px-1.5 text-[11px]" onPress={() => setOpen(!open)}>
+            {open ? "Show less" : "Show all"}
+            <ChevronDown size={12} className={open ? "rotate-180" : ""} />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -146,7 +170,7 @@ function WorkerMessage({ m, onReply }: { m: WorkerChatMessage; onReply: (q: stri
         </Collapsible>
       )}
       <div ref={ref}>
-        <Markdown text={m.content} />
+        <Markdown text={m.content} breaks />
       </div>
       <div className="flex items-center gap-2">
         <MessageActions text={m.content} elRef={ref} onReply={onReply} />

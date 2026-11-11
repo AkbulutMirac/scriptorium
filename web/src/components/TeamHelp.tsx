@@ -1,20 +1,32 @@
 import { Button, Popover, Tooltip } from "@heroui/react";
-import { ArrowDown, CircleHelp } from "lucide-react";
+import { CircleHelp } from "lucide-react";
 import { useApp } from "../store";
 
-/** Order of the steps Claude usually takes with the specialists after it has written a change */
-const FLOW: { ids: string[]; note: string }[] = [
-  { ids: ["test-writer", "reviewer"], note: "in parallel, right after the change" },
-  { ids: ["qa-tester"], note: "if the interface changed" },
-  { ids: ["security-reviewer"], note: "if input, auth, files, shell or network changed" },
-  { ids: ["docs-writer"], note: "last, once everything passes" },
+/** The three ways Claude handles a coding job (docs/CLAUDE-workers.md) */
+const WAYS: { title: string; ids: string[]; when: string; how: string }[] = [
+  { title: "Yourself", ids: [], when: "A few lines, a quick fix, a question, or confidential code.", how: "Claude does it directly." },
+  {
+    title: "Builder",
+    ids: ["deepseek-pro"],
+    when: "The default for a feature or a fix, once Claude knows what to build.",
+    how: "DeepSeek writes, tests and fixes in the project folder; Claude reads its report, not the code.",
+  },
+  {
+    title: "Builder + checks",
+    ids: ["deepseek-pro", "reviewer", "security-reviewer", "qa-tester"],
+    when: "When a mistake would be costly: core logic, data, many files, file paths, input, logins or secrets.",
+    how: "After the builder, the reviewer and (when it applies) security and QA check the result. More Claude usage, more eyes.",
+  },
 ];
 
-/** The "?" in the top bar: who is on the team and how Claude uses the subagents */
+/** Helpers for everything else */
+const OTHERS = ["deepseek", "test-writer", "docs-writer", "haiku", "sonnet"];
+
+/** The "?" in the top bar: how Claude picks a way for each job and who is on the team */
 export function TeamHelp() {
   const workers = useApp((s) => s.workers);
   const byId = new Map(workers.map((w) => [w.id, w]));
-  const tools = workers.filter((w) => w.provider !== "claude");
+  const local = workers.filter((w) => w.local);
 
   const Dot = ({ id }: { id: string }) => {
     const w = byId.get(id);
@@ -35,46 +47,43 @@ export function TeamHelp() {
         </Button>
         <Tooltip.Content>How the team works</Tooltip.Content>
       </Tooltip>
-      <Popover.Content placement="bottom end" className="w-[22rem] max-w-[calc(100vw-1rem)]">
+      <Popover.Content placement="bottom end" className="w-[23rem] max-w-[calc(100vw-1rem)]">
         <Popover.Dialog className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto p-3 text-sm">
           <div>
             <p className="font-semibold">How the team works</p>
-            <p className="mt-1 text-xs text-muted">Claude is the head scribe. It decides on its own who helps with what; nothing is mandatory.</p>
+            <p className="mt-1 text-xs text-muted">Claude is the head scribe: it plans, decides and reads reports. For each coding job it picks one of three ways. Tell it which one if you prefer.</p>
           </div>
 
-          <section className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Workers</p>
-            <p className="text-xs text-muted">Cheap or local models through Scriptorium's tools. They get the files they need and send back an answer; they can't run anything.</p>
-            <div className="flex flex-wrap gap-1">{tools.map((w) => <Dot key={w.id} id={w.id} />)}</div>
-          </section>
-
-          <section className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Subagents</p>
-            <p className="text-xs text-muted">
-              Claude Code agents on your subscription. They read files and run commands themselves, walk into the office while they work and end with a <b>report</b> that is their answer.
-            </p>
-            <div className="flex flex-wrap gap-1">
-              <Dot id="haiku" />
-              <Dot id="sonnet" />
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Specialists, after a change</p>
-            <div className="flex flex-col items-start gap-1">
-              {FLOW.map((step, i) => (
-                <div key={step.ids.join()} className="flex flex-col items-start gap-1">
-                  {i > 0 && <ArrowDown size={12} className="ml-2 text-muted" />}
-                  <div className="flex flex-wrap items-center gap-1">
-                    {step.ids.map((id) => (
+          <ol className="flex flex-col gap-2">
+            {WAYS.map((way, i) => (
+              <li key={way.title} className="flex flex-col gap-1 rounded-lg border border-separator p-2">
+                <p className="text-xs font-semibold">
+                  {i + 1}. {way.title}
+                </p>
+                <p className="text-xs text-muted">{way.when}</p>
+                {way.ids.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {way.ids.map((id) => (
                       <Dot key={id} id={id} />
                     ))}
-                    <span className="text-[11px] text-muted">{step.note}</span>
                   </div>
-                </div>
+                )}
+                <p className="text-xs text-muted">{way.how}</p>
+              </li>
+            ))}
+          </ol>
+
+          <section className="flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Other helpers</p>
+            <div className="flex flex-wrap gap-1">
+              {[...OTHERS, ...local.map((w) => w.id)].map((id) => (
+                <Dot key={id} id={id} />
               ))}
             </div>
-            <p className="text-xs text-muted">Claude reads each report, fixes what needs fixing and tells you who did what. Reports are kept in each helper's history under "From Claude".</p>
+            <p className="text-xs text-muted">
+              Small self-contained files, tests for old code, docs, searching the codebase. Local models are for short jobs with confidential data. Every helper's work is kept in its own history under "From
+              Claude".
+            </p>
           </section>
         </Popover.Dialog>
       </Popover.Content>

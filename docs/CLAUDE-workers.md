@@ -1,52 +1,43 @@
-## Scriptorium helpers (DeepSeek, local LLMs, Haiku and Sonnet subagents, specialist team)
+## Scriptorium helpers
 
-While Scriptorium is running you have a team you can hand work to. Use it when it saves time or Claude usage, or when a second pair of eyes makes the result better, the way a lead hands work to the right person. Nothing here is mandatory: when doing it yourself is quicker or clearer, just do it. You don't need to ask the user before using a helper.
+You lead a small team. Your own attention is the scarcest thing on it: every step you take carries the whole conversation with it, so a long read-edit-test loop is best run by a helper while you keep the overview and make the decisions.
 
-**Workers and general subagents**
+**Choose the way for each job.** Before you start writing code, decide which of these three it is:
 
-| Helper | How to reach it | Good at | Keep in mind |
-|---|---|---|---|
-| `deepseek-pro` | `ask_worker` / `start_job` | Self-contained code: a function, a script, tests, a conversion | Costs nothing from the Claude subscription. Can't read files or run commands: pass the files with `files` and `project_dir` |
-| `deepseek` (Flash) | `ask_worker` / `start_job` | Easy jobs, summaries of long input, classification, anything with images | The only DeepSeek model that reads images |
-| Local workers | `ask_worker` / `start_job` | Short, single-step jobs; anything confidential (`sensitive: true`) | Small models: check their model with `list_workers` first and check their answers closely |
-| Haiku subagent | `Agent` tool, `model: "haiku"` | Searching and reading the codebase, answering "where is this, how does it work", small edits | Uses the Claude subscription, lightly. Can read files and run commands |
-| Sonnet subagent | `Agent` tool, `model: "sonnet"` | Changes across several files, running and fixing tests | Uses the Claude subscription. Can read files and run commands |
+| Way | When | How |
+|---|---|---|
+| **Yourself** | A few lines, a quick fix, a question about the code, or anything that takes longer to explain than to do. Also confidential code: it never goes to DeepSeek | Just do it |
+| **Builder** | The default for writing code: a feature or a fix beyond a few lines, once you know what should be built | One `build` call, then read its report |
+| **Builder + checks** | The same, when a mistake would be costly: core logic, data that could be lost or corrupted, many files, a public interface, anything hard to undo, or code that handles file paths, user input, shell commands, the network, logins or secrets | `build`, then the checks below on its result |
 
-Always pass `model` explicitly when you start a general Haiku or Sonnet subagent: that is how it shows up in the office.
+When in doubt between the last two, add the `reviewer`. If the user names a way ("do it yourself", "use the team", "have it reviewed"), take that one.
 
-**The specialist team** (`Agent` tool with `subagent_type` set to the name)
+**The builder.** `build` takes the task, `project_dir`, and the `test_commands` it may run. It is a Claude Code session that runs on DeepSeek inside that folder: it reads the code, writes the change, runs the tests and fixes until they pass, then reports. It can't run other commands, reach the network or leave the folder. It also gets the user's latest message word for word, so when that message already says what to build, don't open files to plan: hand it over right away. In `task`, write only what that message doesn't say: your plan and decisions, the spec if it came earlier in the conversation (exact names, messages, formats, edge cases), and whether to add tests.
 
-| Specialist | Model | When to call it | What you get back |
-|---|---|---|---|
-| `test-writer` | Sonnet | A feature or fix with logic worth testing is written | Tests added, the command, pass/fail, likely cause of each failure. It only touches test files |
-| `reviewer` | Opus | The change is written and before you tell the user it's done, or the user asks for a review | Verdict (Approve / Changes needed) with must fix, should fix and nits, each at `file:line`. Read-only |
-| `qa-tester` | Sonnet | Something visible changed and the app runs locally | Only problems it verified on the screenshots, plus what it dismissed. Read-only |
-| `security-reviewer` | Sonnet | The change touches auth, permissions, user input, file paths, shell commands, network endpoints, secrets or dependencies | Findings with severity, evidence and fix. Read-only |
-| `docs-writer` | Sonnet | Last step of a change users or developers need to know about | Which docs it updated. It only touches documentation |
+**Read the report, not the code.** The report says what changed and how the tests went. Scriptorium adds the real outcome of rerunning your test commands and the list of files the builder wrote. If everything passed, you are done with that part: don't reread files, rerun tests or try the program yourself. Open code only where a test still fails, or where the report points to something under Look at or Open. Fix a small leftover yourself; for a bigger one, call `build` again with the failure and what should change.
 
-They start with a fresh context, so give each one what it needs: what the user asked for, what changed (files or commits), how it should behave, and for `qa-tester` the local URL. They return their own report format.
+**The checks.** Each one starts fresh, so tell it what the user asked for, what changed and which files matter.
 
-**A good flow after you write a change** (skip the steps that don't apply; a one-line fix needs none of this):
+| Check | When |
+|---|---|
+| `reviewer` (Opus) | Any job you chose "builder + checks" for, or when the user asks for a review |
+| `security-reviewer` (Sonnet) | The change handles file paths, user input, shell commands, the network, logins, secrets or dependencies |
+| `qa-tester` (Sonnet) | Something visible changed and the app runs locally |
 
-1. Start `test-writer` and `reviewer` in parallel.
-2. Read both reports. Fix every must fix and every real test failure yourself (or with a worker). If there was a must fix, ask `reviewer` for one more look; don't loop beyond that.
-3. If the interface changed, `qa-tester`. If the change crosses a trust boundary, `security-reviewer`.
-4. When everything passes, `docs-writer` with a short summary of what changed and how to use it.
-5. Tell the user what each helper found and what you did about it.
+Fix every must fix (yourself, or `build` again with the finding), then ask the reviewer for one more look; don't loop beyond that.
 
-**Other ways to combine helpers**
-- Cheap code first: a self-contained piece goes to DeepSeek; you write it to the file and test it.
-- Exploration: a Haiku subagent reads around the codebase and reports back, so your own context stays small.
-- Bigger changes that need files and tests: a Sonnet subagent does the change and runs the tests.
-- Planning, splitting the work, reviewing the result and decisions that need the whole picture stay with you.
-- Independent parts can run in parallel; two helpers should never edit the same file.
+**Other helpers**
 
-**Reports.** Every subagent ends with a short report, and that report is its answer to you. General subagents get a report request (Done, Files, Checks, Open) added to their task automatically; the specialists have their own. Read it before you continue. For DeepSeek, say which output format you want.
+| Helper | When |
+|---|---|
+| `deepseek-pro`, `deepseek` (`ask_worker` with `output_file`) | One self-contained file you can fully specify, with nothing to run |
+| `test-writer` (Sonnet) | Tests for existing code that has none (the builder tests its own change) |
+| Haiku (`Agent`, `model: "haiku"`) | "Where is this, how does it work" across many files |
+| `docs-writer` (Sonnet) | The last step of a change users or developers need to know about |
+| Local workers (`sensitive: true`) | Short jobs with confidential data |
 
-**Check before you trust.** Don't use an answer unchecked: run the code or the tests. If something is wrong, fix it or send it back with the error.
+Pass `model` explicitly for a plain Haiku or Sonnet subagent. Each report is its author's answer to you.
 
-**UI checks yourself.** For a quick look you can run `qa_sweep` (clicks every visible control in a real browser and measures layout problems) or `qa_explore` (explores menus, dialogs and flows on its own) directly; poll `job_status`. For Scriptorium itself pass `local_storage: {"scriptorium.setupDone":"true"}`. `qa-tester` does the same and also checks each finding.
+**UI checks yourself:** `qa_sweep` and `qa_explore` run in the background; `job_status` waits for their report. For Scriptorium itself pass `local_storage: {"scriptorium.setupDone":"true"}`.
 
-**At the end**, if you used helpers, tell the user in a line which one did what.
-
-If the user names a helper, use that one. If they say not to use helpers, don't.
+At the end, tell the user in a line which way you chose and who did what.

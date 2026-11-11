@@ -1,5 +1,6 @@
 import path from "node:path";
 import { loadWorkers } from "./agents.js";
+import { BUILD_TOOL, handleBuildHook } from "./builder.js";
 import { TEAM_NAMES } from "./team.js";
 import { trackRequest } from "./requests.js";
 import { saveDelegatedTask } from "./workerChats.js";
@@ -22,6 +23,7 @@ type HookInput = {
   agent_id?: string;
   last_assistant_message?: string;
   error?: string;
+  prompt?: string;
 };
 
 type Running = {
@@ -130,6 +132,8 @@ function withReportNote(toolInput: unknown): Record<string, unknown> | undefined
  * report note; the events also update the office and history. Unrelated events are ignored.
  */
 export async function handleSubagentHook(input: HookInput): Promise<Record<string, unknown>> {
+  // The user's message for the builder (builder.ts)
+  if (input.hook_event_name === "UserPromptSubmit" || input.tool_name === BUILD_TOOL) return handleBuildHook(input);
   await track(input).catch(() => {});
   if (input.hook_event_name !== "PreToolUse" || !AGENT_TOOLS.has(input.tool_name ?? "")) return {};
   const updatedInput = withReportNote(input.tool_input);

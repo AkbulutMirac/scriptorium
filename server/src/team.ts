@@ -34,7 +34,8 @@ function parse(file: string): AgentFile | undefined {
     const i = line.indexOf(":");
     if (i > 0) fields[line.slice(0, i).trim()] = line.slice(i + 1).trim();
   }
-  if (!fields.name || !fields.description) return undefined;
+  // Not a Claude subagent: the builder runs on DeepSeek behind the build tool (builder.ts)
+  if (!fields.name || !fields.description || fields["runs-on"]) return undefined;
   return {
     file,
     name: fields.name,

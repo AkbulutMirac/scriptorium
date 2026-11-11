@@ -11,6 +11,8 @@ dist/
 !.env.example
 server/agents.json
 server/data/
+# Benchmark runs: local data with this computer's paths
+bench/results/
 
 # Loglar
 *.log

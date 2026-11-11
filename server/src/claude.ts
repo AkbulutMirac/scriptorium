@@ -51,7 +51,7 @@ class MessageQueue implements AsyncIterable<SDKUserMessage> {
 
 // When to delegate comes from docs/CLAUDE-workers.md (only in sessions opened here), and how to use the tools is written in the MCP instructions.
 const WORKER_RULES = readFileSync(path.join(SERVER_ROOT, "..", "docs", "CLAUDE-workers.md"), "utf8");
-const SYSTEM_APPEND =
+export const SYSTEM_APPEND =
   "This session was opened from the Scriptorium interface. The user sees the workers (mcp__scriptorium__*) and your Haiku and Sonnet subagents at work in a 3D office. " +
   "When to hand work to them is up to you (see the Scriptorium helpers notes below).\n\n" +
   WORKER_RULES;
@@ -89,10 +89,12 @@ const subagentHook: HookCallbackMatcher = {
   hooks: [async (input) => (await handleSubagentHook(input)) as never],
 };
 const SUBAGENT_HOOKS: Partial<Record<HookEvent, HookCallbackMatcher[]>> = {
-  PreToolUse: [{ matcher: "Agent|Task", ...subagentHook }],
+  PreToolUse: [{ matcher: "Agent|Task|mcp__scriptorium__build", ...subagentHook }],
   PostToolUse: [{ matcher: "Agent|Task", ...subagentHook }],
   PostToolUseFailure: [{ matcher: "Agent|Task", ...subagentHook }],
   SubagentStop: [subagentHook],
+  // The builder gets the user's latest message (builder.ts)
+  UserPromptSubmit: [subagentHook],
 };
 
 /** A single chat session connected to Claude Code running in the background. */

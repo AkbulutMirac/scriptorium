@@ -1,0 +1,10 @@
+import { chromium } from "playwright-core";
+const out = process.argv[2];
+const browser = await chromium.launch({ channel: "msedge" });
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2, colorScheme: "dark" });
+await page.addInitScript(() => localStorage.setItem("scriptorium.setupDone", "true"));
+await page.goto("http://localhost:7777");
+await page.waitForTimeout(6000);
+await page.screenshot({ path: out });
+await browser.close();
+console.log("saved", out);
