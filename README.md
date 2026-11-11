@@ -1,14 +1,14 @@
 # Scriptorium
 
-Claude is the head scribe; DeepSeek, local LLMs, Claude's own Haiku and Sonnet subagents and a small specialist team (reviewer, test writer, QA tester, security reviewer, docs writer) are the scribes. A multi-agent workspace where you can talk to all of them from one interface, and Claude hands work to the others on its own judgment. Who is doing what shows up live in an isometric, pixel-art office library.
+A multi-agent workspace for Claude Code. Claude is the head scribe: you talk to it, and it hands work to a team of cheaper models, subagents and specialists when that helps. Everyone's work shows up live in an isometric, pixel-art office library.
 
 ![Scriptorium: project history on the left, 3D office library in the middle, chat with Claude on the right, workers along the bottom](docs/screenshot.png)
 
-**Why:** to save Claude usage. Claude can give well-defined coding tasks, summaries and classification to cheap DeepSeek or free local models, and searching or multi-file work to lighter Haiku and Sonnet subagents, then check the result itself. After a change, the specialists test it, review it with fresh eyes and update the docs, each ending with a report. Claude decides when that is worth it.
+**Why:** to save Claude usage and get better results. Routine code goes to cheap DeepSeek or free local models, searching to a light Haiku subagent, and every finished change can be tested and reviewed with fresh eyes before you see it.
 
 ## Quick start
 
-All you need is [Node.js 22.9+](https://nodejs.org) and a Claude subscription (Pro or Max).
+You need [Node.js 22.9+](https://nodejs.org) and a Claude subscription (Pro or Max).
 
 ```bash
 git clone https://github.com/AkbulutMirac/scriptorium.git
@@ -17,75 +17,22 @@ npm install
 npm run app
 ```
 
-Open http://localhost:7777. On first launch a **Setup** window walks you through everything:
+Open http://localhost:7777. On first launch a **Setup** window walks you through:
 
-1. **Claude account:** "Sign in with Claude" opens Anthropic's sign-in page in your browser. You don't need to install Claude Code separately; Scriptorium uses its own copy.
-2. **DeepSeek (optional):** create an API key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it. The key is tested first and, if it works, written only to the `.env` file on this computer.
-3. **Local models (optional):** install [Ollama](https://ollama.com/download) and pull a model (for example `ollama pull qwen3.5:9b`). Add any installed model as a worker with one click.
-4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools. One click adds the specialist team to `~/.claude/agents`, another adds hooks so their subagents show up in the office. Sessions opened in Scriptorium always get the helper notes; adding them to `~/.claude/CLAUDE.md` as well is a separate, optional click.
+1. **Claude account:** "Sign in with Claude" opens Anthropic's sign-in page. Scriptorium brings its own copy of Claude Code.
+2. **DeepSeek (optional):** paste an API key from [platform.deepseek.com](https://platform.deepseek.com/api_keys). It is tested, then stored only in `.env` on this computer.
+3. **Local models (optional):** install [Ollama](https://ollama.com/download), pull a model (e.g. `ollama pull qwen3.5:9b`) and add it as a worker with one click.
+4. **Other Claude Code sessions (optional):** make the team available in your terminal and the Claude desktop app too (see [Outside Scriptorium](#outside-scriptorium)).
 
-You can reopen the Setup window from the Settings menu.
+Setup can be reopened from the Settings menu. No `.env` is needed: everything has a default.
 
-**No `.env` needed:** everything has a default. Setup creates `.env` when you save a DeepSeek key. To change other settings, copy `.env.example` to `.env` and edit it.
-
-**Windows shortcut:** to put a desktop shortcut that runs without a console window:
+**Windows shortcut** (runs without a console window, stops from Settings → "Quit Scriptorium"):
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\CreateShortcut.ps1
 ```
 
-On first launch the shortcut installs the packages, builds the UI, starts the server in the background and opens the browser. If the server is already running, it just opens the browser. To stop it, use Settings → "Quit Scriptorium" in the app. Output goes to `server\data\*.log`.
-
-## Features
-
-**Claude (head scribe)**
-- Connects to Claude Code. CLAUDE.md, MCP servers, skills and plugins are the same as in your terminal. New Claude Code features arrive as it updates.
-- Streaming answers, thinking blocks, tool cards (red/green diff for Edit and Write), permission prompts and answering multiple-choice questions.
-- Consecutive tool calls fold into one row ("Read 3 files, ran 2 commands") that expands on click. While Claude works, a status line shows what it is doing right now and for how long.
-- **Side chat:** open a separate conversation about a message without disturbing the main one. Reply to a message with a quote.
-- **Session info panel:** folder and git branch, extra folders, context usage, connectors (toggle, reconnect), written files, git changes (diff), background tasks.
-- **"+" menu:** attach files or images (paste and drag-and-drop too), add folders, slash commands (suggested as you type `/`), connectors and plugins.
-- A bar under the input like in the Claude app: working folder picker, model, effort (Low–Max) and fast mode, permission mode, usage ring.
-- Claude subscription usage limits in the top bar (5-hour and weekly).
-- History grouped by project, shared with your terminal Claude Code sessions. The app reopens the chat you had open last.
-
-**Workers (DeepSeek, Ollama)**
-- Chat with any worker directly. Attach images and files (DeepSeek also reads PDFs).
-- Under the input: model, thinking level, temperature, max tokens, JSON output, system prompt, token usage and context usage.
-- Claude delegates with tools: `ask_worker` waits for the answer, `start_job` and `job_status` run in the background.
-- The tools also work in every Claude Code session in your terminal and the desktop app.
-- Several sessions can use the same worker at once. In the 3D office a copy of the worker walks in for each task, sits at a spare desk and leaves when it's done. Local workers do one task at a time; the rest wait in line.
-- Hover over a worker to see which task it is doing, for which project, and for how long.
-- **QA tools** drive a real headless Edge/Chrome on your computer: `qa_sweep` clicks every visible control in desktop, tablet and phone sizes and measures overflow, cut-off text, overlaps, small tap targets and console errors; `qa_explore` is an agent that looks at the screen and decides what to try next. The QA worker reviews the screenshots; reports go to `server/data/qa/`. They only test local addresses and never press buttons that send, delete, rename, sign in/out or quit.
-- Every task Claude delegates (from any session) lands in that worker's history under "From Claude", with the answer and token usage. You can continue it as a chat.
-- Sensitive data (`sensitive`) only goes to local workers.
-- Add, edit and delete workers from the UI (`server/agents.json`). DeepSeek Flash and Pro come by default.
-- Remaining DeepSeek balance in the top bar.
-
-**Haiku and Sonnet (Claude subagents)**
-- Two more workers in the office. Claude starts them itself with its Agent tool (`model: "haiku"` or `"sonnet"`) when it thinks they help: Haiku for searching and reading code, Sonnet for changes across several files with tests. Unlike DeepSeek they can read files and run commands. They use your Claude subscription.
-- Every subagent is asked to end with a short report (Done, Files, Checks, Open). That report is its answer to Claude, and it also lands in the worker's history under "From Claude" with the task.
-- Subagents have no desk of their own: while one works it walks into the 3D office, sits at a spare desk and leaves when it is done.
-- Works in sessions opened in Scriptorium out of the box. For terminal and desktop app sessions, add the hooks in Setup step 4.
-- You can also chat with Haiku and Sonnet directly, like with DeepSeek: a plain chat (no tools) with images and PDFs.
-
-**Specialist team (Claude subagents with a fixed job)**
-
-| Specialist | Model | Claude calls it | It reports |
-|---|---|---|---|
-| Test writer | Sonnet | after writing a change with real logic | the tests it added, the command, pass/fail and the likely cause of each failure. It only touches test files |
-| Reviewer | Opus | after the change, before saying "done" | Approve or Changes needed, with must fix, should fix and nits at `file:line`. Read-only |
-| QA tester | Sonnet | after a visible UI change | only the problems it verified on the QA screenshots, and what it dismissed. Read-only |
-| Security | Sonnet | when input, auth, files, shell, network or secrets are touched | findings with severity, evidence and a fix. Loads the `security-audit` skill if you have it. Read-only |
-| Docs writer | Sonnet | last, once everything passes | which docs it updated. It only touches documentation |
-
-- The agents are plain Claude Code agent files in [`agents/`](agents). Each description says *when* to call it, so Claude picks the right one by itself; nothing forces it.
-- Test writer and reviewer start with a fresh context and run in parallel, so the review isn't colored by how the change was written. A must fix gets one more review after it is fixed, no endless loops.
-- The **?** button in the top bar explains the team in short.
-
-**Interface:** React, HeroUI v3 and react-three-fiber. Light, dark or system theme, 6 accent colors, pixel mode.
-
-## How it works
+## The team
 
 ```mermaid
 flowchart LR
@@ -113,46 +60,60 @@ flowchart LR
   end
 ```
 
-Everything runs on your computer through one Scriptorium server. Workers answer through Scriptorium's tools; subagents and specialists run inside Claude Code and end with a report. The 3D office shows each of them while it works.
+| Member | Runs on | Good at | Can it touch files? |
+|---|---|---|---|
+| **DeepSeek** Flash / Pro | DeepSeek API, cheap | Self-contained code, summaries, classification; Flash reads images | No, Claude passes the files and applies the answer |
+| **Local workers** | Ollama on your GPU, free | Short jobs and anything confidential | No |
+| **Haiku** | Your Claude subscription | Searching and reading the codebase | Yes |
+| **Sonnet** | Your Claude subscription | Changes across several files, running tests | Yes |
+| **Test writer** | Sonnet | Writes and runs tests for a change | Test files only |
+| **Reviewer** | Opus | Reviews a finished change with fresh eyes | Read-only |
+| **QA tester** | Sonnet | Checks the UI in a real browser, verifies each finding | Read-only |
+| **Security** | Sonnet + `security-audit` skill | Changes touching input, auth, files, shell, network, secrets | Read-only |
+| **Docs writer** | Sonnet | Updates README and docs at the end | Docs only |
 
-**Scriptorium has to be running for the worker tools to work.** Other Claude Code sessions reach the workers through `http://127.0.0.1:7777/mcp`, so when Scriptorium is closed the tools are simply missing there. Keeping one server means the DeepSeek key stays in one place, all sessions share the local model queue, and the 3D office sees every task.
+How Claude uses them:
 
-**Helper notes** (`docs/CLAUDE-workers.md`) describe the team and when each helper fits. They are always given to sessions opened from Scriptorium; Claude decides whether to use a helper at all. Other sessions only get the tools, unless you also add the notes to `~/.claude/CLAUDE.md` from Setup.
+- **Claude decides.** Nothing is mandatory; the helper notes ([docs/CLAUDE-workers.md](docs/CLAUDE-workers.md)) describe when each one fits, and each specialist's description says when to call it.
+- **Every subagent ends with a report**, which is its answer to Claude. The reviewer's ends with a verdict (Approve / Changes needed) and must fix, should fix and nits at `file:line`; the test writer's with pass/fail and the likely cause of each failure.
+- **A typical change:** Claude writes it, the test writer and reviewer check it in parallel, Claude fixes what they found, then QA or security if relevant, and the docs writer last.
+- The **?** button in the top bar explains the team in short.
 
-### After a change
+The specialists are plain Claude Code agent files in [`agents/`](agents), easy to read and change.
 
-```mermaid
-flowchart TD
-  A["Claude writes the change"] --> B["Test writer"] & C["Reviewer"]
-  B --> D["Claude reads the reports<br/>and fixes what's needed"]
-  C --> D
-  D --> E{"UI or security<br/>touched?"}
-  E -- "yes" --> F["QA tester / Security"]
-  E -- "no" --> G["Docs writer"]
-  F --> G
-  G --> H["Claude tells you<br/>who did what"]
-```
+## Features
 
-### How a subagent works
+**Chat with Claude**
+- Runs on Claude Code: your CLAUDE.md, MCP servers, skills and plugins work as in the terminal.
+- Streaming answers, thinking, tool cards with diffs, permission prompts and multiple-choice questions.
+- Side chats, quoting replies, a session panel (folder, git changes, context, connectors, background tasks).
+- Attach files and images, slash commands, model, effort, fast mode and permission mode under the input.
+- Subscription usage limits in the top bar; history grouped by project and shared with your terminal sessions.
 
-```mermaid
-sequenceDiagram
-  participant C as Claude
-  participant S as Scriptorium
-  participant H as Haiku / Sonnet
+**Workers and helpers**
+- Chat with any worker, Haiku or Sonnet directly, with images and files, model and thinking settings.
+- Every task Claude hands out lands in that helper's history under "From Claude", with the answer or report.
+- Add, edit and remove DeepSeek and Ollama workers from the UI. Confidential tasks (`sensitive`) only go to local workers.
+- **QA tools** drive a real headless Edge/Chrome: `qa_sweep` clicks every visible control on desktop, tablet and phone and measures overflow, cut-off text, overlaps, tap targets and console errors; `qa_explore` explores flows on its own. They only test local addresses and never press send, delete, sign-in or quit buttons.
 
-  C->>H: Task
-  Note over S: Adds "end with a report"<br/>Worker sits down in the office
-  H->>H: Reads files, runs tests
-  H-->>C: Report
-  Note over S: Saves the report to history<br/>Worker leaves the office
-```
+**The office**
+- Claude sits at the head desk; workers have their own desks and rest in the lounge when idle.
+- Subagents and specialists walk in through the door while they work and leave when done. Several jobs for the same worker show up as several copies.
+- Hover over anyone to see their task, project and how long it has been running.
+- Light, dark or system theme, 6 accent colors and a pixel mode.
 
-Subagents run inside Claude Code. Scriptorium only watches them through Claude Code hooks.
+## Outside Scriptorium
 
-Specialists appear in the office by name. General subagents appear when started with an explicit `model` of `haiku` or `sonnet`. Every general subagent gets the report request, whatever its model; the specialists bring their own report format.
+The team also works in Claude Code sessions in your terminal and the Claude desktop app. In Setup step 4:
 
-**Claude desktop app:** to see the workers under Settings → Desktop app → Local MCP servers, add this to `claude_desktop_config.json` and restart the app:
+- **Worker tools:** registers Scriptorium's MCP server (`http://127.0.0.1:7777/mcp`).
+- **Specialists:** copies the agent files to `~/.claude/agents/scriptorium/`.
+- **Office hooks:** adds Claude Code hooks so those sessions' subagents show up in the office and get the report request.
+- **Helper notes (optional):** adds the notes to `~/.claude/CLAUDE.md`. Sessions opened in Scriptorium always have them.
+
+Scriptorium has to be running for the worker tools: one server keeps the DeepSeek key in one place, gives every session the same local model queue and lets the office see every task. Subagents run inside Claude Code; Scriptorium only follows them through the hooks.
+
+To list the workers in the Claude desktop app under Settings → Desktop app → Local MCP servers, add this to `claude_desktop_config.json` and restart the app:
 
 ```json
 "mcpServers": {
@@ -168,40 +129,40 @@ Specialists appear in the office by name. General subagents appear when started 
 | `CLAUDE_CODE_PATH` | Path to your own `claude` install. Empty means Scriptorium's own copy. |
 | `CLAUDE_CWD` | Claude's default working folder (also changeable in the UI) |
 | `PROJECTS_DIR` | Where your project folders live. Listed automatically in the folder picker and history. |
-| `PROJECTS_EXCLUDE` | Folders to hide from the lists entirely (names or full paths, comma-separated). Folders are never touched. |
+| `PROJECTS_EXCLUDE` | Folders to hide from the lists (names or full paths, comma-separated). Folders are never touched. |
 | `OLLAMA_BASE_URL` | If Ollama runs at another address |
-| `WORKER_MAX_TOKENS` | Optional cap on output tokens per worker call. Empty: the provider's default (DeepSeek: 64K with thinking). Thinking tokens count too. |
+| `WORKER_MAX_TOKENS` | Optional cap on output tokens per worker call. Empty: the provider's default. Thinking tokens count too. |
 | `PORT` | Backend port (default 7777) |
 
 ## Choosing a local model
 
-Local workers get short, single-step tasks (classification, short summaries, small tasks with sensitive data). A model runs fast when it fits entirely in your GPU memory:
+Local workers get short, single-step tasks. A model is fast when it fits entirely in your GPU memory:
 
-- **8 GB GPU:** `qwen3.5:9b` (6.6 GB) fits entirely and is fast. Stronger but slower: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB), about 3.7 tokens/s on an RTX 4060 Laptop.
+- **8 GB GPU:** `qwen3.5:9b` (6.6 GB) is fast. Stronger but slower: `hf.co/ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF:IQ2_S` (9.3 GB), about 3.7 tokens/s on an RTX 4060 Laptop.
 - **12 GB and up:** 14B–27B models.
 
-For a model you won't send images to, removing Ollama's vision module makes it faster and uses no extra disk space:
+For a model you won't send images to, removing Ollama's vision module makes it faster:
 
 ```bash
 ollama show --modelfile <model> > model.Modelfile
 ```
 
-Delete the second `FROM` line in `model.Modelfile`. To use a larger context, add `PARAMETER num_ctx 16384` at the end. Then:
+Delete the second `FROM` line in `model.Modelfile` (add `PARAMETER num_ctx 16384` for a larger context), then:
 
 ```bash
 ollama create <new-name> -f model.Modelfile
 ```
 
-Thinking is off by default for local workers (on small models it can take minutes). Turn it on from the menu under the worker's input.
+Thinking is off by default for local workers; turn it on from the menu under the worker's input.
 
 ## Development
 
 ```bash
-npm run dev        # development: http://localhost:5173 (server restarts on code changes)
+npm run dev        # http://localhost:5173, the server restarts on code changes
 ```
 
 ```bash
-npm run typecheck  # type check
+npm run typecheck
 ```
 
 ```bash
@@ -212,11 +173,10 @@ Design notes: [docs/PLAN.md](docs/PLAN.md)
 
 ## Security
 
-- The backend is reachable only from this computer (`127.0.0.1`).
-- The WebSocket and the MCP endpoint accept requests only from this computer and from the app's own origins. Other sites open in your browser can't control Claude or the workers.
+- The backend listens only on this computer (`127.0.0.1`). The WebSocket, MCP and hook endpoints accept requests only from this computer and the app's own origins, so other sites in your browser can't control Claude or the workers.
 - API keys live only in `.env`, never go into the repo and are never sent back to the UI.
-- Claude's commands and file operations ask for approval in the UI when the permission mode is "Ask every time".
-- Data sent to DeepSeek goes to DeepSeek's servers. For sensitive tasks use `sensitive: true` and a local worker.
+- In "Ask every time" mode, Claude's commands and file changes wait for your approval in the UI.
+- Data sent to DeepSeek goes to DeepSeek's servers. For confidential tasks use `sensitive: true` and a local worker.
 
 ## License
 
