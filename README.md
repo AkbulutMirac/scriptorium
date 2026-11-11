@@ -69,7 +69,7 @@ flowchart LR
 | **Test writer** | Sonnet | Writes and runs tests for a change | Test files only |
 | **Reviewer** | Opus | Reviews a finished change with fresh eyes | Read-only |
 | **QA tester** | Sonnet | Checks the UI in a real browser, verifies each finding | Read-only |
-| **Security** | Sonnet + `security-audit` skill | Changes touching input, auth, files, shell, network, secrets | Read-only |
+| **Security** | Sonnet + Cloudflare's [security-audit](https://github.com/cloudflare/security-audit-skill) skill | Changes touching input, auth, files, shell, network, secrets | Read-only |
 | **Docs writer** | Sonnet | Updates README and docs at the end | Docs only |
 
 How Claude uses them:
@@ -80,6 +80,12 @@ How Claude uses them:
 - The **?** button in the top bar explains the team in short.
 
 The specialists are plain Claude Code agent files in [`agents/`](agents), easy to read and change.
+
+**Security skill:** the security specialist loads Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill) when it is installed, and falls back to general secure-coding checks when it isn't. To install it for all projects:
+
+```bash
+npx skills add https://github.com/cloudflare/security-audit-skill --skill security-audit --global
+```
 
 ## Features
 
