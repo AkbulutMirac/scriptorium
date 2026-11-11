@@ -187,6 +187,18 @@ export function SetupModal() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <span className="flex-1">Add the specialist team: reviewer, test writer, QA tester, docs writer, security (~/.claude/agents)</span>
+                      {status.agents ? (
+                        <Chip size="sm" variant="soft" color="success">
+                          added
+                        </Chip>
+                      ) : (
+                        <Button size="sm" variant="secondary" isPending={busy === "agents"} onPress={() => actions.setupAction("agents")}>
+                          Add
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
                       <span className="flex-1">Show their Haiku and Sonnet subagents in the office and ask every subagent for a report (hooks in ~/.claude/settings.json)</span>
                       {status.hooks ? (
                         <Chip size="sm" variant="soft" color="success">

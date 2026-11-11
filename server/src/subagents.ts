@@ -1,5 +1,6 @@
 import path from "node:path";
 import { loadWorkers } from "./agents.js";
+import { TEAM_NAMES } from "./team.js";
 import { trackRequest } from "./requests.js";
 import { saveDelegatedTask } from "./workerChats.js";
 
@@ -62,10 +63,14 @@ function end(r: Running, answer: string, error?: string) {
 }
 
 async function onPreToolUse(key: string, input: HookInput) {
-  const args = (input.tool_input ?? {}) as { description?: unknown; prompt?: unknown; model?: unknown };
+  const args = (input.tool_input ?? {}) as { description?: unknown; prompt?: unknown; model?: unknown; subagent_type?: unknown };
   const model = text(args.model).toLowerCase();
-  if (!model) return;
-  const worker = (await loadWorkers()).find((w) => w.provider === "claude" && model.includes(w.model.toLowerCase()));
+  const type = text(args.subagent_type);
+  const workers = (await loadWorkers()).filter((w) => w.provider === "claude");
+  // A specialist by its name; otherwise a plain Haiku or Sonnet subagent by the model it was given
+  const worker =
+    workers.find((w) => w.id === type) ??
+    (model ? workers.find((w) => !TEAM_NAMES.has(w.id) && model.includes(w.model.toLowerCase())) : undefined);
   if (!worker) return;
   const description = text(args.description);
   const prompt = text(args.prompt);
@@ -115,6 +120,8 @@ export const REPORT_NOTE = [
 function withReportNote(toolInput: unknown): Record<string, unknown> | undefined {
   const args = toolInput as Record<string, unknown> | undefined;
   if (!args || typeof args.prompt !== "string" || args.prompt.includes(REPORT_NOTE)) return undefined;
+  // The specialists' own instructions already define their report
+  if (typeof args.subagent_type === "string" && TEAM_NAMES.has(args.subagent_type)) return undefined;
   return { ...args, prompt: `${args.prompt}\n\n${REPORT_NOTE}` };
 }
 

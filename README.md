@@ -1,10 +1,10 @@
 # Scriptorium
 
-Claude is the head scribe; DeepSeek, local LLMs and Claude's own Haiku and Sonnet subagents are the scribes. A multi-agent workspace where you can talk to all of them from one interface, and Claude hands work to the others on its own judgment. Who is doing what shows up live in an isometric, pixel-art office library.
+Claude is the head scribe; DeepSeek, local LLMs, Claude's own Haiku and Sonnet subagents and a small specialist team (reviewer, test writer, QA tester, security reviewer, docs writer) are the scribes. A multi-agent workspace where you can talk to all of them from one interface, and Claude hands work to the others on its own judgment. Who is doing what shows up live in an isometric, pixel-art office library.
 
 ![Scriptorium: project history on the left, 3D office library in the middle, chat with Claude on the right, workers along the bottom](docs/screenshot.png)
 
-**Why:** to save Claude usage. Claude can give well-defined coding tasks, summaries and classification to cheap DeepSeek or free local models, and searching or multi-file work to lighter Haiku and Sonnet subagents, then check the result itself. It decides when that is worth it.
+**Why:** to save Claude usage. Claude can give well-defined coding tasks, summaries and classification to cheap DeepSeek or free local models, and searching or multi-file work to lighter Haiku and Sonnet subagents, then check the result itself. After a change, the specialists test it, review it with fresh eyes and update the docs, each ending with a report. Claude decides when that is worth it.
 
 ## Quick start
 
@@ -22,7 +22,7 @@ Open http://localhost:7777. On first launch a **Setup** window walks you through
 1. **Claude account:** "Sign in with Claude" opens Anthropic's sign-in page in your browser. You don't need to install Claude Code separately; Scriptorium uses its own copy.
 2. **DeepSeek (optional):** create an API key at [platform.deepseek.com](https://platform.deepseek.com/api_keys) and paste it. The key is tested first and, if it works, written only to the `.env` file on this computer.
 3. **Local models (optional):** install [Ollama](https://ollama.com/download) and pull a model (for example `ollama pull qwen3.5:9b`). Add any installed model as a worker with one click.
-4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools. Another click adds hooks so their Haiku and Sonnet subagents show up in the office. Sessions opened in Scriptorium always get the helper notes; adding them to `~/.claude/CLAUDE.md` as well is a separate, optional click.
+4. **Every Claude Code session (optional):** one click lets Claude in your terminal and in the Claude desktop app use the workers too, by adding the worker tools. One click adds the specialist team to `~/.claude/agents`, another adds hooks so their subagents show up in the office. Sessions opened in Scriptorium always get the helper notes; adding them to `~/.claude/CLAUDE.md` as well is a separate, optional click.
 
 You can reopen the Setup window from the Settings menu.
 
@@ -65,9 +65,23 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 **Haiku and Sonnet (Claude subagents)**
 - Two more workers in the office. Claude starts them itself with its Agent tool (`model: "haiku"` or `"sonnet"`) when it thinks they help: Haiku for searching and reading code, Sonnet for changes across several files with tests. Unlike DeepSeek they can read files and run commands. They use your Claude subscription.
 - Every subagent is asked to end with a short report (Done, Files, Checks, Open). That report is its answer to Claude, and it also lands in the worker's history under "From Claude" with the task.
-- While a subagent runs, its worker sits at a desk in the 3D office and leaves when it is done.
+- Subagents have no desk of their own: while one works it walks into the 3D office, sits at a spare desk and leaves when it is done.
 - Works in sessions opened in Scriptorium out of the box. For terminal and desktop app sessions, add the hooks in Setup step 4.
 - You can also chat with Haiku and Sonnet directly, like with DeepSeek: a plain chat (no tools) with images and PDFs.
+
+**Specialist team (Claude subagents with a fixed job)**
+
+| Specialist | Model | Claude calls it | It reports |
+|---|---|---|---|
+| Test writer | Sonnet | after writing a change with real logic | the tests it added, the command, pass/fail and the likely cause of each failure. It only touches test files |
+| Reviewer | Opus | after the change, before saying "done" | Approve or Changes needed, with must fix, should fix and nits at `file:line`. Read-only |
+| QA tester | Sonnet | after a visible UI change | only the problems it verified on the QA screenshots, and what it dismissed. Read-only |
+| Security | Sonnet | when input, auth, files, shell, network or secrets are touched | findings with severity, evidence and a fix. Loads the `security-audit` skill if you have it. Read-only |
+| Docs writer | Sonnet | last, once everything passes | which docs it updated. It only touches documentation |
+
+- The agents are plain Claude Code agent files in [`agents/`](agents). Each description says *when* to call it, so Claude picks the right one by itself; nothing forces it.
+- Test writer and reviewer start with a fresh context and run in parallel, so the review isn't colored by how the change was written. A must fix gets one more review after it is fixed, no endless loops.
+- The **?** button in the top bar explains the team in short.
 
 **Interface:** React, HeroUI v3 and react-three-fiber. Light, dark or system theme, 6 accent colors, pixel mode.
 
@@ -75,27 +89,49 @@ On first launch the shortcut installs the packages, builds the UI, starts the se
 
 ```mermaid
 flowchart LR
-  YOU["You<br/>(web UI)"] --> CLAUDE["Claude<br/>head scribe"]
+  YOU["You"] --> CLAUDE["Claude<br/>head scribe"]
   CLAUDE -- "worker tools" --> WORKERS
   CLAUDE -- "Agent tool" --> SUBAGENTS
+  CLAUDE -- "Agent tool" --> TEAM
 
   subgraph WORKERS["Workers"]
     DS["DeepSeek"]
-    OL["Ollama (local)"]
-    QA["QA browser"]
+    OL["Ollama"]
   end
 
   subgraph SUBAGENTS["Subagents"]
     HA["Haiku"]
     SO["Sonnet"]
   end
+
+  subgraph TEAM["Specialists"]
+    TW["Test writer"]
+    RV["Reviewer"]
+    QT["QA tester"]
+    SE["Security"]
+    DW["Docs writer"]
+  end
 ```
 
-Everything runs on your computer through one Scriptorium server. The 3D office shows every worker and subagent while it works.
+Everything runs on your computer through one Scriptorium server. Workers answer through Scriptorium's tools; subagents and specialists run inside Claude Code and end with a report. The 3D office shows each of them while it works.
 
 **Scriptorium has to be running for the worker tools to work.** Other Claude Code sessions reach the workers through `http://127.0.0.1:7777/mcp`, so when Scriptorium is closed the tools are simply missing there. Keeping one server means the DeepSeek key stays in one place, all sessions share the local model queue, and the 3D office sees every task.
 
 **Helper notes** (`docs/CLAUDE-workers.md`) describe the team and when each helper fits. They are always given to sessions opened from Scriptorium; Claude decides whether to use a helper at all. Other sessions only get the tools, unless you also add the notes to `~/.claude/CLAUDE.md` from Setup.
+
+### After a change
+
+```mermaid
+flowchart TD
+  A["Claude writes the change"] --> B["Test writer"] & C["Reviewer"]
+  B --> D["Claude reads the reports<br/>and fixes what's needed"]
+  C --> D
+  D --> E{"UI or security<br/>touched?"}
+  E -- "yes" --> F["QA tester / Security"]
+  E -- "no" --> G["Docs writer"]
+  F --> G
+  G --> H["Claude tells you<br/>who did what"]
+```
 
 ### How a subagent works
 
@@ -114,7 +150,7 @@ sequenceDiagram
 
 Subagents run inside Claude Code. Scriptorium only watches them through Claude Code hooks.
 
-Only subagents started with an explicit `model` of `haiku` or `sonnet` appear in the office. Every subagent gets the report request, whatever its model.
+Specialists appear in the office by name. General subagents appear when started with an explicit `model` of `haiku` or `sonnet`. Every general subagent gets the report request, whatever its model; the specialists bring their own report format.
 
 **Claude desktop app:** to see the workers under Settings → Desktop app → Local MCP servers, add this to `claude_desktop_config.json` and restart the app:
 

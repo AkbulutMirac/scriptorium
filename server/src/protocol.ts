@@ -192,9 +192,11 @@ export type SetupStatus = {
   rules: boolean;
   /** Whether the subagent hooks exist in ~/.claude/settings.json (Haiku/Sonnet subagents of other sessions show in the office) */
   hooks: boolean;
+  /** Whether the specialist team is in ~/.claude/agents/scriptorium/ (up to date) */
+  agents: boolean;
 };
 
-export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules" | "hooks";
+export type SetupAction = "claudeLogin" | "deepseekKey" | "mcp" | "rules" | "hooks" | "agents";
 
 export type DeepSeekBalance = {
   ok: boolean;
@@ -295,6 +297,7 @@ export type ClientMsg =
   | { type: "setup.mcp" }
   | { type: "setup.rules" }
   | { type: "setup.hooks" }
+  | { type: "setup.agents" }
   | { type: "workers.list" }
   | { type: "workers.save"; worker: WorkerInfo }
   | { type: "workers.delete"; workerId: string }

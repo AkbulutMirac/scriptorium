@@ -25,14 +25,19 @@ export type CopyState = {
 
 export const LEAVE_MS = 3200;
 
-export function assignCopies(prev: CopyState, requests: WorkerRequest[], now: number): CopyState {
+/**
+ * visitors: workers with no desk of their own (Claude's subagents). Every job of theirs walks in through the
+ * door as a copy and leaves when done.
+ */
+export function assignCopies(prev: CopyState, requests: WorkerRequest[], now: number, visitors: Set<string> = new Set()): CopyState {
   const active = new Set(requests.filter((r) => r.status !== "queued").map((r) => r.id));
   const base: CopyState["base"] = {};
   const copies: CopyState["copies"] = {};
   const assigned = new Set<string>();
 
   for (const [workerId, reqId] of Object.entries(prev.base)) {
-    if (reqId && active.has(reqId)) {
+    // A visitor placed before the worker list arrived moves to a visitor desk
+    if (reqId && active.has(reqId) && !visitors.has(workerId)) {
       base[workerId] = reqId;
       assigned.add(reqId);
     }
@@ -50,11 +55,12 @@ export function assignCopies(prev: CopyState, requests: WorkerRequest[], now: nu
 
   for (const r of requests) {
     if (r.status === "queued" || assigned.has(r.id)) continue;
-    if (!base[r.workerId]) {
+    const visitor = visitors.has(r.workerId);
+    if (!visitor && !base[r.workerId]) {
       base[r.workerId] = r.id;
       continue;
     }
-    let n = 2;
+    let n = visitor ? 1 : 2;
     while (copies[`${r.workerId}#${n}`]) n++;
     const busyDesks = new Set(Object.values(copies).map((c) => c.desk));
     let desk = 0;

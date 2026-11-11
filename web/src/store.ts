@@ -214,6 +214,9 @@ useApp.subscribe((s, prev) => {
 });
 
 /** Loads the worker's chat list and its last open chat */
+/** Claude's subagents have no desk in the office: each of their jobs walks in as a visitor */
+const visitorIds = (workers: WorkerInfo[]) => new Set(workers.filter((w) => w.provider === "claude").map((w) => w.id));
+
 function loadWorker(workerId: string) {
   socket.send({ type: "worker.chats", workerId });
   const chatId = get().activeWorkerChat[workerId];
@@ -548,15 +551,19 @@ function onServer(msg: ServerMsg) {
 
     case "workers": {
       const selectedGone = s.selected !== CLAUDE_ID && !msg.workers.some((w) => w.id === s.selected);
-      set({ workers: msg.workers, ...(selectedGone ? { selected: CLAUDE_ID } : {}) });
+      set({
+        workers: msg.workers,
+        workerCopies: assignCopies(s.workerCopies, s.workerRequests, Date.now(), visitorIds(msg.workers)),
+        ...(selectedGone ? { selected: CLAUDE_ID } : {}),
+      });
       return;
     }
 
     case "worker.requests": {
-      set({ workerRequests: msg.requests, workerCopies: assignCopies(s.workerCopies, msg.requests, Date.now()) });
+      set({ workerRequests: msg.requests, workerCopies: assignCopies(s.workerCopies, msg.requests, Date.now(), visitorIds(s.workers)) });
       // Copies leaving the room should be removed after they walk away
       if (Object.values(get().workerCopies.copies).some((c) => c.leavingAt)) {
-        setTimeout(() => set({ workerCopies: assignCopies(get().workerCopies, get().workerRequests, Date.now()) }), LEAVE_MS + 50);
+        setTimeout(() => set({ workerCopies: assignCopies(get().workerCopies, get().workerRequests, Date.now(), visitorIds(get().workers)) }), LEAVE_MS + 50);
       }
       return;
     }
@@ -1021,6 +1028,7 @@ export const actions = {
     else if (action === "deepseekKey") socket.send({ type: "setup.deepseekKey", key: key ?? "" });
     else if (action === "mcp") socket.send({ type: "setup.mcp" });
     else if (action === "hooks") socket.send({ type: "setup.hooks" });
+    else if (action === "agents") socket.send({ type: "setup.agents" });
     else socket.send({ type: "setup.rules" });
   },
 

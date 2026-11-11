@@ -13,6 +13,7 @@ import path from "node:path";
 import { config, SERVER_ROOT } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
 import { handleSubagentHook } from "./subagents.js";
+import { TEAM_AGENTS } from "./team.js";
 import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
 
 /** Simple queue that streams user messages to the SDK. As long as the session stays open, it waits for new messages. */
@@ -120,6 +121,8 @@ export class ClaudeSession {
         allowDangerouslySkipPermissions: true,
         systemPrompt: { type: "preset", preset: "claude_code", append: SYSTEM_APPEND },
         hooks: SUBAGENT_HOOKS,
+        // The specialist team (agents/*.md); a copy in ~/.claude/agents loads too, these take precedence
+        agents: TEAM_AGENTS,
         // If the user added the server to their global settings (claude mcp add), that one is used; both go to the same address.
         mcpServers: {
           [WORKER_SERVER_NAME]:

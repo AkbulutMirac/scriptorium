@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ACCENTS, useTheme, type AccentName, type ThemeMode } from "../lib/theme";
 import { pct, UsageCard } from "./chat/UsageCard";
 import { DeepSeekBalanceChip } from "./DeepSeekBalance";
+import { TeamHelp } from "./TeamHelp";
 import { actions, useApp } from "../store";
 
 export function TopBar() {
@@ -43,6 +44,7 @@ export function TopBar() {
       </span>
       <UsageChip />
       <ConnectionDot status={connection} />
+      <TeamHelp />
       <SettingsPopover />
     </header>
   );

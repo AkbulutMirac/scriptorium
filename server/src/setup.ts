@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { config, SERVER_ROOT } from "./config.js";
 import { deepseekBalance, listModels } from "./llm.js";
 import type { SetupStatus } from "./protocol.js";
+import { teamInstalled } from "./team.js";
 import { WORKER_SERVER_NAME } from "./workerTools.js";
 
 /**
@@ -173,6 +174,13 @@ async function ollamaStatus(): Promise<SetupStatus["ollama"]> {
 }
 
 export async function setupStatus(): Promise<SetupStatus> {
-  const [claude, ollama, mcp, rules, hooks] = await Promise.all([claudeStatus(), ollamaStatus(), mcpRegistered(), rulesInstalled(), hooksInstalled()]);
-  return { claude, deepseek: { configured: !!config.deepseekApiKey }, ollama, mcp, rules, hooks };
+  const [claude, ollama, mcp, rules, hooks, agents] = await Promise.all([
+    claudeStatus(),
+    ollamaStatus(),
+    mcpRegistered(),
+    rulesInstalled(),
+    hooksInstalled(),
+    teamInstalled(),
+  ]);
+  return { claude, deepseek: { configured: !!config.deepseekApiKey }, ollama, mcp, rules, hooks, agents };
 }

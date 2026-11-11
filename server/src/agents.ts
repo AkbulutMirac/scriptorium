@@ -48,6 +48,52 @@ const CLAUDE_WORKERS: Worker[] = [
     description: "Claude Sonnet subagent on your subscription. Strong coder: changes across several files, running and fixing tests. Can read files and run commands.",
     local: false,
   },
+  // The specialist team (agents/*.md): matched by the subagent's name, not its model
+  {
+    id: "reviewer",
+    name: "Reviewer",
+    provider: "claude",
+    model: "opus",
+    color: "#8B5CF6",
+    description: "Opus subagent. Reviews a finished change with fresh eyes and reports must-fix, should-fix and nits with a verdict. Read-only.",
+    local: false,
+  },
+  {
+    id: "test-writer",
+    name: "Test writer",
+    provider: "claude",
+    model: "sonnet",
+    color: "#10B981",
+    description: "Sonnet subagent. Writes tests for a change, runs them and reports what passes and fails. Only touches test files.",
+    local: false,
+  },
+  {
+    id: "qa-tester",
+    name: "QA tester",
+    provider: "claude",
+    model: "sonnet",
+    color: "#EAB308",
+    description: "Sonnet subagent. Runs the QA sweep and explorer on a running UI, checks every finding on its screenshot and reports only real problems.",
+    local: false,
+  },
+  {
+    id: "docs-writer",
+    name: "Docs writer",
+    provider: "claude",
+    model: "sonnet",
+    color: "#06B6D4",
+    description: "Sonnet subagent. Updates README and docs after a change is done. Only touches documentation files.",
+    local: false,
+  },
+  {
+    id: "security-reviewer",
+    name: "Security",
+    provider: "claude",
+    model: "sonnet",
+    color: "#EF4444",
+    description: "Sonnet subagent with the security-audit skill. Reviews changes that touch input, auth, files, shell, network or secrets. Read-only.",
+    local: false,
+  },
 ];
 
 /** Reads agents.json. Creates it from the example file if missing. Read from disk on every call, so a worker added via the UI appears immediately. */

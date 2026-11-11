@@ -54,7 +54,9 @@ const SHRINK_DELAY_MS = 20_000;
  * enters the room and sits at one of the extra desks, leaving when the job is done.
  */
 export function LibraryScene() {
-  const workers = useApp((s) => s.workers);
+  const all = useApp((s) => s.workers);
+  // Claude's subagents (Haiku, Sonnet, the specialists) have no desk: they only come in while they work
+  const workers = useMemo(() => all.filter((w) => w.provider !== "claude"), [all]);
   const activity = useApp((s) => s.activity);
   const requests = useApp((s) => s.workerRequests);
   const copies = useApp((s) => s.workerCopies);
@@ -81,7 +83,7 @@ export function LibraryScene() {
   const p = palette(isDark);
   const bg = isDark ? "#15121b" : "#f1e7d8";
 
-  const figures = useMemo(() => computeFigures(workers, requests, copies, stations, frontZ), [workers, requests, copies, stations, frontZ]);
+  const figures = useMemo(() => computeFigures(workers, all, requests, copies, stations, frontZ), [workers, all, requests, copies, stations, frontZ]);
   const occupied = new Set(
     Object.values(copies.copies)
       .filter((c) => !c.leavingAt)

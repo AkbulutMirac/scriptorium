@@ -25,6 +25,7 @@ import { createMcpHandler, readJson } from "./mcpHttp.js";
 import { listRequests } from "./requests.js";
 import { claudeLogin, installHooks, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
 import { handleSubagentHook } from "./subagents.js";
+import { installTeam } from "./team.js";
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { appControlSupported, getAutostart, restartApp, setAutostart } from "./app.js";
@@ -499,10 +500,11 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
 
     case "setup.mcp":
     case "setup.rules":
-    case "setup.hooks": {
-      const action = msg.type === "setup.mcp" ? "mcp" : msg.type === "setup.rules" ? "rules" : "hooks";
+    case "setup.hooks":
+    case "setup.agents": {
+      const action = ({ "setup.mcp": "mcp", "setup.rules": "rules", "setup.hooks": "hooks", "setup.agents": "agents" } as const)[msg.type];
       try {
-        await (action === "mcp" ? registerMcp() : action === "rules" ? installRules() : installHooks());
+        await { mcp: registerMcp, rules: installRules, hooks: installHooks, agents: installTeam }[action]();
       } catch (err) {
         return reply(ws, { type: "setup.result", action, ok: false, message: err instanceof Error ? err.message : String(err) });
       }

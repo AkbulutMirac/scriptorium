@@ -30,9 +30,11 @@ export function hotDeskCount(workerCount: number, copies: CopyState): number {
 /**
  * Who is where: the main worker with a job at their own desk, copies at extra desks; idle ones in turn
  * in the lounge corner (dozing at their desk if no room). Copies enter and exit from the front of the room.
+ * `workers` are the residents with a desk of their own; `all` also has the visitors (Claude's subagents).
  */
 export function computeFigures(
   workers: WorkerInfo[],
+  all: WorkerInfo[],
   requests: WorkerRequest[],
   copies: CopyState,
   stations: Workstation[],
@@ -54,7 +56,7 @@ export function computeFigures(
   });
 
   for (const [key, c] of Object.entries(copies.copies)) {
-    const worker = workers.find((w) => w.id === c.workerId);
+    const worker = all.find((w) => w.id === c.workerId);
     const desk = stations[workers.length + c.desk];
     if (!worker || !desk) continue;
     const door: Vec3 = [desk.seat.pos[0], SEAT_HEIGHT, frontZ + 1.4];
