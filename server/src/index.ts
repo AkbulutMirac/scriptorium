@@ -25,7 +25,12 @@ import { createMcpHandler, readJson } from "./mcpHttp.js";
 import { listRequests } from "./requests.js";
 import { claudeLogin, installHooks, installRules, registerMcp, saveDeepseekKey, setupStatus } from "./setup.js";
 import { handleSubagentHook } from "./subagents.js";
-import { installTeam } from "./team.js";
+import { applyTeamModels, installTeam, refreshInstalledTeam, TEAM_DEFAULT_MODELS } from "./team.js";
+import { getTeamSettings, saveTeamSettings } from "./teamSettings.js";
+import { BUILDER_DEFAULTS } from "./builder.js";
+
+// The user's model choices for the specialists (Settings → Team models)
+applyTeamModels(getTeamSettings().models);
 import { listJobs } from "./jobs.js";
 import { gitDiff, gitInfo } from "./git.js";
 import { appControlSupported, getAutostart, restartApp, setAutostart } from "./app.js";
@@ -36,16 +41,16 @@ import { deleteChat, getChat, listChats, sendToWorker } from "./workerChats.js";
 
 const HOST = "127.0.0.1";
 const WEB_DIST = path.resolve(SERVER_ROOT, "../web/dist");
-/** Allowed UI origins: the built UI and the Vite dev server. */
-const ALLOWED_ORIGINS = new Set([
-  `http://localhost:${config.port}`,
-  `http://127.0.0.1:${config.port}`,
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  ...config.remoteOrigins,
-]);
+/**
+ * The Vite dev server's address is trusted only while developing (`npm run dev` runs the server with --watch).
+ * Otherwise 5173 is likely some other project's dev server, and any page there could drive Claude.
+ */
+const DEV = process.execArgv.includes("--watch");
+const DEV_ORIGINS = DEV ? ["http://localhost:5173", "http://127.0.0.1:5173"] : [];
+/** Allowed UI origins: the built UI, the Vite dev server while developing, and remote access if set up. */
+const ALLOWED_ORIGINS = new Set([`http://localhost:${config.port}`, `http://127.0.0.1:${config.port}`, ...DEV_ORIGINS, ...config.remoteOrigins]);
 
-const LOCAL_HOSTS = new Set([`localhost:${config.port}`, `127.0.0.1:${config.port}`, "localhost:5173", "127.0.0.1:5173"]);
+const LOCAL_HOSTS = new Set([`localhost:${config.port}`, `127.0.0.1:${config.port}`, ...(DEV ? ["localhost:5173", "127.0.0.1:5173"] : [])]);
 const REMOTE_HOSTS = new Set(config.remoteOrigins.map((o) => new URL(o).host));
 
 /**
@@ -253,6 +258,11 @@ function chatOrThrow(chatId: string): ChatState {
 }
 
 // ─── Workers ───────────────────────────────────────────────────────────────────
+
+/** The team's model choices with their defaults, for the Team models dialog */
+function teamSettingsMsg(): ServerMsg {
+  return { type: "team.settings", settings: getTeamSettings(), defaults: { models: TEAM_DEFAULT_MODELS, builder: { ...BUILDER_DEFAULTS } } };
+}
 
 async function workersWithAvailability(): Promise<WorkerInfo[]> {
   const workers = await loadWorkers();
@@ -474,6 +484,20 @@ async function handle(ws: WebSocket, msg: ClientMsg) {
       return broadcast({ type: "workers", workers: await workersWithAvailability() });
     }
 
+    case "team.settings":
+      return reply(ws, teamSettingsMsg());
+
+    case "team.save": {
+      // The builder only runs on a DeepSeek worker; anything else falls back to the default
+      const worker = msg.settings.builder?.worker;
+      const deepseek = worker ? (await loadWorkers()).some((w) => w.id === worker && w.provider === "deepseek") : true;
+      const saved = saveTeamSettings({ ...msg.settings, builder: { ...msg.settings.builder, worker: deepseek ? worker : undefined } });
+      applyTeamModels(saved.models);
+      await refreshInstalledTeam().catch(() => {});
+      broadcast(teamSettingsMsg());
+      return broadcast({ type: "workers", workers: await workersWithAvailability() });
+    }
+
     case "jobs.list":
       return reply(ws, { type: "jobs", jobs: listJobs() });
 
@@ -548,7 +572,8 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse) {
   }
   const urlPath = decodeURIComponent(new URL(req.url ?? "/", "http://localhost").pathname);
   let file = path.resolve(WEB_DIST, `.${urlPath}`);
-  if (!file.startsWith(WEB_DIST)) {
+  const rel = path.relative(WEB_DIST, file);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
     res.writeHead(403).end();
     return;
   }

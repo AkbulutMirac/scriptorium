@@ -6,6 +6,7 @@ import { chat, clientFor, supportsVision } from "../llm.js";
 import type { WorkerCaller } from "../protocol.js";
 import { setRequestTask, withWorkerSlot } from "../requests.js";
 import { runExplore } from "./explore.js";
+import { isLocalQaHost } from "./hosts.js";
 import { runSweep, type Shot } from "./sweep.js";
 import { DEFAULT_DENY, type QaIssue, type QaReport, type Theme, type ViewportName } from "./types.js";
 
@@ -25,16 +26,7 @@ export function checkQaUrl(url: string): string | null {
     return "Not a valid URL.";
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") return "Only http and https URLs.";
-  const h = u.hostname;
-  const local =
-    h === "localhost" ||
-    h === "127.0.0.1" ||
-    h === "[::1]" ||
-    h.endsWith(".localhost") ||
-    h.endsWith(".test") ||
-    h.endsWith(".ts.net") ||
-    /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
-  return local ? null : "QA tools only test local or private addresses (localhost, 127.0.0.1, LAN, Tailscale).";
+  return isLocalQaHost(u.hostname) ? null : "QA tools only test local or private addresses (localhost, a private IP address, a .localhost or .test name, or a remote address set up for Scriptorium).";
 }
 
 /** The reviewer: a worker with vision, preferring the one called "qa" */

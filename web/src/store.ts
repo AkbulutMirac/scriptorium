@@ -6,6 +6,8 @@ import { socket, type ConnectionStatus } from "./lib/socket";
 import { load, save } from "./lib/storage";
 import { assignCopies, LEAVE_MS, type CopyState } from "./lib/workerCopies";
 import type {
+  TeamDefaults,
+  TeamSettings,
   AgentActivity,
   Attachment,
   ClaudeInfo,
@@ -117,6 +119,8 @@ type State = {
   quotes: Record<string, string | undefined>;
   overlay: Overlay | null;
   workerModal: { open: boolean; worker?: WorkerInfo };
+  /** Settings → Team models: the user's choices and the defaults, loaded when the dialog opens */
+  team: { open: boolean; settings?: TeamSettings; defaults?: TeamDefaults };
   /** Initial setup window */
   setup: { open: boolean; status?: SetupStatus; busy?: SetupAction };
   ui: UiPrefs;
@@ -173,6 +177,7 @@ export const useApp = create<State>(() => ({
   quotes: {},
   overlay: null,
   workerModal: { open: false },
+  team: { open: false },
   setup: { open: false },
   ui: { historyOpen: true, chatWidth: 520, sideWidth: 440, infoOpen: false, mobileView: "chat", ...load<Partial<UiPrefs>>("ui", {}) },
   git: {},
@@ -547,6 +552,10 @@ function onServer(msg: ServerMsg) {
 
     case "worker.done":
       updateWorkerChat(msg.chatId, (c) => ({ ...c, messages: [...c.messages, msg.message], stream: "", streamReasoning: "", busy: false, updatedAt: msg.message.at }));
+      return;
+
+    case "team.settings":
+      set({ team: { ...s.team, settings: msg.settings, defaults: msg.defaults } });
       return;
 
     case "workers": {
@@ -1038,6 +1047,19 @@ export const actions = {
 
   closeWorkerModal() {
     set({ workerModal: { open: false } });
+  },
+
+  openTeamModels() {
+    set({ team: { ...get().team, open: true }, workerModal: { open: false } });
+    socket.send({ type: "team.settings" });
+  },
+
+  closeTeamModels() {
+    set({ team: { ...get().team, open: false } });
+  },
+
+  saveTeamSettings(settings: TeamSettings) {
+    socket.send({ type: "team.save", settings });
   },
 };
 

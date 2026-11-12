@@ -301,7 +301,17 @@ export type ClientMsg =
   | { type: "workers.list" }
   | { type: "workers.save"; worker: WorkerInfo }
   | { type: "workers.delete"; workerId: string }
+  | { type: "team.settings" }
+  | { type: "team.save"; settings: TeamSettings }
   | { type: "jobs.list" };
+
+/** Models the user picked for the team (Settings → Team models). Missing entries use the defaults. */
+export type TeamSettings = {
+  /** Specialist id → Claude model */
+  models: Record<string, "haiku" | "sonnet" | "opus">;
+  builder: { worker?: string; thinking?: "low" | "high" | "max" };
+};
+export type TeamDefaults = { models: Record<string, string>; builder: { worker: string; thinking: "low" | "high" | "max" } };
 
 export type ServerMsg =
   | { type: "welcome"; cwd: string; claudeCodeVersion?: string; appControl: AppControl }
@@ -338,6 +348,7 @@ export type ServerMsg =
   | { type: "worker.models"; workerId: string; models: WorkerModel[] }
   | { type: "worker.done"; chatId: string; message: WorkerChatMessage }
   | { type: "workers"; workers: WorkerInfo[] }
+  | { type: "team.settings"; settings: TeamSettings; defaults: TeamDefaults }
   | { type: "activity"; activity: AgentActivity }
   | { type: "jobs"; jobs: JobInfo[] }
   | { type: "worker.requests"; requests: WorkerRequest[] }

@@ -14,7 +14,7 @@ import { config, SERVER_ROOT } from "./config.js";
 import type { Attachment, ClaudeInfo, EffortLevel, LimitWindow, McpServerInfo, ModelOption, UsageInfo } from "./protocol.js";
 import { handleSubagentHook } from "./subagents.js";
 import { TEAM_AGENTS } from "./team.js";
-import { createWorkerServer, WORKER_SERVER_NAME } from "./workerTools.js";
+import { createWorkerServer, isReadOnlyTool, WORKER_SERVER_NAME, WORKER_TOOLS } from "./workerTools.js";
 
 /** Simple queue that streams user messages to the SDK. As long as the session stays open, it waits for new messages. */
 class MessageQueue implements AsyncIterable<SDKUserMessage> {
@@ -80,6 +80,7 @@ export type ClaudeSessionOptions = {
  * (sdk, dynamic); a server with the same name in a project's .mcp.json does not count.
  */
 const TRUSTED_WORKER_SOURCES = new Set(["sdk", "dynamic", "user"]);
+const READ_ONLY_WORKER_TOOLS = new Set<string>(WORKER_TOOLS.filter(isReadOnlyTool).map((t) => t.name));
 
 /**
  * Subagents of this session are asked for a report at the end, and Haiku and Sonnet ones appear in the office
@@ -132,9 +133,14 @@ export class ClaudeSession {
               ? { type: "http", url: `http://127.0.0.1:${config.port}/mcp` }
               : createWorkerServer({ cwd, caller: { kind: "claude", label: path.basename(cwd) || "Claude" } }),
         },
+        // Commands Claude runs here don't need the DeepSeek key (it stays in this server)
+        env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== "DEEPSEEK_API_KEY")),
         canUseTool: (toolName, input, options) =>
-          // Our own worker tools run without asking for permission. We check the source not only by name but also by `source`.
-          options.mcpServer?.name === WORKER_SERVER_NAME && TRUSTED_WORKER_SOURCES.has(options.mcpServer.source)
+          // Our own read-only worker tools run without asking. The others (build, files written by a worker, QA
+          // runs) follow the session's permission mode. The source is checked as well as the name.
+          options.mcpServer?.name === WORKER_SERVER_NAME &&
+          TRUSTED_WORKER_SOURCES.has(options.mcpServer.source) &&
+          READ_ONLY_WORKER_TOOLS.has(toolName.replace(`mcp__${WORKER_SERVER_NAME}__`, ""))
             ? Promise.resolve({ behavior: "allow", updatedInput: input })
             : opts.canUseTool(toolName, input, options),
       },

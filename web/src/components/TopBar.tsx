@@ -167,6 +167,9 @@ function SettingsPopover() {
             <Button size="sm" variant="secondary" className="w-full" onPress={() => actions.openSetup()}>
               Setup (Claude, DeepSeek, local models)
             </Button>
+            <Button size="sm" variant="secondary" className="w-full" onPress={() => actions.openTeamModels()}>
+              Team models (builder and specialists)
+            </Button>
             <div className="grid grid-cols-2 gap-2">
               {appControl?.supported && (
                 <Button size="sm" variant="secondary" className="w-full" onPress={() => actions.restartServer()}>

@@ -1,5 +1,5 @@
 import { Button, Popover } from "@heroui/react";
-import { ChevronUp, Plus, Users } from "lucide-react";
+import { ChevronUp, Plus, SlidersHorizontal, Users } from "lucide-react";
 import { useState } from "react";
 import { truncate } from "../lib/format";
 import { actions, agentMeta, CLAUDE_ID, useApp } from "../store";
@@ -115,6 +115,17 @@ export function SceneOverlay() {
                   </section>
                 ) : null,
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mx-1 mb-1 justify-start gap-1.5 text-xs"
+                onPress={() => {
+                  setOpen(false);
+                  actions.openTeamModels();
+                }}
+              >
+                <SlidersHorizontal size={13} /> Models…
+              </Button>
             </Popover.Dialog>
           </Popover.Content>
         </Popover>

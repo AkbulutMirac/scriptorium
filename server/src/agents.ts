@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { SERVER_ROOT } from "./config.js";
+import { TEAM_AGENTS } from "./team.js";
 
 const WorkerSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/, "id may only contain lowercase letters, digits and hyphens"),
@@ -55,7 +56,7 @@ const CLAUDE_WORKERS: Worker[] = [
     provider: "claude",
     model: "opus",
     color: "#8B5CF6",
-    description: "Opus subagent. Reviews a finished change with fresh eyes and reports must-fix, should-fix and nits with a verdict. Read-only.",
+    description: "Specialist subagent. Reviews a finished change with fresh eyes and reports must-fix, should-fix and nits with a verdict. Read-only.",
     local: false,
   },
   {
@@ -64,7 +65,7 @@ const CLAUDE_WORKERS: Worker[] = [
     provider: "claude",
     model: "sonnet",
     color: "#10B981",
-    description: "Sonnet subagent. Writes tests for a change, runs them and reports what passes and fails. Only touches test files.",
+    description: "Specialist subagent. Writes tests for a change, runs them and reports what passes and fails. Only touches test files.",
     local: false,
   },
   {
@@ -73,7 +74,7 @@ const CLAUDE_WORKERS: Worker[] = [
     provider: "claude",
     model: "sonnet",
     color: "#EAB308",
-    description: "Sonnet subagent. Runs the QA sweep and explorer on a running UI, checks every finding on its screenshot and reports only real problems.",
+    description: "Specialist subagent. Runs the QA sweep and explorer on a running UI, checks every finding on its screenshot and reports only real problems.",
     local: false,
   },
   {
@@ -82,7 +83,7 @@ const CLAUDE_WORKERS: Worker[] = [
     provider: "claude",
     model: "sonnet",
     color: "#06B6D4",
-    description: "Sonnet subagent. Updates README and docs after a change is done. Only touches documentation files.",
+    description: "Specialist subagent. Updates README and docs after a change is done. Only touches documentation files.",
     local: false,
   },
   {
@@ -91,7 +92,7 @@ const CLAUDE_WORKERS: Worker[] = [
     provider: "claude",
     model: "sonnet",
     color: "#EF4444",
-    description: "Sonnet subagent with the security-audit skill. Reviews changes that touch input, auth, files, shell, network or secrets. Read-only.",
+    description: "Specialist subagent with the security-audit skill. Reviews changes that touch input, auth, files, shell, network or secrets. Read-only.",
     local: false,
   },
 ];
@@ -101,7 +102,10 @@ export async function loadWorkers(): Promise<Worker[]> {
   if (!existsSync(AGENTS_PATH)) await copyFile(EXAMPLE_PATH, AGENTS_PATH);
   const raw = JSON.parse(await readFile(AGENTS_PATH, "utf8"));
   const workers = AgentsFileSchema.parse(raw).workers;
-  return [...workers, ...CLAUDE_WORKERS.filter((c) => !workers.some((w) => w.id === c.id))];
+  // A specialist shows the model it runs on now (Settings → Team models), not the one it was saved with
+  return [...workers, ...CLAUDE_WORKERS.filter((c) => !workers.some((w) => w.id === c.id))].map((w) =>
+    w.provider === "claude" && TEAM_AGENTS[w.id]?.model ? { ...w, model: TEAM_AGENTS[w.id].model! } : w,
+  );
 }
 
 export async function saveWorkers(workers: Worker[]): Promise<void> {

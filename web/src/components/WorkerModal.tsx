@@ -75,6 +75,14 @@ export function WorkerModal() {
             {isClaude ? (
               <p className="text-xs text-muted">
                 Claude subagent on your subscription (model <span className="font-code">{form.model}</span>). Claude starts it itself when it decides to.
+                {!["haiku", "sonnet"].includes(form.id) && (
+                  <>
+                    {" "}
+                    <button type="button" className="text-accent hover:underline" onClick={() => actions.openTeamModels()}>
+                      Change its model in Team models
+                    </button>
+                  </>
+                )}
               </p>
             ) : (
             <>

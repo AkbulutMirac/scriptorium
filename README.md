@@ -64,7 +64,7 @@ flowchart LR
 
 | Member | Runs on | Good at | Can it touch files? |
 |---|---|---|---|
-| **Builder** | Claude Code on DeepSeek V4 Pro, cheap | Building a planned feature or fix end to end: reads the code, writes it, runs the tests, fixes, reports | Only inside the project folder, and it can only run the test commands Claude allows |
+| **Builder** | Claude Code on DeepSeek V4 Pro (or Flash), cheap | Building a planned feature or fix end to end: reads the code, writes it, runs the tests, fixes, reports | Only inside the project folder, and it can only run the test commands Claude allows |
 | **DeepSeek** Flash / Pro | DeepSeek API, cheap | One self-contained file, summaries, classification; Flash reads images | Writes one file Claude names, nothing else |
 | **Local workers** | Ollama on your GPU, free | Short jobs and anything confidential | No |
 | **Haiku** | Your Claude subscription | Searching and reading the codebase | Yes |
@@ -85,7 +85,7 @@ flowchart LR
 
 You can always name the way yourself ("do it yourself", "use the team", "have it reviewed"). **Every helper ends with a report**, which is its answer to Claude: the builder's says what changed and how the tests went, the reviewer's ends with a verdict (Approve / Changes needed) and must fix, should fix and nits at `file:line`. The **?** button in the top bar shows the three ways in short.
 
-The specialists are plain Claude Code agent files in [`agents/`](agents), easy to read and change.
+The specialists are plain Claude Code agent files in [`agents/`](agents), easy to read and change. The models in the table are the defaults: **Settings → Team models** (or **Models…** in the Team list under the office) picks another Claude model for each specialist, and Pro or Flash and the thinking level for the builder. It shows each default next to the choice, and changes apply to new chats and builds.
 
 **Security skill:** the security specialist loads Cloudflare's [security-audit skill](https://github.com/cloudflare/security-audit-skill) when it is installed, and falls back to general secure-coding checks when it isn't. To install it for all projects:
 
@@ -111,16 +111,18 @@ sequenceDiagram
     B->>B: read and edit files, run the test command
   end
   B->>S: report
-  S->>S: rerun the test commands, list the files it wrote
+  S->>S: add the last real run of each test command, list the files it wrote
   S->>C: report + real test results
   C->>C: reads the report, opens code only where something failed
 ```
 
-What keeps it safe:
+What keeps it safe, and what doesn't:
 
 - **No Claude login:** the session starts with a fresh environment (only paths and system basics), the DeepSeek key as its API key and its own empty config folder. Your Claude credentials and settings never reach it.
-- **Locked to the folder:** reading and writing work only inside the project folder (links are followed and checked too); `.env` files are off limits.
-- **Only the test commands:** the shell runs nothing but the exact commands Claude passed. There is no network and there are no other tools. It never commits.
+- **File tools locked to the folder:** reading and writing work only inside the project folder (links are followed and checked too). `.env` files are off limits, and so are `.git`, `.claude`, `.vscode`, `.husky` and `.github`, whose files run outside the tests.
+- **Only the test commands:** the shell runs nothing but the exact commands Claude passed; there are no other tools and it never commits. In Scriptorium's own chats a `build` call follows the chat's permission mode, so in "Ask" mode you see the test commands before it starts.
+- **The test commands run code the builder wrote.** Where Claude Code has a sandbox, they run in it: no network, writes only inside the project, the API key hidden. Windows has no sandbox for them yet, so there they run with your user's rights; the report says which. Keep untrusted projects away from the builder.
+- **Real test results:** the report carries the last run of each test command as the shell returned it, flagged when files changed after it. Scriptorium doesn't run them again itself.
 - **Limits:** 80 turns and 30 minutes per job, and one build per folder at a time.
 
 The report has a fixed shape (Result, Changed, Tests, Failures, Look at, Open), so Claude can read it instead of the code. The builder's instructions are in [`agents/builder.md`](agents/builder.md). While it works, DeepSeek Pro sits at a desk in the office, and its report is kept in DeepSeek Pro's history under "From Claude".
@@ -254,11 +256,13 @@ Design notes: [docs/PLAN.md](docs/PLAN.md)
 
 ## Security
 
-- The backend listens only on this computer (`127.0.0.1`). The WebSocket, MCP and hook endpoints accept requests only from this computer and the app's own origins, so other sites in your browser can't control Claude or the workers.
-- API keys live only in `.env`, never go into the repo and are never sent back to the UI.
-- In "Ask every time" mode, Claude's commands and file changes wait for your approval in the UI.
+- The backend listens only on this computer (`127.0.0.1`). The WebSocket, MCP and hook endpoints accept requests only from this computer and the app's own origins, so other sites in your browser can't control Claude or the workers. The Vite dev server's address (port 5173) is trusted only while developing (`npm run dev`).
+- API keys live only in `.env`, never go into the repo and are never sent back to the UI. Commands Claude runs in Scriptorium's chats don't get the DeepSeek key in their environment.
+- In "Ask every time" mode, Claude's commands and file changes wait for your approval in the UI, and so do the worker tools that run commands or write files (`build`, a worker writing a file, QA runs). Only `list_workers` and `job_status` run without asking. Worker tools only work inside the chat's folder.
 - Data sent to DeepSeek goes to DeepSeek's servers, and that includes the code the builder reads. For confidential tasks use `sensitive: true` and a local worker.
-- The builder runs without your Claude login, only inside the project folder and only with the test commands Claude allows (see [How the builder works](#how-the-builder-works)). Those test commands run code the builder wrote, with your user's rights and without a sandbox; review the report when it touches anything sensitive.
+- The builder runs without your Claude login and its file tools stay in the project folder (see [How the builder works](#how-the-builder-works)). Its test commands run code it wrote, sandboxed where Claude Code has a sandbox and with your user's rights on Windows; review the report when it touches anything sensitive.
+- The QA browser only opens local or private addresses (checked again after every redirect) and won't click buttons like send, delete or sign in, also when it clicks by position.
+- [docs/security-audit.md](docs/security-audit.md) is the latest audit, with what was fixed and what is still open.
 
 ## License
 

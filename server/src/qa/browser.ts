@@ -1,5 +1,6 @@
 import { chromium } from "playwright-core";
 import type { Browser } from "playwright-core";
+import { isLocalQaHost } from "./hosts.js";
 import { VIEWPORTS } from "./types.js";
 import type {
   Observation,
@@ -57,6 +58,12 @@ export async function openSession(
       hasTouch: vp.hasTouch,
       deviceScaleFactor: 1,
       colorScheme: theme,
+    });
+    // Pages may only be opened on local addresses, also after a redirect or a click on a link
+    await context.route("**/*", (route) => {
+      const req = route.request();
+      if (req.isNavigationRequest() && !isLocalQaHost(new URL(req.url()).hostname)) return route.abort("blockedbyclient");
+      return route.continue();
     });
 
     // tsx/esbuild adds __name() calls to functions sent to page.evaluate; the page has no such helper

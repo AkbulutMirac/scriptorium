@@ -1,5 +1,4 @@
 import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type ModelUsage } from "@anthropic-ai/claude-agent-sdk";
-import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -15,15 +14,17 @@ import { saveDelegatedTask } from "./workerChats.js";
  * with one tool call; it reads the project, writes the change, runs the tests, fixes until they pass and
  * reports. The read-edit-test loop then costs DeepSeek tokens instead of Claude's.
  *
- * It is locked down: its process never sees Claude's login (fresh environment, empty config folder), it can only
- * read and write inside the project folder, and the only shell commands it can run are the exact test commands
- * Claude passed.
+ * Its process never sees Claude's login (fresh environment, empty config folder), its file tools only reach the
+ * project folder, and the only shell commands it can run are the exact test commands Claude passed. Those commands
+ * run code the builder wrote, though: in Claude Code's sandbox where there is one, otherwise with the user's rights.
  */
 
 const DEEPSEEK_ANTHROPIC_URL = "https://api.deepseek.com/anthropic";
 const MAX_TURNS = 80;
 const MAX_MS = 30 * 60_000;
-const TEST_TIMEOUT_MS = 5 * 60_000;
+
+/** What the builder runs on unless the user picks otherwise (Settings → Team models) */
+export const BUILDER_DEFAULTS = { worker: "deepseek-pro", thinking: "low" } as const;
 
 /**
  * DeepSeek takes Claude model names: claude-opus* runs on deepseek-v4-pro, everything else on deepseek-flash
@@ -65,6 +66,8 @@ function sessionEnv(configDir: string): Record<string, string> {
     CLAUDE_CONFIG_DIR: configDir,
     // No update checks, telemetry or error reports to Anthropic
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    // The test commands don't see the API key (Claude Code removes it from its subprocesses)
+    CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1",
   };
 }
 
@@ -72,8 +75,24 @@ function sessionEnv(configDir: string): Record<string, string> {
 // What the session may do
 
 const TOOLS = ["Read", "Grep", "Glob", "Edit", "Write", "Bash"];
-/** .env files hold secrets; .env.example is a template and fine to read */
-const SECRET_FILE = /^\.env(\..+)?$/i;
+
+/**
+ * .env files hold secrets (.env.example is a template and fine). Windows opens ".env.", ".env " and ".env::$DATA"
+ * as the same file, so the name is normalized first.
+ */
+function isSecretPath(p: unknown): boolean {
+  if (typeof p !== "string" || !p) return false;
+  const name = path.basename(p).replace(/:.*$/, "").replace(/[. ]+$/, "").toLowerCase();
+  return /^\.env(\..+)?$/.test(name) && !name.endsWith(".example");
+}
+
+/** Folders whose files run outside the test command (git hooks, Claude Code and editor settings, CI) */
+const PROTECTED_DIRS = new Set([".git", ".claude", ".vscode", ".husky", ".github"]);
+const inProtectedDir = (root: string, p: string) =>
+  path
+    .relative(root, path.resolve(root, p))
+    .split(/[\\/]/)
+    .some((part) => PROTECTED_DIRS.has(part.replace(/[. ]+$/, "").toLowerCase()));
 
 function within(root: string, abs: string): boolean {
   const rel = path.relative(root, abs);
@@ -94,22 +113,26 @@ function inside(root: string, realRoot: string, p: unknown): boolean {
   }
 }
 
-type Policy = { root: string; realRoot: string; commands: string[] };
+export type Policy = { root: string; realRoot: string; commands: string[] };
 
-/** Returns why the call is refused, or undefined if it may run */
-function refuse(policy: Policy, tool: string, input: Record<string, unknown>): string | undefined {
+/** Returns why the call is refused, or undefined if it may run (exported for checks) */
+export function refuse(policy: Policy, tool: string, input: Record<string, unknown>): string | undefined {
   const outside = `Only files inside ${policy.root} are available.`;
   switch (tool) {
     case "Read":
     case "Edit":
     case "Write": {
       if (!inside(policy.root, policy.realRoot, input.file_path)) return outside;
-      if (SECRET_FILE.test(path.basename(String(input.file_path))) && !/\.example$/i.test(String(input.file_path))) return ".env files are off limits.";
+      if (isSecretPath(input.file_path)) return ".env files are off limits.";
+      if (tool !== "Read" && inProtectedDir(policy.root, String(input.file_path))) {
+        return `Files under ${[...PROTECTED_DIRS].join(", ")} can't be changed: they run outside the tests.`;
+      }
       return undefined;
     }
     case "Grep":
     case "Glob": {
       if (input.path !== undefined && !inside(policy.root, policy.realRoot, input.path)) return outside;
+      if (isSecretPath(input.path)) return ".env files are off limits.";
       const pattern = String(input.pattern ?? "");
       if (tool === "Glob" && (path.isAbsolute(pattern) || pattern.split(/[\\/]/).includes(".."))) return outside;
       return undefined;
@@ -125,50 +148,33 @@ function refuse(policy: Policy, tool: string, input: Record<string, unknown>): s
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Checking the result: Scriptorium reruns the test commands itself
+// Sandbox. The test commands run code the builder wrote. Where Claude Code has a sandbox, they run in it: no
+// network, writes only inside the project, and the API key hidden. Windows has none yet (the SDK reports it as
+// unavailable), so there they run with the user's rights, and the report says so.
 
-/** Git Bash on Windows (the shell the session's Bash tool uses), so commands behave the same in both places */
-function findBash(): string | undefined {
-  if (process.platform !== "win32") return "/bin/sh";
-  if (process.env.CLAUDE_CODE_GIT_BASH_PATH && existsSync(process.env.CLAUDE_CODE_GIT_BASH_PATH)) return process.env.CLAUDE_CODE_GIT_BASH_PATH;
-  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
-    if (!existsSync(path.join(dir, "git.exe"))) continue;
-    for (const up of ["..", path.join("..", "..")]) {
-      const bash = path.resolve(dir, up, "bin", "bash.exe");
-      if (existsSync(bash)) return bash;
-    }
-  }
-  return undefined;
+const SANDBOX_UNAVAILABLE = /sandbox required but unavailable/i;
+/** Unknown until the first build has tried it */
+let sandboxAvailable: boolean | undefined;
+
+function sandboxFor(root: string) {
+  return {
+    enabled: true,
+    failIfUnavailable: true,
+    allowUnsandboxedCommands: false,
+    network: { allowedDomains: [], strictAllowlist: true },
+    filesystem: { allowWrite: [root] },
+    credentials: { envVars: [{ name: "ANTHROPIC_API_KEY", mode: "deny" as const }] },
+  };
 }
 
-type TestRun = { command: string; code: number | null; tail: string };
+/** The last run of a test command in the session, as the shell returned it (not the builder's account of it) */
+type TestRun = { failed: boolean; output: string; seq: number };
 
-function runCommand(command: string, cwd: string): Promise<TestRun> {
-  return new Promise((resolve) => {
-    const bash = findBash();
-    // Same clean environment as the session, without the DeepSeek key
-    const child = bash
-      ? spawn(bash, ["-c", command], { cwd, env: baseEnv(), windowsHide: true })
-      : spawn(command, { cwd, env: baseEnv(), shell: true, windowsHide: true });
-    let out = "";
-    const add = (d: Buffer) => {
-      out = (out + d.toString("utf8")).slice(-20_000);
-    };
-    child.stdout.on("data", add);
-    child.stderr.on("data", add);
-    const timer = setTimeout(() => child.kill(), TEST_TIMEOUT_MS);
-    const done = (code: number | null) => {
-      clearTimeout(timer);
-      const lines = out.trimEnd().split(/\r?\n/);
-      resolve({ command, code, tail: lines.slice(code === 0 ? -6 : -40).join("\n") });
-    };
-    child.on("close", done);
-    child.on("error", (err) => {
-      out += `\n${err.message}`;
-      done(null);
-    });
-  });
-}
+/** Text of a tool result block */
+const resultText = (content: unknown): string =>
+  typeof content === "string" ? content : Array.isArray(content) ? content.map((c) => (c as { text?: string })?.text ?? "").join("\n") : "";
+
+const tail = (text: string, lines: number) => text.trimEnd().split(/\r?\n/).slice(-lines).join("\n");
 
 // ---------------------------------------------------------------------------------------------------------------
 
@@ -271,6 +277,11 @@ export async function runBuild(args: {
     let stopped = "";
     let turns = 0;
     let usage: Record<string, ModelUsage> = {};
+    // Order of the allowed tool calls, so a test run can be told apart from files changed after it
+    let seq = 0;
+    let lastWrite = 0;
+    const pendingRuns = new Map<string, { command: string; seq: number }>();
+    const runs = new Map<string, TestRun>();
 
     // The hook sees every tool call, also the ones Claude Code would allow without asking (reads inside the folder)
     const guard: HookCallbackMatcher = {
@@ -283,7 +294,9 @@ export async function runBuild(args: {
           setRequestTask(req, `Build: ${title} · ${activity(input.tool_name, toolInput, root)}`);
           if ((input.tool_name === "Edit" || input.tool_name === "Write") && typeof toolInput.file_path === "string") {
             written.add(path.relative(root, path.resolve(root, toolInput.file_path)).replaceAll("\\", "/"));
+            lastWrite = ++seq;
           }
+          if (input.tool_name === "Bash") pendingRuns.set(input.tool_use_id, { command: String(toolInput.command ?? "").trim(), seq: ++seq });
           return {};
         },
       ],
@@ -294,7 +307,7 @@ export async function runBuild(args: {
       return why ? { behavior: "deny", message: why } : { behavior: "allow", updatedInput: input };
     };
 
-    try {
+    const runSession = async (sandboxed: boolean) => {
       const q = query({
         prompt,
         options: {
@@ -314,6 +327,7 @@ export async function runBuild(args: {
           hooks,
           canUseTool,
           abortController: abort,
+          ...(sandboxed ? { sandbox: sandboxFor(root) } : {}),
         },
       });
       for await (const msg of q) {
@@ -322,13 +336,37 @@ export async function runBuild(args: {
           const text = (msg.message.content as { type: string; text?: string }[]).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
           if (text) report = text;
         }
+        // The shell's own answer to each test run
+        if (msg.type === "user" && Array.isArray(msg.message.content)) {
+          for (const block of msg.message.content as { type: string; tool_use_id?: string; content?: unknown; is_error?: boolean }[]) {
+            const run = block.type === "tool_result" ? pendingRuns.get(block.tool_use_id ?? "") : undefined;
+            if (!run) continue;
+            const output = resultText(block.content);
+            runs.set(run.command, { failed: !!block.is_error || /^(Error: )?Exit code [1-9]/m.test(output), output, seq: run.seq });
+          }
+        }
         if (msg.type === "result") {
+          const errors = "errors" in msg && Array.isArray(msg.errors) ? msg.errors.join(" ") : "";
+          if (SANDBOX_UNAVAILABLE.test(errors)) throw new Error(errors);
           usage = msg.modelUsage ?? {};
           turns = msg.num_turns || turns;
           // The model tends to copy the report template's code fence
           if (msg.subtype === "success") report = (msg.result || report).replace(/```\w*\n(Result:[\s\S]*?)\n```/, "$1");
           else stopped = msg.subtype === "error_max_turns" ? `turn limit (${MAX_TURNS}) reached` : msg.subtype;
         }
+      }
+    };
+
+    let sandboxed = sandboxAvailable !== false;
+    try {
+      try {
+        await runSession(sandboxed);
+        if (sandboxed) sandboxAvailable = true;
+      } catch (err) {
+        // No sandbox on this computer (Windows today): remember it and run without one
+        if (!sandboxed || !SANDBOX_UNAVAILABLE.test(err instanceof Error ? err.message : String(err))) throw err;
+        sandboxAvailable = sandboxed = false;
+        await runSession(false);
       }
     } catch (err) {
       stopped = abort.signal.aborted ? `time limit (${MAX_MS / 60_000} min) reached` : err instanceof Error ? err.message : String(err);
@@ -337,19 +375,24 @@ export async function runBuild(args: {
       await rm(configDir, { recursive: true, force: true }).catch(() => {});
     }
 
-    setRequestTask(req, `Build: ${title} · checking the tests`);
-    const checks: TestRun[] = [];
-    for (const c of commands) checks.push(await runCommand(c, root));
-
     const totals = Object.values(usage).reduce(
       (t, u) => ({ input: t.input + u.inputTokens + u.cacheReadInputTokens + u.cacheCreationInputTokens, cached: t.cached + u.cacheReadInputTokens, output: t.output + u.outputTokens }),
       { input: 0, cached: 0, output: 0 },
     );
+    const checks = commands.map((c) => {
+      const run = runs.get(c);
+      if (!run) return `- \`${c}\`: not run in the session`;
+      const after = run.seq < lastWrite ? " (files changed after this run, so it doesn't cover them)" : "";
+      return `- \`${c}\`: ${run.failed ? "FAILED" : "passed"} in its last run${after}\n\`\`\`\n${tail(run.output, run.failed ? 40 : 6).replaceAll("```", "'''")}\n\`\`\``;
+    });
     const lines = [
       stopped ? `Result: Stopped (${stopped}). The builder's last words:\n${report || "(none)"}` : report || "Result: Blocked\nOpen: the builder ended without a report.",
       "",
-      "Checked by Scriptorium after the session:",
-      ...checks.map((c) => `- \`${c.command}\`: ${c.code === 0 ? "passed" : `FAILED (exit ${c.code ?? "none"})`}\n\`\`\`\n${c.tail.replaceAll("```", "'''")}\n\`\`\``),
+      "Checked by Scriptorium: the last run of each test command in the session, as the shell returned it:",
+      ...checks,
+      sandboxed
+        ? "Sandbox: on (the test commands had no network and could only write inside the project)"
+        : "Sandbox: off (not available on this computer): the test commands ran code the builder wrote, with your user's rights",
       `Files the builder wrote: ${written.size ? [...written].join(", ") : "none"}`,
       `Session: ${worker.model}, ${turns} turns, ${Math.round((Date.now() - started) / 1000)}s, input ${k(totals.input)} (cached ${k(totals.cached)}), output ${k(totals.output)}`,
     ];

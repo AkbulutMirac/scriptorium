@@ -11,6 +11,7 @@ import { SceneOverlay } from "./components/SceneOverlay";
 import { TopBar } from "./components/TopBar";
 import { SetupModal } from "./components/SetupModal";
 import { WorkerModal } from "./components/WorkerModal";
+import { TeamModelsModal } from "./components/TeamModelsModal";
 import { Drawer } from "./components/Drawer";
 import { MobileTabs } from "./components/MobileTabs";
 import { actions, CLAUDE_ID, useApp } from "./store";
@@ -107,6 +108,7 @@ export default function App() {
       </div>
       {mobile && <MobileTabs />}
       <WorkerModal />
+      <TeamModelsModal />
       <SetupModal />
       <FolderPicker />
     </div>

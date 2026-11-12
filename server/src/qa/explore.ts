@@ -485,8 +485,26 @@ Call exactly one action tool, plus report_issue for every real problem you see.`
           onProgress(`Step ${step}/${maxSteps} · ${log}`);
           continue;
         }
+        // The same do-not-click rule as for refs, applied to whatever is at that point
+        const target = await session.page
+          .evaluate(
+            ([px, py]) => {
+              let el = document.elementFromPoint(px, py) as HTMLElement | null;
+              while (el && !el.matches("a,button,input,select,textarea,summary,[role],[onclick],[tabindex]")) el = el.parentElement;
+              return el ? (el.getAttribute("aria-label") || el.textContent || (el as HTMLInputElement).value || el.title || "").trim().slice(0, 120) : "";
+            },
+            [x, y] as [number, number],
+          )
+          .catch(() => "");
+        if (target && deny.test(target)) {
+          const log = `blocked: click at (${x},${y}) on "${target}" (denied)`;
+          actionLog.push(log);
+          stepsTaken = step;
+          onProgress(`Step ${step}/${maxSteps} · ${log}`);
+          continue;
+        }
         action = { kind: "click_xy", x, y };
-        label = `click at (${x},${y})`;
+        label = `click at (${x},${y})${target ? ` on "${target}"` : ""}`;
       } else if (actionName === "back") {
         action = { kind: "back" };
         label = "go back";

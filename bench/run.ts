@@ -169,7 +169,7 @@ function historyFor(workspace: string, since: number): { builds: Build[]; report
     const { prompt: input, completion: output, cacheHit: cached = 0 } = answer.usage;
     const p = DEEPSEEK_PRICE[answer.model ?? ""] ?? DEEPSEEK_PRICE["deepseek-v4-pro"];
     const usd = (((input - cached) * p.miss + cached * p.hit + output * p.out) / 1e6) * (isPeak(new Date(chat.updatedAt)) ? 2 : 1);
-    builds.push({ model: answer.model ?? "?", turns: Number(m?.[1] ?? 0), seconds: Number(m?.[2] ?? 0), input, cached, output, usd, checksPassed: !/: FAILED \(exit/.test(answer.content) });
+    builds.push({ model: answer.model ?? "?", turns: Number(m?.[1] ?? 0), seconds: Number(m?.[2] ?? 0), input, cached, output, usd, checksPassed: !/`: (FAILED|not run)/.test(answer.content) });
   }
   return { builds, reports };
 }

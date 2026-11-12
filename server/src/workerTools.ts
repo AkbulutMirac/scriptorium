@@ -7,7 +7,8 @@ import { isAvailable, supportsVision } from "./llm.js";
 import type { WorkerCaller } from "./protocol.js";
 import { listRequests } from "./requests.js";
 import { runWorkerTask } from "./workerTasks.js";
-import { claimFolder, runBuild } from "./builder.js";
+import { BUILDER_DEFAULTS, claimFolder, runBuild } from "./builder.js";
+import { getTeamSettings } from "./teamSettings.js";
 import { checkQaUrl, pickQaWorker, runQaExplore, runQaSweep } from "./qa/run.js";
 
 /** The Claude session calling the tool: the folder file paths are relative to, and the name shown in the 3D office */
@@ -67,22 +68,31 @@ const taskArgs = {
 };
 type TaskArgs = { worker_id: string; task: string; files?: string[]; project_dir?: string; sensitive?: boolean; output_file?: string; thinking?: "low" | "high" | "max" };
 
-/** Uses project_dir if given and sets the 3D office name to the folder name */
-function withProjectDir(ctx: ToolCtx, projectDir?: string): ToolCtx {
+/**
+ * Uses project_dir if given and sets the 3D office name to the folder name. When the session's folder is known,
+ * project_dir has to be that folder or inside it: a tool call can't reach the rest of the computer.
+ */
+function withProjectDir(ctx: ToolCtx, projectDir?: string): ToolCtx | string {
   if (!projectDir) return ctx;
+  if (ctx.cwd) {
+    const rel = path.relative(path.resolve(ctx.cwd), path.resolve(projectDir));
+    if (rel.startsWith("..") || path.isAbsolute(rel)) return `project_dir must be this session's folder (${ctx.cwd}) or a folder inside it.`;
+  }
   return { cwd: projectDir, caller: { ...ctx.caller, label: path.basename(projectDir) || ctx.caller.label } };
 }
 
 /**
- * readOnlyHint: the tools don't change the user's files, so Claude Code may run them concurrently.
- * Without it, ask_worker calls sent in parallel run one after another (and only one worker shows up in the office).
+ * readOnlyHint only where it is true (list_workers, job_status). Claude Code runs tools marked read-only
+ * concurrently and may allow them in read-only modes; the others change files or run commands.
  */
-export const WORKER_TOOL_ANNOTATIONS = { readOnlyHint: true, openWorldHint: true };
+export const isReadOnlyTool = (t: object) => "readOnly" in t && t.readOnly === true;
+export const toolAnnotations = (t: object) => ({ readOnlyHint: isReadOnlyTool(t), openWorldHint: true });
 
 /** The four worker tools. The same in both Scriptorium sessions (in-SDK) and other Claude Code sessions (HTTP). */
 export const WORKER_TOOLS = [
   {
     name: "list_workers",
+    readOnly: true,
     description:
       "Lists worker models (DeepSeek, local LLMs) with descriptions: whether they are currently reachable, how many jobs they are running, how many are queued.",
     schema: {},
@@ -120,6 +130,7 @@ export const WORKER_TOOLS = [
       const worker = await pickWorker(args.worker_id, args.sensitive);
       if (typeof worker === "string") return fail(worker);
       const c = withProjectDir(ctx, args.project_dir);
+      if (typeof c === "string") return fail(c);
       try {
         return ok(await runWorkerTask({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller, outputFile: args.output_file, thinking: args.thinking }));
       } catch (err) {
@@ -136,6 +147,7 @@ export const WORKER_TOOLS = [
       const worker = await pickWorker(args.worker_id, args.sensitive);
       if (typeof worker === "string") return fail(worker);
       const c = withProjectDir(ctx, args.project_dir);
+      if (typeof c === "string") return fail(c);
       const job = startJob({ worker, task: args.task, files: args.files, cwd: c.cwd, caller: c.caller, outputFile: args.output_file, thinking: args.thinking });
       return ok(`Job started. Job number: ${job.id}. Ask for the result with job_status.`);
     },
@@ -145,10 +157,11 @@ export const WORKER_TOOLS = [
     description: [
       "Hands a coding job to the builder: a headless Claude Code session in project_dir that runs on DeepSeek.",
       "It reads the code, writes the change (and tests, if the task asks), runs the test commands and fixes until they pass, then returns a short report: Result, Changed, Tests, Failures, Look at, Open.",
-      "Scriptorium then reruns the test commands itself and adds their real outcome and the list of files the builder wrote, so you don't need to rerun or reread what passed.",
+      "Scriptorium adds the last real run of each test command in the session (the shell's own output, flagged if files changed after it) and the list of files the builder wrote, so you don't need to rerun or reread what passed.",
       "The builder starts with no context but can read the project, and in sessions with Scriptorium's hooks it also gets the user's latest message word for word.",
       "In task, give it what that message doesn't say: your plan and decisions, the spec if it came earlier in the conversation (exact names, messages, formats, edge cases), and whether to add tests.",
-      "It can only read and write inside project_dir and run exactly the test_commands: no network, no other commands, no commits. Not for confidential code: it goes to DeepSeek.",
+      "Its file tools only reach project_dir (not .env files, not .git, .claude, .vscode, .husky or .github), and its shell runs exactly the test_commands, no others. Those run code the builder wrote: in Claude Code's sandbox where there is one (no network, writes only in project_dir), otherwise with the user's rights; the report says which.",
+      "No commits. Not for confidential code: it goes to DeepSeek.",
       "One build per folder at a time: a second one in the same folder is refused until the first has finished.",
       "Waits until the job is done (usually a few minutes), which is the cheapest way to wait: just call it and read the report.",
       "Use background: true only when you have other work to do meanwhile; it returns a job id, and job_status gives the report.",
@@ -160,10 +173,10 @@ export const WORKER_TOOLS = [
         .array(z.string())
         .min(1)
         .max(5)
-        .describe('Exact shell commands the builder may run, e.g. ["npm test"]. It can run nothing else. Scriptorium reruns them at the end to check the result.'),
+        .describe('Exact shell commands the builder may run, e.g. ["npm test"]. It can run nothing else. Only test or check commands: they run code from the project.'),
       files: z.array(z.string()).optional().describe("Files to read first, relative to project_dir"),
-      worker_id: z.string().optional().describe('"deepseek-pro" (default, stronger) or "deepseek" (Flash: cheaper, for easy jobs)'),
-      thinking: z.enum(["low", "high", "max"]).optional().describe('How hard the builder thinks. Default "low"; "high" for a genuinely hard problem.'),
+      worker_id: z.string().optional().describe('"deepseek-pro" (stronger) or "deepseek" (Flash: cheaper, for easy jobs). Leave it out to use the user\'s setting (DeepSeek Pro unless changed).'),
+      thinking: z.enum(["low", "high", "max"]).optional().describe('How hard the builder thinks. Leave it out to use the user\'s setting ("low" unless changed); "high" for a genuinely hard problem.'),
       background: z.boolean().optional().describe("true: return a job id right away instead of waiting"),
       user_request: z.string().optional().describe("Filled in by Scriptorium with the user's latest message. Leave it out."),
     },
@@ -180,14 +193,17 @@ export const WORKER_TOOLS = [
       },
       ctx: ToolCtx,
     ): Promise<ToolResult> => {
-      const worker = await findWorker(args.worker_id ?? "deepseek-pro");
-      if (!worker || worker.provider !== "deepseek") return fail(`The builder runs on a DeepSeek worker; ${args.worker_id} isn't one. Use "deepseek-pro" or "deepseek".`);
+      const chosen = getTeamSettings().builder;
+      const thinking = args.thinking ?? chosen.thinking ?? BUILDER_DEFAULTS.thinking;
+      const worker = await findWorker(args.worker_id ?? chosen.worker ?? BUILDER_DEFAULTS.worker);
+      if (!worker || worker.provider !== "deepseek") return fail(`The builder runs on a DeepSeek worker; ${args.worker_id ?? chosen.worker} isn't one. Use "deepseek-pro" or "deepseek".`);
       const c = withProjectDir(ctx, args.project_dir);
+      if (typeof c === "string") return fail(c);
       // Claimed right here, so even two calls sent at the same moment can't both start
       const release = claimFolder(args.project_dir);
       if (typeof release === "string") return fail(release);
       const run = () =>
-        runBuild({ worker, task: args.task, userRequest: args.user_request, projectDir: args.project_dir, testCommands: args.test_commands, files: args.files, thinking: args.thinking, caller: c.caller }).finally(release);
+        runBuild({ worker, task: args.task, userRequest: args.user_request, projectDir: args.project_dir, testCommands: args.test_commands, files: args.files, thinking, caller: c.caller }).finally(release);
       if (args.background) {
         const job = startJob({ worker, task: `Build: ${args.task.split("\n")[0].slice(0, 80)}`, caller: c.caller, run });
         return ok(`Build started (job ${job.id}). Ask job_status with job_id "${job.id}" for the report.`);
@@ -201,6 +217,7 @@ export const WORKER_TOOLS = [
   },
   {
     name: "job_status",
+    readOnly: true,
     description:
       "Returns a background job's result. If the job is still running, it first waits up to 4 minutes for it to finish, so there's no need to sleep or poll in between: just call it again if it is still running. If job_id is not given, lists recent jobs.",
     schema: { job_id: z.string().optional().describe("Job number returned by start_job, build or a QA tool") },
@@ -333,7 +350,7 @@ export function createWorkerServer(ctx: ToolCtx) {
     instructions: WORKER_INSTRUCTIONS,
     tools: WORKER_TOOLS.map((t) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tool(t.name, t.description, t.schema, (args: any) => t.handler(args, ctx), { alwaysLoad: true, annotations: WORKER_TOOL_ANNOTATIONS }),
+      tool(t.name, t.description, t.schema, (args: any) => t.handler(args, ctx), { alwaysLoad: true, annotations: toolAnnotations(t) }),
     ),
   });
 }
